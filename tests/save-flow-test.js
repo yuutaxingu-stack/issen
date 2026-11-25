@@ -91,11 +91,11 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   ok(/アカウントに保存中/.test((await st(p1)).meta), 'タイトルに「アカウントに保存中」');
 
   console.log('--- 勝ちの銭はサーバーが数える');
-  await p1.evaluate(() => { WALLET.coins += 20; recordWin(0, '明鏡止水', 20); });
+  await p1.evaluate(() => { WALLET.coins += 60; recordWin(0, '明鏡止水', 60); });
   await p1.waitForFunction(() => IssenSave.status().pending === 0, null, { timeout: 10000 });
   v = server(A); s = await st(p1);
-  ok(v.coins === 77 && s.coins === 77 && v.rec.ruri['明鏡止水'] === 1, '明鏡止水で +20（サーバー ' + v.coins + '）');
-  ok(server(A) && JSON.parse(sql("select coalesce(day_coins,0) from public.saves where id = :'id'", { id: USERS[A] })) === 20, '今日の銭として数えている');
+  ok(v.coins === 117 && s.coins === 117 && v.rec.ruri['明鏡止水'] === 1, '明鏡止水で +60（サーバー ' + v.coins + '）');
+  ok(server(A) && JSON.parse(sql("select coalesce(day_coins,0) from public.saves where id = :'id'", { id: USERS[A] })) === 60, '今日の銭として数えている');
 
   console.log('--- ガチャはサーバーが引く');
   await p1.click('#m_gacha'); await p1.waitForTimeout(300);
@@ -105,7 +105,7 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   v = server(A); s = await st(p1);
   const cnt = o => Object.values(o).reduce((a, b) => a + b, 0);
   ok(cnt(v.owned) === cnt(before.owned) + 1 && v.pulls === 1, '刀が1本増えた（サーバー）');
-  ok(s.coins === v.coins && v.coins <= 67 + 30 && v.coins >= 67, '銭が10減った（重なれば戻る） 画面 ' + s.coins + ' / サーバー ' + v.coins);
+  ok(s.coins === v.coins && v.coins <= 107 + 30 && v.coins >= 107, '銭が10減った（重なれば戻る） 画面 ' + s.coins + ' / サーバー ' + v.coins);
   await p1.evaluate(() => { WALLET.coins = 99999; refreshCoins(); });
   await p1.waitForFunction(() => GA.phase === 'shown' || GA.phase === 'draw', null);
   await p1.evaluate(() => { GA.phase = 'idle'; doPull(50); });
@@ -121,14 +121,14 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
 
   console.log('--- 電波が切れているあいだの勝ち');
   offline = true;
-  await p1.evaluate(() => { WALLET.coins += 1; recordWin(0, '疾風', 1); });
+  await p1.evaluate(() => { WALLET.coins += 3; recordWin(0, '疾風', 3); });
   await p1.waitForTimeout(1500);
   ok((await p1.evaluate(() => IssenSave.status().pending)) === 1, '届かなかった勝ちは端末で待つ');
   offline = false;
   const c0 = server(A).coins;
   await p1.evaluate(() => IssenSave.flush());
   await p1.waitForFunction(() => IssenSave.status().pending === 0, null, { timeout: 10000 });
-  ok(server(A).coins === c0 + 1 && (await st(p1)).coins === c0 + 1, '電波が戻ったら届いた');
+  ok(server(A).coins === c0 + 3 && (await st(p1)).coins === c0 + 3, '電波が戻ったら届いた');
 
   console.log('--- 読み込み直し（アップデート後にページを開き直すのと同じ）');
   const keep = server(A);

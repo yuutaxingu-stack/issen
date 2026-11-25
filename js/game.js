@@ -286,7 +286,7 @@ function qIns(q){ let i=inputQ.length; while(i>0&&(inputQ[i-1].t>q.t||(inputQ[i-
 const TOWIN=()=>G.mode==='cpu'?1:(G.mode==='online'&&NET.toWin)?NET.toWin:CFG.toWin;
 
 /* コインと記録（ログインしていなければこの端末に、ログイン中はアカウントに保存） */
-const COIN={'並':1,'上':3,'極':8,'幻':20,'絶':50,'分':0};
+const COIN={'並':3,'上':9,'極':24,'幻':60,'絶':150,'分':0};
 const WALLET={coins:0,best:0};
 function loadGuestWallet(){ WALLET.coins=0; WALLET.best=0;
   try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){} }

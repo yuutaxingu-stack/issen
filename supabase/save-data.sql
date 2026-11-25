@@ -37,7 +37,9 @@ create table if not exists public.finish_coins (
 
 -- ---------- 設定（schema.sql の app_config に列を足す） ----------
 alter table public.app_config add column if not exists pull_cost int not null default 10;        -- ガチャ1回の銭
-alter table public.app_config add column if not exists day_coin_cap int not null default 5000;   -- 1日に勝負で得られる銭の上限（ずる対策）
+alter table public.app_config add column if not exists day_coin_cap int not null default 15000;  -- 1日に勝負で得られる銭の上限（ずる対策）
+alter table public.app_config alter column day_coin_cap set default 15000;
+update public.app_config set day_coin_cap = 15000 where day_coin_cap = 5000;  -- 銭3倍(2026-11-26)に合わせて上限も3倍
 
 -- ---------- 一人ひとりの持ち物 ----------
 create table if not exists public.saves (
@@ -69,10 +71,10 @@ insert into public.gacha_tiers (tier, weight, dup_back) values
 on conflict (tier) do update set weight = excluded.weight, dup_back = excluded.dup_back;
 
 insert into public.finish_coins (finish, coins) values
-  ('疾風', 1), ('先の先', 1), ('隙穿ち', 1),
-  ('陽炎', 3), ('二の太刀', 3), ('止め', 3),
-  ('死中活', 8), ('流転', 8), ('紙一重', 8), ('鏡返し', 8),
-  ('明鏡止水', 20), ('一閃', 50)
+  ('疾風', 3), ('先の先', 3), ('隙穿ち', 3),
+  ('陽炎', 9), ('二の太刀', 9), ('止め', 9),
+  ('死中活', 24), ('流転', 24), ('紙一重', 24), ('鏡返し', 24),
+  ('明鏡止水', 60), ('一閃', 150)
 on conflict (finish) do update set coins = excluded.coins;
 
 -- 刀を足したときは、ここに1行足して、このファイルをもう一度実行する
@@ -226,7 +228,7 @@ begin
   -- 1日の上限
   if s.coin_day is distinct from current_date then s.coin_day := current_date; s.day_coins := 0; end if;
   select x.day_coin_cap into cap from public.app_config x where x.id = 1;
-  gain := greatest(0, least(c, coalesce(cap, 5000) - s.day_coins));
+  gain := greatest(0, least(c, coalesce(cap, 15000) - s.day_coins));
 
   cur := coalesce(s.rec -> p_katana, '{}');
   cur := jsonb_set(cur, array[p_finish], to_jsonb(coalesce((cur ->> p_finish)::bigint, 0) + 1));

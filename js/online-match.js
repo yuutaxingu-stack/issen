@@ -152,6 +152,8 @@
     if (N.onMatchUi) N.onMatchUi('idle');
   }
 
+  // ページを閉じるときは、相手にすぐ知らせる
+  window.addEventListener('pagehide', () => { const st = M.active; if (st && !st.ended && st.started) { send(st, { k: 'bye' }); } });
   N.onMatch = (id, me) => M.start(id, me);
   window.IssenMatch = M;
 })();

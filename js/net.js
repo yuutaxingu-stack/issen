@@ -197,7 +197,7 @@
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'invites', filter: 'from_id=eq.' + uid }, p => onMyInvite(p.new))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: 'a=eq.' + uid }, () => refreshFriends())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'friendships', filter: 'b=eq.' + uid }, () => refreshFriends())
-      .subscribe();
+      .subscribe(st => { if (st === 'SUBSCRIBED') { refreshFriends(); loadPendingInvite(); } });
   }
   function untilOf(inv){
     const dur = Date.parse(inv.expires_at) - Date.parse(inv.created_at);

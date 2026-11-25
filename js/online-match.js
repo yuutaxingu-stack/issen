@@ -121,8 +121,19 @@
     const { data, error } = await N.sb.rpc('report_result', { p_id: st.id, p_report: st.report });
     if (!st.reported) { st.reported = true; send(st, { k: 'rep' }); }
     if (error) return toast('結果を記録できませんでした');
-    if (data === 'done') toast('この試合を記録しました');
+    if (data === 'done') { toast('この試合を記録しました'); showRating(st); }
     else if (data === 'void') toast('二人の結果が食い違ったため、この試合は無効になりました', 6000);
+  }
+
+  // この試合で戦闘力がどう動いたかを、結果の画面に出す（ranking.sql が未実行なら何もしない）
+  async function showRating(st){
+    if (st.rated) return; st.rated = true;
+    for (let i = 0; i < 3; i++) {
+      const { data, error } = await N.sb.rpc('match_rating', { p_id: st.id });
+      if (error) return;
+      if (data) { if (I.G.mode === 'online') I.NET.rate = Object.assign({ at: performance.now() }, data); return; }
+      await new Promise(r => setTimeout(r, 800));
+    }
   }
 
   function leave(st, phase){

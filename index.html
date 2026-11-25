@@ -22,6 +22,7 @@
     <button type="button" id="m_vs" class="mb"><span class="mk">二人対戦</span><span class="ms">向かい合って一台で</span></button>
     <button type="button" id="m_gacha" class="mb"><span class="mk">刀ガチャ</span><span class="ms">刀帳</span></button>
     <button type="button" id="m_online" class="mb"><span class="mk">オンライン</span><span class="ms" id="m_online_s">フレンドと対戦</span></button>
+    <button type="button" id="m_rank" class="mb"><span class="mk">番付</span><span class="ms">フレンドと競う</span></button>
   </div>
 </div>
 <div id="gacha" hidden>
@@ -133,6 +134,22 @@
     </section>
   </div>
 </div>
+<div id="rank" hidden>
+  <div class="gwrap">
+    <div class="gtop">
+      <button type="button" id="r_back" class="gback">戻る</button>
+      <div class="otitle">番付</div>
+      <button type="button" id="r_reload" class="gback rreload" aria-label="読み直す">更新</button>
+    </div>
+    <div class="gtabs rtabs" role="tablist"><button type="button" data-tab="power" class="on">戦闘力</button><button type="button" data-tab="cpu">勝ち抜き</button><button type="button" data-tab="book">刀帳</button></div>
+    <p class="rlead" id="r_lead"></p>
+    <div class="rme" id="r_me" hidden></div>
+    <ol class="rlist" id="r_list"></ol>
+    <p class="rmsg" id="r_msg"></p>
+    <div class="ract" id="r_login" hidden><button type="button" class="gpull" id="r_go">オンラインでログイン</button></div>
+    <p class="gnote" id="r_note"></p>
+  </div>
+</div>
 <div id="o_inv" class="obar" hidden>
   <div><b id="o_invname"></b>さんから対戦の招待　<span class="osec"><span id="o_invsec"></span>秒</span></div>
   <div class="oacts"><button type="button" class="obtn pri" id="o_invok">受ける</button><button type="button" class="obtn" id="o_invno">ことわる</button></div>
@@ -151,5 +168,6 @@
 <script src="js/save-sync.js"></script>
 <script src="js/online-match.js"></script>
 <script src="js/online-ui.js"></script>
+<script src="js/ranking-ui.js"></script>
 </body>
 </html>

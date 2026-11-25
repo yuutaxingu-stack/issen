@@ -272,7 +272,7 @@ const G={mode:'title',phase:'title',round:1,cueAt:0,roundEnd:0,frozenLeft:0,fx:n
 const RUN={n:1,coins:0,newBest:false};
 const inputQ=[];
 /* オンライン対戦の出入り口（js/online-match.js が使う）。ローカルの対戦では使わない */
-const NET={me:0,seq:0,oppH:-Infinity,remoteQ:[],fightFrom:0,rng:Math.random,send:null,oppKat:'mumei',oppName:'相手',myName:'あなた',wait:'',onPhase:null,onLeave:null};
+const NET={me:0,seq:0,oppH:-Infinity,remoteQ:[],fightFrom:0,rng:Math.random,send:null,oppKat:'mumei',oppName:'相手',myName:'あなた',wait:'',onPhase:null,onLeave:null,rate:null};
 const ONLINE=()=>G.mode==='online';
 function opp(){ return P[1-NET.me]; }
 /* 相手から届いた操作（t: 合わせた時計での押した時刻、s: 何度目の決着の後か） */
@@ -298,7 +298,7 @@ function applySave(d,pend){ // アカウントの持ち物を画面に映す。p
   uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
 function useAccount(api){ ACCT=api; }
 function useGuest(){ ACCT=null; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
-window.__issen={G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT};
+window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
 function startMatch(mode,base){
@@ -310,7 +310,7 @@ function startMatch(mode,base){
 /* オンライン対戦を始める。o={me,seed,startAt,clockOff,oppKat,oppName,myName,send} */
 function startOnline(o){
   NETCLK={off:o.clockOff}; NET.me=o.me; NET.seq=0; NET.oppH=-Infinity; NET.remoteQ.length=0; NET.fightFrom=Infinity;
-  NET.rng=mulberry32(o.seed|0); NET.send=o.send||null; NET.oppKat=o.oppKat||'mumei'; NET.oppName=o.oppName||'相手'; NET.myName=o.myName||'あなた'; NET.wait='';
+  NET.rng=mulberry32(o.seed|0); NET.send=o.send||null; NET.oppKat=o.oppKat||'mumei'; NET.oppName=o.oppName||'相手'; NET.myName=o.myName||'あなた'; NET.wait=''; NET.rate=null;
   pauseWhy.clear(); pausedAt=null;
   startMatch('online',o.startAt);
 }
@@ -815,8 +815,15 @@ function drawMatch(c,now,vw){
   txt(c,on?whoName(NET.me)+' '+P[NET.me].score+' − '+P[1-NET.me].score+' '+whoName(1-NET.me):'朱 '+P[0].score+' − '+P[1].score+' 藍',VW/2,VH*0.28+big*0.72+sl*2,sl*1.3,UIF,PALE,'center',a);
   const hist=G.history.map((h,i)=>kn(i+1)+'本目 '+h.name+(h.winner==null?'':'（'+(on?whoName(h.winner):COL[h.winner].name)+'）')).join('　');
   c.save(); let hs=sl; c.font=hs+'px '+UIF; while(c.measureText(hist).width>VW-24&&hs>8){ hs-=1; c.font=hs+'px '+UIF; } c.restore();
-  txt(c,hist,VW/2,VH*0.28+big*0.72+sl*4,hs,UIF,'#cfc8b6','center',a);
-  if(e>1200) txt(c,'画面をタップでタイトルへ',VW/2,VH*0.28+big*0.72+sl*6.2,sl*1.1,UIF,PALE,'center',0.55+0.35*Math.sin(now/260));
+  const R=on?NET.rate:null, y0=VH*0.28+big*0.72;
+  if(R){ // 戦闘力の増減（サーバーが計算した値）
+    const ra=a*clamp((performance.now()-(R.at||0))/600,0,1), up=R.delta>0, dn=R.delta<0;
+    const d=R.counted?(up?'＋':dn?'−':'±')+Math.abs(R.delta):'同じ相手とは一日五戦まで';
+    const sk=R.counted&&R.streak>=2?'　'+kn(R.streak)+'連勝':'';
+    txt(c,'戦闘力　'+R.before+'　→　'+R.after+'　'+d+sk,VW/2,y0+sl*3.3,sl*1.15,UIF,up?'#e8c35a':dn?'#b9b29e':PALE,'center',ra);
+  }
+  txt(c,hist,VW/2,y0+sl*(R?4.7:4),hs,UIF,'#cfc8b6','center',a);
+  if(e>1200) txt(c,'画面をタップでタイトルへ',VW/2,y0+sl*(R?6.8:6.2),sl*1.1,UIF,PALE,'center',0.55+0.35*Math.sin(now/260));
 }
 /* タイトル：墨の夜の竹林、余白、縦書きの題字と朱の落款、傾けた一振り */
 let GRAIN=null, SHINE=null;
@@ -1021,13 +1028,13 @@ function advance(){
 const KEYS={a:[0,'iai'],s:[0,'mk'],l:[1,'iai'],k:[1,'mk']};
 window.addEventListener('keydown',e=>{
   if(!document.getElementById('panel').hidden||!document.getElementById('gacha').hidden||!document.getElementById('pausep').hidden) return;
-  const onl=document.getElementById('online'); if((onl&&!onl.hidden)||(e.target&&/^(INPUT|TEXTAREA|BUTTON)$/.test(e.target.tagName))) return;
+  const onl=document.getElementById('online'), rk=document.getElementById('rank'); if((onl&&!onl.hidden)||(rk&&!rk.hidden)||(e.target&&/^(INPUT|TEXTAREA|BUTTON)$/.test(e.target.tagName))) return;
   if(e.repeat) return; const k=KEYS[e.key.toLowerCase()];
   if(k&&G.mode==='online'){ ensureAudio(); press(NET.me,k[1]); }
   else if(k&&(k[0]===0||G.mode==='vs')){ ensureAudio(); press(k[0],k[1]); }
   else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); advance(); }
 });
-document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')&&!e.target.closest('#online')) e.preventDefault(); },{passive:false});
+document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')&&!e.target.closest('#online')&&!e.target.closest('#rank')) e.preventDefault(); },{passive:false});
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 

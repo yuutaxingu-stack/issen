@@ -102,11 +102,28 @@ web/
 
 ガチャの確率・重なりの銭・決着の銭を変えたときは、`save-data.sql` の同じ値も直して実行してください（`node tests/save-values-test.js` で食い違いを見つけられます）。
 
+### 番付（フレンドのランキング）と戦闘力
+タイトルの「番付」から、自分とフレンドだけの三つの番付を見られます（ログインが必要）。
+
+| 番付 | 値 |
+|---|---|
+| 戦闘力 | オンライン対戦の結果だけで動く。サーバーが計算する |
+| 勝ち抜き | CPU戦の最高記録（`saves.cpu_best`） |
+| 刀帳 | 集めた刀の種類の数（`saves.owned`） |
+
+- `supabase/ranking.sql` を SQL Editor で実行する（`schema.sql`・`save-data.sql` の後）。何度実行しても戦闘力（`ratings`）と記録（`rating_log`）は消えない
+- 戦闘力は、二人の報告が一致して確定した試合（`matches.status = 'done'`）のときだけ、データベースのトリガーが動かす。ゲームから書き込む処理はない
+- 計算: はじめ1000。期待勝率 E = 1/(1+10^((相手−自分)/400))。勝ち +32×(1−E)×連勝倍率、負け −32×E。連勝倍率は1連勝目×1.0から1勝ごとに+0.1、上限×1.5。増減は最低1、100より下がらない。同じ相手とは1日（日本時間）5戦まで数える
+- 数値は `rating_config` の表で変えられる（Table Editor で直せばすぐ反映）
+- 試合の結果画面に「戦闘力 1056 → 1074 ＋18」と出る（`match_rating`）
+
 ### テスト
 ```
 node tests/save-values-test.js    # ゲームとサーバーで刀の一覧・確率・銭が一致しているか
 sh tests/save-db-test.sh          # 手元の PostgreSQL で SQL を試す（2回実行しても持ち物が消えないか、など）
 node tests/save-flow-test.js      # 引っ越し・勝ち・ガチャ・ログアウト・2台目の端末（手元の PostgreSQL を使う）
+KEEP=1 sh tests/ranking-db-test.sh # 戦闘力の計算・1日の回数・無効試合・番付・2回実行しても消えないか
+node tests/ranking-flow-test.js <保存先> # 番付の画面と結果画面の戦闘力（上の KEEP=1 の後に）
 node tests/judge-test.js          # 決着13種がこれまで通りか
 node tests/online-sync-test.js    # 遅れをはさんだ2画面で結果が一致するか（Supabase不要）
 node tests/smoke-test.js <保存先>  # 各画面でエラーが出ないか

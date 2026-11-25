@@ -81,6 +81,7 @@ declare
   today_start timestamptz;
 begin
   if new.status <> 'done' or old.status = 'done' then return new; end if;
+  if (to_jsonb(new) ->> 'room_id') is not null then return new; end if;   -- 団体戦の試合は数えない（team.sql）
   if exists (select 1 from public.rating_log where match_id = new.id) then return new; end if;
   s := new.result -> 's';
   if jsonb_typeof(s) <> 'array' or jsonb_array_length(s) <> 2

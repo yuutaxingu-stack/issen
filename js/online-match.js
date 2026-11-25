@@ -8,6 +8,7 @@
      h      … 「この時刻までの操作は全部送った」という知らせ（0.5秒ごと）
      rep    … 結果を報告した合図
      bye    … 退出
+   どの送り物にも p（送った側 0=朱 / 1=藍）を付ける。団体戦の観戦者はこれを見て二人の動きを再生する（M.watch）。
    勝ち負けの判定は二人の端末が同じ計算で行い、最後にサーバーで結果を照らし合わせる。
    ===================================================================== */
 (function(){
@@ -18,9 +19,10 @@
 
   function toast(s, ms){ if (N.toast) N.toast(s, ms); }
 
-  M.start = async function(matchId, me){
+  /* opts（団体戦から）: { toWin: 先取本数, tag: 画面上の見出し, back: 終わりの案内, team: true, onEnd: 終わったら呼ぶ } */
+  M.start = async function(matchId, me, opts){
     if (M.active) return;
-    const st = { id: matchId, me, ch: null, timers: [], lastRecv: performance.now(), oppHello: null, seenMe: false,
+    const st = { id: matchId, me, opts: opts || {}, ch: null, timers: [], lastRecv: performance.now(), oppHello: null, seenMe: false,
                  pings: [], off: 0, started: false, startMsg: null, reported: false, ended: false, report: null };
     M.active = st;
     N.setStatus('playing');
@@ -36,7 +38,8 @@
     st.ch.on('broadcast', { event: 'm' }, ({ payload }) => recv(st, payload));
     st.ch.subscribe(s => {
       if (s === 'SUBSCRIBED') {
-        const hello = () => { if (!st.started && !(st.oppHello && st.seenMe)) send(st, { k: 'hello', name: myName, kat, seen: !!st.oppHello }); };
+        // 始まるまで送り続ける（相手がまだ部屋に入っていない間の送り物は届かないので、片方だけ止まると固まる）
+        const hello = () => { if (!st.started) send(st, { k: 'hello', name: myName, kat, seen: !!st.oppHello }); };
         hello(); st.timers.push(setInterval(hello, 600));
       } else if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') && !st.started) fail('対戦の部屋に入れませんでした');
     });
@@ -45,7 +48,7 @@
     st.timers.push(setInterval(() => tick(st), HB_MS));
   };
 
-  function send(st, msg){ if (st.ch) st.ch.send({ type: 'broadcast', event: 'm', payload: msg }).catch(() => {}); }
+  function send(st, msg){ if (st.ch) st.ch.send({ type: 'broadcast', event: 'm', payload: Object.assign({ p: st.me }, msg) }).catch(() => {}); }
 
   function recv(st, m){
     if (M.active !== st || !m) return;
@@ -101,13 +104,14 @@
     I.NET.onPhase = ph => { if (ph === 'match') report(st); };
     I.NET.onLeave = ph => leave(st, ph);
     I.startOnline({ me: st.me, seed: st.seed, startAt, clockOff: off, oppKat: o.kat || 'mumei', oppName, myName: st.myName,
-                    send: msg => send(st, msg) });
+                    toWin: st.opts.toWin, tag: st.opts.tag, back: st.opts.back, send: msg => send(st, msg) });
   }
 
   function tick(st){
     if (M.active !== st || !st.started || st.ended) return;
     const G = I.G, NET = I.NET;
     send(st, { k: 'h', h: performance.now() + (st.me === 1 ? st.off : 0) });
+    if (st.reported) { NET.wait = ''; return; }   // 決着のあとは、相手が先に画面を閉じても「切れた」とは言わない
     const silent = performance.now() - st.lastRecv;
     if (silent > DROP_MS) return end(st, '相手との通信が切れました。この試合は記録しません');
     const behind = (performance.now() + (st.me === 1 ? st.off : 0)) - NET.oppH;
@@ -121,7 +125,7 @@
     const { data, error } = await N.sb.rpc('report_result', { p_id: st.id, p_report: st.report });
     if (!st.reported) { st.reported = true; send(st, { k: 'rep' }); }
     if (error) return toast('結果を記録できませんでした');
-    if (data === 'done') { toast('この試合を記録しました'); showRating(st); }
+    if (data === 'done') { toast('この試合を記録しました'); if (!st.opts.team) showRating(st); }
     else if (data === 'void') toast('二人の結果が食い違ったため、この試合は無効になりました', 6000);
   }
 
@@ -161,6 +165,66 @@
     I.NET.onPhase = null; I.NET.onLeave = null;
     N.setStatus('online');
     if (N.onMatchUi) N.onMatchUi('idle');
+    if (st.opts.onEnd) try { st.opts.onEnd(st.id); } catch (e) { console.error(e); }
+  }
+
+  /* ---------- 観戦（団体戦）: 二人の送り物を見るだけで、同じ試合を手元で再生する ----------
+     info = { seed, toWin, names: [朱の名, 藍の名], tag, back, onEnd(reason) }
+     時計: 朱の時計で届く時刻（h・pong）から朱の今を推し量り、それより WATCH_DELAY だけ遅れて再生する */
+  const WATCH_DELAY = 1500;
+  M.watching = null;
+  M.watch = function(matchId, info){
+    if (M.active || M.watching) return false;
+    const w = { id: matchId, info, ch: null, base: null, started: false, ended: false, hello: [{}, {}], early: [], lastRecv: performance.now(), timers: [] };
+    M.watching = w;
+    w.ch = N.sb.channel('match:' + matchId, { config: { private: true, broadcast: { self: false, ack: false } } });
+    w.ch.on('broadcast', { event: 'm' }, ({ payload }) => wrecv(w, payload));
+    w.ch.subscribe(s => { if ((s === 'CHANNEL_ERROR' || s === 'TIMED_OUT') && !w.started) wend(w, 'error'); });
+    // 始まりの合図を見逃したら（途中から来た）、観戦はあきらめる
+    w.timers.push(setTimeout(() => { if (!w.started) wend(w, 'late'); }, 30000));
+    w.timers.push(setInterval(() => {
+      if (w.started && !w.ended && performance.now() - w.lastRecv > 15000) { toast('試合の様子が届かなくなりました'); if (I.G.mode === 'online') I.goTitle(); else wend(w, 'lost'); }
+    }, 1000));
+    return true;
+  };
+  M.stopWatch = function(){ const w = M.watching; if (!w) return; if (w.started && I.G.mode === 'online' && I.NET.watch) I.goTitle(); else wend(w, 'stop'); };
+  function seen(w, t){
+    const est = t - performance.now();
+    if (w.base == null || est > w.base) { w.base = est; if (w.started) I.netClock(w.base - WATCH_DELAY); }
+  }
+  function wrecv(w, m){
+    if (M.watching !== w || !m || w.ended) return;
+    w.lastRecv = performance.now();
+    const p = m.p === 1 ? 1 : 0;
+    switch (m.k) {
+      case 'hello': w.hello[p] = m; break;
+      case 'pong': if (p === 0) seen(w, m.t2); break;
+      case 'h': seen(w, m.h); if (w.started) I.netHorizon(m.h, p); break;
+      case 'start': if (!w.started) wbegin(w, m.startAt); break;
+      case 'in':
+        if (!w.started) { w.early.push(m); break; }
+        I.netHorizon(m.t, p); I.netInput(m.t, m.a, m.s, p); break;
+      case 'bye': toast('選手が退出しました'); if (w.started && I.G.mode === 'online') setTimeout(() => { if (M.watching === w && I.G.mode === 'online') I.goTitle(); }, 1500); else wend(w, 'bye'); break;
+    }
+  }
+  function wbegin(w, startAt){
+    w.started = true;
+    if (w.base == null) w.base = startAt - 1500 - performance.now();
+    const i = w.info, h = w.hello;
+    I.NET.onPhase = null;
+    I.NET.onLeave = () => wend(w, 'done');
+    I.startOnline({ me: 0, watch: true, seed: i.seed, startAt, clockOff: w.base - WATCH_DELAY, myKat: h[0].kat || 'mumei', oppKat: h[1].kat || 'mumei',
+                    myName: i.names[0], oppName: i.names[1], toWin: i.toWin, tag: i.tag, back: i.back, send: null });
+    w.early.forEach(m => { const p = m.p === 1 ? 1 : 0; I.netHorizon(m.t, p); I.netInput(m.t, m.a, m.s, p); }); w.early = [];
+    if (i.onStart) try { i.onStart(); } catch (e) {}
+  }
+  function wend(w, why){
+    if (w.ended) return; w.ended = true;
+    w.timers.forEach(t => { clearInterval(t); clearTimeout(t); });
+    if (w.ch) { N.sb.removeChannel(w.ch); w.ch = null; }
+    if (M.watching === w) M.watching = null;
+    if (I.NET.onLeave && w.started) { I.NET.onLeave = null; I.NET.onPhase = null; }
+    if (w.info.onEnd) try { w.info.onEnd(why); } catch (e) { console.error(e); }
   }
 
   // ページを閉じるときは、相手にすぐ知らせる

@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/online.css">
+<link rel="stylesheet" href="css/team.css">
 </head>
 <body>
 
@@ -23,6 +24,7 @@
     <button type="button" id="m_gacha" class="mb"><span class="mk">刀ガチャ</span><span class="ms">刀帳</span></button>
     <button type="button" id="m_online" class="mb"><span class="mk">オンライン</span><span class="ms" id="m_online_s">フレンドと対戦</span></button>
     <button type="button" id="m_rank" class="mb"><span class="mk">番付</span><span class="ms">フレンドと競う</span></button>
+    <button type="button" id="m_team" class="mb"><span class="mk">団体戦</span><span class="ms" id="m_team_s">赤と青に分かれて</span></button>
   </div>
 </div>
 <div id="gacha" hidden>
@@ -150,6 +152,63 @@
     <p class="gnote" id="r_note"></p>
   </div>
 </div>
+<div id="team" hidden>
+  <div class="gwrap">
+    <div class="gtop">
+      <button type="button" id="t_back" class="gback">戻る</button>
+      <div class="otitle">団体戦</div>
+      <div class="ospacer"></div>
+    </div>
+    <p class="oerr" id="t_err"></p>
+    <section id="t_login" hidden>
+      <p class="gnote">団体戦はオンラインで遊びます。先にログインしてください。</p>
+      <div class="ract"><button type="button" class="gpull" id="t_go">オンラインでログイン</button></div>
+    </section>
+    <section id="t_entry" hidden>
+      <div id="t_invs"></div>
+      <h3>部屋を作る</h3>
+      <div class="trules" id="t_rules"></div>
+      <div class="tset">
+        <label>一試合の先取<select id="t_towin"><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option></select>本</label>
+        <label id="t_targetrow">自由戦は先に<select id="t_target"></select>点</label>
+        <label class="tpass">合言葉（なくてもよい）<input id="t_pass" maxlength="16" autocomplete="off" placeholder="空なら合言葉なし"></label>
+      </div>
+      <button type="button" class="gpull" id="t_create">部屋を作る</button>
+      <h3>部屋番号で入る</h3>
+      <form class="oadd" id="t_jform">
+        <input id="t_code" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="部屋番号（6文字）">
+        <input id="t_jpass" maxlength="16" autocomplete="off" placeholder="合言葉">
+        <button type="submit" class="obtn pri">入る</button>
+      </form>
+      <p class="omsg" id="t_jmsg"></p>
+    </section>
+    <section id="t_room" hidden>
+      <div class="thead" id="t_head"></div>
+      <div id="t_body"></div>
+      <div class="thost" id="t_hostset" hidden>
+        <h3>部屋の主の設定</h3>
+        <div class="tset">
+          <label>ルール<select id="t_srule"><option value="taisho">大将戦</option><option value="kachinuki">勝ち抜き戦</option><option value="free">自由戦</option><option value="tournament">トーナメント</option></select></label>
+          <label>先取<select id="t_stowin"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select>本</label>
+          <label id="t_stargetrow">自由戦<select id="t_starget"></select>点</label>
+          <label class="tpass">合言葉<input id="t_spass" maxlength="16" autocomplete="off" placeholder="空なら合言葉なし"></label>
+        </div>
+        <button type="button" class="obtn" id="t_ssave">設定を変える</button>
+      </div>
+      <div class="tchat">
+        <h3>部屋の一言</h3>
+        <ul class="tlog" id="t_log"></ul>
+        <form class="oadd" id="t_say"><input id="t_sayin" maxlength="60" autocomplete="off" placeholder="ひとこと（部屋の人だけに届きます）"><button type="submit" class="obtn">送る</button></form>
+      </div>
+      <div class="tfoot" id="t_foot"></div>
+    </section>
+  </div>
+</div>
+<div id="t_invbar" class="obar" hidden>
+  <div><b id="t_invname"></b>さんから団体戦の誘い</div>
+  <div class="oacts"><button type="button" class="obtn pri" id="t_invok">参陣</button><button type="button" class="obtn" id="t_invno">あとで</button></div>
+</div>
+<div id="t_turn" class="ocover tturn" hidden><div class="obig" id="t_turnt">出番</div><p id="t_turns"></p></div>
 <div id="o_inv" class="obar" hidden>
   <div><b id="o_invname"></b>さんから対戦の招待　<span class="osec"><span id="o_invsec"></span>秒</span></div>
   <div class="oacts"><button type="button" class="obtn pri" id="o_invok">受ける</button><button type="button" class="obtn" id="o_invno">ことわる</button></div>
@@ -169,5 +228,6 @@
 <script src="js/online-match.js"></script>
 <script src="js/online-ui.js"></script>
 <script src="js/ranking-ui.js"></script>
+<script src="js/team.js"></script>
 </body>
 </html>

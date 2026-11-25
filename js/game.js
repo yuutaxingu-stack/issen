@@ -220,7 +220,7 @@ const KMAP={}; KATANA.forEach(k=>KMAP[k.id]=k);
 const METAL={gold:null,silver:[198,204,214],copper:[206,122,82],black:[44,40,38]};
 const TIERRATE=[['並',60],['上',28],['極',10],['幻',2]];
 const DUPBACK={'並':2,'上':4,'極':10,'幻':30};
-const PULLCOST=10;
+let PULLCOST=10;
 function hsl2rgb(h,s,l){ h=((h%360)+360)%360/360; const f=n=>{ const k=(n+h*12)%12, a=s*Math.min(l,1-l); return 255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))); }; return [f(0),f(8),f(4)]; }
 function tintCanvas(src,col){ const t=document.createElement('canvas'); t.width=src.width; t.height=src.height; const x=t.getContext('2d'); x.drawImage(src,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,t.width,t.height); return t; }
 let KREADY=false;
@@ -246,17 +246,21 @@ function buildKatanas(){
   });
   KREADY=true;
 }
-/* 自分の刀（この端末に保存） */
-let ARM={owned:{mumei:1},equip:['mumei','mumei'],rec:{}};
-try{ const a=JSON.parse(localStorage.getItem('issen-armory-v1')||'null'); if(a) ARM=Object.assign(ARM,a); }catch(e){}
-function saveArm(){ try{ localStorage.setItem('issen-armory-v1',JSON.stringify(ARM)); }catch(e){} }
+/* 自分の刀。ログインしていなければこの端末に、ログイン中はアカウントに保存する（js/save-sync.js）
+   刀は id（英字の名前）で覚えるので、刀を足したり並べ替えたりしても記録は崩れない */
+let ACCT=null;   // ログイン中だけ入る、アカウントへ保存する出入り口 {win,best,pull,equip}
+let ARM;
+function loadGuestArm(){ ARM={owned:{mumei:1},equip:['mumei','mumei'],rec:{}};
+  try{ const a=JSON.parse(localStorage.getItem('issen-armory-v1')||'null'); if(a) ARM=Object.assign(ARM,a); }catch(e){} }
+loadGuestArm();
+function saveArm(){ if(ACCT) return; try{ localStorage.setItem('issen-armory-v1',JSON.stringify(ARM)); }catch(e){} }
 let CPUKAT='mumei';
 function katOf(i){ if(G.mode==='online') return KMAP[i===NET.me?(ARM.equip[0]||'mumei'):NET.oppKat]||KMAP.mumei;
   return KMAP[(G.mode==='cpu'&&i===1)?CPUKAT:(ARM.equip[i]||'mumei')]||KMAP.mumei; }
 function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x)],['上',lerp(0.12,0.45,x)],['極',lerp(0,0.22,x)],['幻',lerp(0,0.06,x)]];
   let r=Math.random()*w.reduce((s,v)=>s+v[1],0), t='並'; for(const [k,v] of w){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
-function recordWin(i,name){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&i!==NET.me) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); }
+function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&i!==NET.me) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0); }
 function rollKatana(){ let r=Math.random()*100, t='並'; for(const [k,v] of TIERRATE){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
 
@@ -277,12 +281,24 @@ function netHorizon(h){ if(h>NET.oppH) NET.oppH=h; }
 function qIns(q){ let i=inputQ.length; while(i>0&&(inputQ[i-1].t>q.t||(inputQ[i-1].t===q.t&&inputQ[i-1].p>q.p))) i--; inputQ.splice(i,0,q); }
 const TOWIN=()=>G.mode==='cpu'?1:CFG.toWin;
 
-/* コインと記録（この端末に保存） */
+/* コインと記録（ログインしていなければこの端末に、ログイン中はアカウントに保存） */
 const COIN={'並':1,'上':3,'極':8,'幻':20,'絶':50,'分':0};
-let WALLET={coins:0,best:0};
-try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){}
-function saveWallet(){ try{ localStorage.setItem('issen-wallet-v1',JSON.stringify(WALLET)); }catch(e){} }
-window.__issen={G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle};
+const WALLET={coins:0,best:0};
+function loadGuestWallet(){ WALLET.coins=0; WALLET.best=0;
+  try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){} }
+loadGuestWallet();
+function saveWallet(){ if(ACCT) return; try{ localStorage.setItem('issen-wallet-v1',JSON.stringify(WALLET)); }catch(e){} }
+/* アカウント保存との出入り口（js/save-sync.js が使う） */
+function guestData(){ // この端末に保存されている記録（ログイン中でも端末の分を読む）
+  let a=null,w=null; try{ a=JSON.parse(localStorage.getItem('issen-armory-v1')||'null'); w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); }catch(e){}
+  a=a||{}; w=w||{}; return {coins:w.coins||0,best:w.best||0,owned:a.owned||{},rec:a.rec||{},equip:a.equip||['mumei','mumei']}; }
+function applySave(d,pend){ // アカウントの持ち物を画面に映す。pend: まだサーバーに届いていない銭
+  ARM.owned=Object.assign({mumei:1},d.owned||{}); ARM.rec=d.rec||{}; ARM.equip=Array.isArray(d.equip)&&d.equip.length===2?d.equip.slice():['mumei','mumei'];
+  WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; if(d.cost>0) PULLCOST=d.cost;
+  uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
+function useAccount(api){ ACCT=api; }
+function useGuest(){ ACCT=null; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
+window.__issen={G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
 function startMatch(mode,base){
@@ -407,7 +423,7 @@ function finish(W,L,name,kind){
   if(G.mode==='online'&&W.i!==NET.me) coin=0;
   if(coin){ WALLET.coins+=coin; RUN.coins+=coin; saveWallet(); }
   G.result={name,winner:W.i,coin};
-  recordWin(W.i,name);
+  recordWin(W.i,name,coin);
   G.history.push({name,winner:W.i});
   beginFx(kind,W,L,{name,mutual:W.counters>=1&&L.counters>=1});
 }
@@ -422,7 +438,7 @@ function nextFromResult(){
   if(G.mode==='cpu'){
     const r=G.result;
     if(r.winner===0){ RUN.n++; G.round=1; startRound(); }
-    else if(r.winner===1){ const wins=RUN.n-1; if(wins>WALLET.best){ WALLET.best=wins; RUN.newBest=true; saveWallet(); } G.phase='match'; G.resultAt=gnow(); sfx('gong'); }
+    else if(r.winner===1){ const wins=RUN.n-1; if(wins>WALLET.best){ WALLET.best=wins; RUN.newBest=true; saveWallet(); if(ACCT) ACCT.best(wins); } G.phase='match'; G.resultAt=gnow(); sfx('gong'); }
     else { G.round++; startRound(); }
     return;
   }
@@ -1021,14 +1037,14 @@ let uiCache='';
 function updateUI(){
   const gearOn=G.mode!=='title'&&(G.phase==='ready'||G.phase==='fight');
   const menuOn=G.phase==='title'&&gachaEl.hidden;
-  const key=gearOn+'|'+menuOn+'|'+G.mode+'|'+WALLET.coins+'|'+WALLET.best+'|'+JSON.stringify(ARM.owned);
+  const key=gearOn+'|'+menuOn+'|'+G.mode+'|'+!!ACCT+'|'+WALLET.coins+'|'+WALLET.best+'|'+JSON.stringify(ARM.owned);
   if(key===uiCache) return; uiCache=key;
   gearEl.hidden=!gearOn; gearEl.classList.toggle('mid',G.mode==='vs'); gearEl.textContent=G.mode==='vs'?'止':G.mode==='online'?'退出':'一時停止';
   document.querySelector('#pausep h2').textContent=G.mode==='online'?'退出しますか':'一時停止';
   document.getElementById('ps_resume').textContent=G.mode==='online'?'続ける（試合は止まりません）':'続ける';
   document.getElementById('ps_title').textContent=G.mode==='online'?'退出してタイトルへ':'タイトルへ戻る';
   menuEl.hidden=!menuOn;
-  document.getElementById('m_meta').textContent='所持 '+WALLET.coins+' 銭　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き';
+  document.getElementById('m_meta').textContent='所持 '+WALLET.coins+' 銭　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
 }
 document.getElementById('m_cpu').addEventListener('click',()=>{ ensureAudio(); startMatch('cpu'); });
 document.getElementById('m_vs').addEventListener('click',()=>{ ensureAudio(); startMatch('vs'); });
@@ -1054,18 +1070,28 @@ function shownTier(k,e){ if(k.tier!=='幻') return e<TP[k.tier].d0*0.8&&k.tier!=
 function gSize(){ const r=gcv.getBoundingClientRect(); GA.W=Math.max(200,r.width); GA.H=Math.max(120,r.height); gcv.width=Math.round(GA.W*DPR); gcv.height=Math.round(GA.H*DPR); }
 function openGacha(){ gachaEl.hidden=false; uiCache=''; setTab('pull'); GA.phase='idle'; document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
-function refreshCoins(){ document.getElementById('g_coins').textContent=WALLET.coins; const n=Math.floor(WALLET.coins/PULLCOST), busy=GA.phase==='draw';
+function refreshCoins(){ document.getElementById('g_coins').textContent=WALLET.coins; const n=Math.floor(WALLET.coins/PULLCOST), busy=GA.phase==='draw'||GA.phase==='wait';
   document.getElementById('g_pull1').disabled=busy||n<1; const all=document.getElementById('g_all'); all.disabled=busy||n<2; all.innerHTML='全部引く　<small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>'; }
 function setTab(t){ document.querySelectorAll('.gtabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
   document.getElementById('g_pull').hidden=t!=='pull'; document.getElementById('g_book').hidden=t!=='book'; if(t==='book') renderBook(); else gSize(); }
 function doPull(n){
-  if(GA.phase==='draw') return;
+  if(GA.phase==='draw'||GA.phase==='wait') return;
   const msg=document.getElementById('g_msg'); n=Math.min(n,Math.floor(WALLET.coins/PULLCOST));
   if(n<1){ msg.textContent='銭が足りません。勝負に勝って銭を集めてください。'; return; }
   msg.textContent=''; ensureAudio();
+  if(ACCT){ // ログイン中: くじはサーバーが引く
+    GA.phase='wait'; msg.textContent='引いています…'; refreshCoins();
+    ACCT.pull(n).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
+      startDraw(r.got.map(g=>({k:KMAP[g.id]||KMAP.mumei,isNew:!!g.new})),r.back||0); },
+      e=>{ if(GA.phase==='wait') GA.phase='idle'; msg.textContent=e.message; refreshCoins(); });
+    return;
+  }
   const batch=[]; let back=0;
   for(let i=0;i<n;i++){ WALLET.coins-=PULLCOST; const k=rollKatana(); const had=ARM.owned[k.id]||0; ARM.owned[k.id]=had+1; const d=had?DUPBACK[k.tier]:0; back+=d; batch.push({k,isNew:!had}); }
   WALLET.coins+=back; saveWallet(); saveArm();
+  startDraw(batch,back);
+}
+function startDraw(batch,back){
   let best=batch[0]; batch.forEach(b=>{ if(TORD[b.k.tier]>TORD[best.k.tier]||(TORD[b.k.tier]===TORD[best.k.tier]&&b.isNew&&!best.isNew)) best=b; });
   GA.batch=batch; GA.kat=best.k; GA.isNew=best.isNew; GA.dup=back; GA.phase='draw'; GA.t0=performance.now(); GA.cued={};
   document.getElementById('g_res').hidden=true; refreshCoins();
@@ -1095,7 +1121,7 @@ function gLoop(){
   const drawSaya=(m,alpha)=>{ c.save(); c.globalAlpha=alpha; c.fillStyle='#16120f'; c.strokeStyle='rgba(233,226,207,0.18)'; c.lineWidth=1;
     c.beginPath(); c.moveTo(m,cy-kh*0.2); c.lineTo(m+sayaL,cy-kh*0.12); c.quadraticCurveTo(m+sayaL+kh*0.3,cy,m+sayaL,cy+kh*0.14); c.lineTo(m,cy+kh*0.22); c.closePath(); c.fill(); c.stroke();
     c.fillStyle='rgba(233,226,207,0.08)'; c.fillRect(m+sayaL*0.2,cy-kh*0.16,sayaL*0.6,kh*0.05); c.restore(); };
-  if(GA.phase==='idle'){
+  if(GA.phase==='idle'||GA.phase==='wait'){
     const k=KMAP[ARM.equip[0]]||KMAP.mumei; if(KREADY){ c.save(); c.globalAlpha=0.5+0.1*Math.sin(now/700); c.beginPath(); c.rect(0,0,mouth0,H); c.clip(); drawKatanaAt(c,k.shadow,cx,cy,kw); c.restore(); }
     drawSaya(mouth0,1);
     txt(c,'鞘に手をかける',cx,H*0.86,Math.max(11,H*0.055),UIF,'rgba(233,226,207,0.4)','center');
@@ -1186,8 +1212,8 @@ function openDetail(k){
   document.getElementById('gd_rec').innerHTML=names.length?names.map(n=>'<li><span class="rt" style="color:'+TIER[FIN[n].tier]+'">'+FIN[n].tier+'</span>'+n+'<b>'+rec[n]+'</b></li>').join(''):'<li class="none">まだこの刀で勝っていません</li>';
   [0,1].forEach(i=>{ const btn=document.getElementById('gd_e'+i); const on=ARM.equip[i]===k.id; btn.textContent=on?COL[i].name+'が持っています':COL[i].name+'に持たせる'; btn.disabled=on; });
 }
-document.getElementById('gd_e0').addEventListener('click',()=>{ ARM.equip[0]=DETAIL.id; saveArm(); openDetail(DETAIL); renderBook(); });
-document.getElementById('gd_e1').addEventListener('click',()=>{ ARM.equip[1]=DETAIL.id; saveArm(); openDetail(DETAIL); renderBook(); });
+document.getElementById('gd_e0').addEventListener('click',()=>{ ARM.equip[0]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
+document.getElementById('gd_e1').addEventListener('click',()=>{ ARM.equip[1]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
 document.getElementById('gd_close').addEventListener('click',()=>{ document.getElementById('g_detail').hidden=true; });
 document.querySelectorAll('.gtabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 document.getElementById('g_pull1').addEventListener('click',()=>doPull(1));

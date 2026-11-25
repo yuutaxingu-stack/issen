@@ -98,6 +98,8 @@
       $('o_myname').textContent = N.profile.name;
       $('o_mycode').textContent = N.profile.code;
       $('o_mylogin').textContent = 'ログインID ' + N.profile.login;
+      const acct = I.isAccount && I.isAccount(); $('o_save').hidden = !acct;
+      $('o_save').textContent = '銭・刀・戦績はこのアカウントに保存されています。ほかの端末でも同じIDでログインすれば続きから遊べます';
       const busy = !!N.waiting || !!(window.IssenMatch && IssenMatch.active);
       $('o_list').innerHTML = N.friends.length ? N.friends.map(f => {
         const s = N.statusOf(f.id), [lab, cls] = STATUS[s];

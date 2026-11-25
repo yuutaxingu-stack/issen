@@ -27,6 +27,8 @@ function restSelect(table, q, me){
     if (k === 'order') { order = ' order by ' + v.split(',').map(x => { const [c, d] = x.split('.'); if (!COLS.test(c)) throw 0; return c + (d === 'desc' ? ' desc' : ''); }).join(','); continue; }
     if (k === 'limit') { limit = ' limit ' + (parseInt(v, 10) || 0); continue; }
     if (!COLS.test(k)) throw 0;
+    if (v === 'is.null') { where.push(k + ' is null'); continue; }
+    if (v === 'not.is.null') { where.push(k + ' is not null'); continue; }
     const m = v.match(/^(eq|gt|lt|in)\.(.*)$/); if (!m) continue;
     const key = 'v' + (n++);
     if (m[1] === 'in') { vars[key] = '{' + m[2].replace(/^\(|\)$/g, '') + '}'; where.push(k + "::text = any(:'" + key + "'::text[])"); }
@@ -109,8 +111,13 @@ const unstick = () => sql("update public.chat_messages set created_at = created_
   ok(L.length === 1 && /乙/.test(L[0]) && /今宵/.test(L[0]), '乙の発言が見える: ' + JSON.stringify(L));
 
   console.log('--- @で乙を名指しして送る');
-  await a.click('#c_at'); await a.waitForTimeout(200);
-  await a.click('#c_sheet [data-pick="' + U.bbb + '"]');
+  await a.type('#c_text', '@'); await a.waitForTimeout(200);
+  ok(await a.isVisible('#c_sugg [data-pick="' + U.bbb + '"]') && await a.isVisible('#c_sugg [data-pick="' + U.ccc + '"]'), '@を打つとフレンドの候補が出る');
+  await a.type('#c_text', '乙'); await a.waitForTimeout(150);
+  ok(!(await a.isVisible('#c_sugg [data-pick="' + U.ccc + '"]')), '打った字で候補がしぼられる');
+  await a.screenshot({ path: out + '/chat-suggest.png' });
+  await a.click('#c_sugg [data-pick="' + U.bbb + '"]');
+  ok(await a.isHidden('#c_sugg'), '選ぶと候補が閉じる');
   await a.type('#c_text', '受けて立とう');
   await a.click('#c_send'); await a.waitForTimeout(800);
   const last = JSON.parse(sql("select row_to_json(m) from public.chat_messages m order by id desc limit 1"));
@@ -126,9 +133,9 @@ const unstick = () => sql("update public.chat_messages set created_at = created_
   const b = await mk(browser, { width: 390, height: 844 });
   if (await b.isVisible('#r_ok')) await b.click('#r_ok');
   await login(b, 'bbb');
-  await b.evaluate(() => { const C = IssenChat; C.lastRead = 0; C.render(); });
+  await b.evaluate(() => { const C = IssenChat; C.read.open = 0; C.render(); });
   const badge = await b.textContent('#m_chat_b');
-  ok(/名指し 1/.test(badge), 'タイトルの入口に「名指し」の印: ' + badge);
+  ok(badge === '1' && await b.getAttribute('#m_chat_b', 'class') === 'cbadge named' && /名指し/.test(await b.textContent('#m_chat_s')), 'タイトルの入口に朱の印: ' + badge + ' ' + await b.textContent('#m_chat_s'));
   await b.screenshot({ path: out + '/chat-badge.png' });
   // 甲から乙へ新しい名指しが届いた（リアルタイムのまね）
   const nid = asUser('aaa', "select public.chat_post('@乙 いざ', array['" + U.bbb + "']::uuid[])").split('\n').pop(); unstick();
@@ -144,9 +151,26 @@ const unstick = () => sql("update public.chat_messages set created_at = created_
   await b.click('#c_back');
   ok(await b.isHidden('#m_chat_b'), '読んだら印が消える');
 
-  console.log('--- 内緒: 甲→乙は丙に見えない');
-  asUser('aaa', "select public.chat_post('内緒だが', '{}', '" + U.bbb + "')"); unstick();
+  console.log('--- 密書: 甲が乙に一対一で送る');
+  await a.click('#chat .ctabs [data-tab="dm"]'); await a.waitForTimeout(200);
+  ok((await a.$$('#c_list .cdm')).length === 2 && await a.isHidden('#c_form'), '密書の一覧にフレンドが並ぶ');
+  await a.click('[data-open="' + U.bbb + '"]'); await a.waitForTimeout(200);
+  ok(/乙/.test(await a.textContent('#c_dmhead')) && /乙さんにだけ/.test(await a.getAttribute('#c_text', 'placeholder')), '乙との密書の画面');
+  await a.type('#c_text', '内緒だが、明日も一本'); await a.click('#c_send'); await a.waitForTimeout(700); unstick();
+  L = await lines(a);
+  ok(L.length === 1 && /内緒だが/.test(L[0]), '密書が並ぶ: ' + JSON.stringify(L));
+  await a.screenshot({ path: out + '/chat-dm.png' });
   ok(sql("set role authenticated; set request.jwt.claim.sub = '" + U.ccc + "'; select count(*) from public.chat_messages where to_id is not null").split('\n').pop() === '0', '丙には見えない');
+  const did = sql("select id from public.chat_messages where to_id is not null order by id desc limit 1");
+  await b.evaluate(r => IssenChat.feed({ eventType: 'INSERT', new: r }), row(did)); await b.waitForTimeout(200);
+  ok(/甲より密書/.test(await b.textContent('#c_herald')), '乙に密書の知らせ: ' + (await b.textContent('#c_herald')).trim());
+  ok(/密書/.test(await b.textContent('#m_chat_s')), 'タイトルにも: ' + await b.textContent('#m_chat_s'));
+  await b.click('#c_herald'); await b.waitForTimeout(300);
+  ok(/甲/.test(await b.textContent('#c_dmhead')) && (await lines(b)).some(x => /内緒だが/.test(x)), '知らせを押すと甲との密書が開く');
+  await b.click('#c_back');
+  ok(await b.isHidden('#m_chat_b'), '読んだら印が消える（密書）');
+  await a.click('#chat .ctabs [data-tab="open"]'); await a.waitForTimeout(200);
+  ok(!(await lines(a)).some(x => /内緒だが/.test(x)), '密書は「皆で」には出ない');
 
   console.log('--- 相手求む → 乙が受けて立つ → 二人とも対戦へ');
   await a.click('#c_rec'); await a.waitForTimeout(700);
@@ -185,6 +209,26 @@ const unstick = () => sql("update public.chat_messages set created_at = created_
   ok(!(await lines(a)).some(x => /今宵/.test(x)), '見えなくした人の発言は消える');
   await a.click('#c_mutes'); await a.click('#c_sheet [data-op="unmute"]'); await a.waitForTimeout(600);
   ok((await lines(a)).some(x => /今宵/.test(x)), '戻すとまた見える');
+
+  console.log('--- 対戦中のひとこと');
+  await a.click('#c_back');
+  await a.evaluate(() => { startOnline({ me: 0, seed: 7, startAt: performance.now(), clockOff: 0, send: () => {}, oppName: '乙', myName: '甲' });
+    setInterval(() => netHorizon(gnow()), 100); IssenMatch.active = { started: true, ended: false, timers: [] }; __issen.G.cueAt += 3000; });
+  await a.waitForTimeout(300);
+  ok(await a.isVisible('#mc_btn'), '「言」の印が出る');
+  await a.click('#mc_btn'); await a.waitForTimeout(150);
+  ok(await a.isVisible('#mc_form'), '立ち合いの前（合間）は自由に打てる');
+  await a.screenshot({ path: out + '/chat-match-panel.png' });
+  await a.waitForFunction(() => __issen.G.phase === 'fight', null, { timeout: 8000 });
+  await a.waitForTimeout(300);
+  ok(await a.isHidden('#mc_form'), '立ち合い中は定型の一言だけ');
+  await a.click('#mc_phr [data-say="いざ"]'); await a.waitForTimeout(100);
+  await a.evaluate(() => IssenChat.matchSay('参った'));
+  await a.waitForTimeout(300);
+  ok(/いざ/.test(await a.textContent('#mc_b0')) && /参った/.test(await a.textContent('#mc_b1')) && await a.isVisible('#mc_b1'), '自分と相手の吹き出し');
+  await a.screenshot({ path: out + '/chat-match.png' });
+  await a.evaluate(() => { IssenMatch.active = null; goTitle(); }); await a.waitForTimeout(400);
+  ok(await a.isHidden('#mc_btn'), '試合が終われば消える');
 
   console.log('--- chat.sql 未実行なら入口は「準備中」で、他は壊れない');
   noChat = true;

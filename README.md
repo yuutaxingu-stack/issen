@@ -117,6 +117,17 @@ web/
 - 数値は `rating_config` の表で変えられる（Table Editor で直せばすぐ反映）
 - 試合の結果画面に「戦闘力 1056 → 1074 ＋18」と出る（`match_rating`）
 
+### 寄合（フレンドのオープンチャット）
+タイトルの「寄合」から（ログインが必要）。`supabase/chat.sql` を SQL Editor で実行すると使えるようになる（`schema.sql` の後。何度実行しても発言は消えない）。未実行なら入口は「準備中」。
+
+- 皆で: 発言は送った人のフレンドに見える。`@` を打つとフレンドの候補が出て、選ぶと名指し。名指しされた人には朱の印と知らせ
+- 密書: フレンドと一対一（二人にしか見えない）
+- 相手求む: 3分間の募集。「受けて立つ」と、そのまま二人の対戦が始まる（`chat_accept_recruit`）
+- 団体戦の募集: `chat_post(p_kind:'team', p_ref:{room,rule,host,n})`。`window.IssenTeam.join(room)` があれば「参陣」ボタン
+- 立ち合いの知らせ: `matches` のトリガーが「誰と誰の対戦が始まった／誰がどの決着で勝った」を流す
+- 対戦中: 下の「言」から定型の一言、一本の合間は30文字まで自由に。対戦の部屋で相手にだけ届き、残らない
+- 守り: 100文字まで、3秒に1回、7日で消える、自分の発言は消せる、人ごとに「見えなくする」。数値は `chat_config` で変えられる。`paused` を true にすると止まる
+
 ### テスト
 ```
 node tests/save-values-test.js    # ゲームとサーバーで刀の一覧・確率・銭が一致しているか
@@ -124,6 +135,8 @@ sh tests/save-db-test.sh          # 手元の PostgreSQL で SQL を試す（2�
 node tests/save-flow-test.js      # 引っ越し・勝ち・ガチャ・ログアウト・2台目の端末（手元の PostgreSQL を使う）
 KEEP=1 sh tests/ranking-db-test.sh # 戦闘力の計算・1日の回数・無効試合・番付・2回実行しても消えないか
 node tests/ranking-flow-test.js <保存先> # 番付の画面と結果画面の戦闘力（上の KEEP=1 の後に）
+KEEP=1 sh tests/chat-db-test.sh    # 寄合: 見える範囲・連投・名指し・相手求む・立ち合いの知らせ・7日で消える
+node tests/chat-flow-test.js <保存先> # 寄合の画面（上の KEEP=1 の後に）
 node tests/judge-test.js          # 決着13種がこれまで通りか
 node tests/online-sync-test.js    # 遅れをはさんだ2画面で結果が一致するか（Supabase不要）
 node tests/smoke-test.js <保存先>  # 各画面でエラーが出ないか

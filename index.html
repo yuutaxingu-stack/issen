@@ -159,23 +159,32 @@
       <div class="otitle">寄合</div>
       <button type="button" id="c_rec" class="obtn pri">相手求む</button>
     </div>
+    <div class="gtabs ctabs" role="tablist"><button type="button" data-tab="open" class="on">皆で<span class="cbadge named" id="c_tabopen" hidden></span></button><button type="button" data-tab="dm">密書<span class="cbadge named" id="c_tabdm" hidden></span></button></div>
+    <div class="cdmhead" id="c_dmhead" hidden><button type="button" class="olink" id="c_dmback">‹ 一覧</button><span><b id="c_dmname"></b>さんとの密書</span></div>
     <ul class="clist" id="c_list"></ul>
-    <div class="cwhisper" id="c_whisper" hidden>内緒 → <b id="c_wname"></b> <button type="button" class="olink" id="c_wclear">やめる</button></div>
+    <div class="csugg" id="c_sugg" hidden></div>
     <form id="c_form" class="cform" autocomplete="off">
       <button type="button" class="obtn cat-btn" id="c_at" aria-label="名指し">＠</button>
       <input id="c_text" maxlength="120" enterkeyhint="send" placeholder="ひとこと（@で名指し）">
       <span class="ccount" id="c_count"></span>
       <button type="submit" class="obtn pri" id="c_send">送る</button>
     </form>
-    <div class="cfoot"><span>便りは七日で消えます。名前を押すと名指し・内緒・見えなくするができます</span><button type="button" class="olink" id="c_mutes" hidden>見えなくした人</button></div>
+    <div class="cfoot"><span id="c_foottext"></span><button type="button" class="olink" id="c_mutes" hidden>見えなくした人</button></div>
     <div class="csheet" id="c_sheet" hidden></div>
   </div>
 </div>
-<div id="c_herald" class="cherald" hidden role="status"><span class="chseal">便</span><b id="c_hfrom"></b><span id="c_hbody"></span></div>
+<div id="c_herald" class="cherald" hidden role="status"><span class="chseal" id="c_hseal">便</span><b id="c_hfrom"></b><span id="c_hbody"></span></div>
 <div id="c_wait" class="obar cwait" hidden>
   <div>相手を求めています　<span class="osec" id="c_waitsec"></span></div>
   <div class="oacts"><button type="button" class="obtn" id="c_waitshut">しめる</button></div>
 </div>
+<button type="button" id="mc_btn" class="mcbtn" hidden aria-label="ひとこと">言</button>
+<div id="mc_panel" class="mcpanel" hidden>
+  <div class="mcphr" id="mc_phr"></div>
+  <form id="mc_form" class="mcform" autocomplete="off"><input id="mc_text" maxlength="30" enterkeyhint="send" placeholder="一本の合間はひとこと自由に"><button type="submit" class="obtn pri">送る</button></form>
+</div>
+<div id="mc_b0" class="mcbub left" hidden></div>
+<div id="mc_b1" class="mcbub right" hidden></div>
 <div id="o_inv" class="obar" hidden>
   <div><b id="o_invname"></b>さんから対戦の招待　<span class="osec"><span id="o_invsec"></span>秒</span></div>
   <div class="oacts"><button type="button" class="obtn pri" id="o_invok">受ける</button><button type="button" class="obtn" id="o_invno">ことわる</button></div>

@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#3d4a3f">
+<title>一閃</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<canvas id="cv" aria-label="一閃 対戦画面"></canvas>
+<div id="safe"></div>
+<div id="menu" hidden>
+  <div class="meta" id="m_meta"></div>
+  <div class="mrow">
+    <button type="button" id="m_cpu" class="mb pri"><span class="mk">CPU戦</span><span class="ms">勝ち抜き</span></button>
+    <button type="button" id="m_vs" class="mb"><span class="mk">二人対戦</span><span class="ms">向かい合って一台で</span></button>
+    <button type="button" id="m_gacha" class="mb"><span class="mk">刀ガチャ</span><span class="ms">刀帳</span></button>
+  </div>
+</div>
+<div id="gacha" hidden>
+  <div class="gwrap">
+    <div class="gtop">
+      <button type="button" id="g_back" class="gback">戻る</button>
+      <div class="gtabs" role="tablist"><button type="button" data-tab="pull" class="on">刀ガチャ</button><button type="button" data-tab="book">刀帳</button></div>
+      <div class="gcoin">所持 <b id="g_coins">0</b> 銭</div>
+    </div>
+    <section id="g_pull">
+      <div class="gstage"><canvas id="gc"></canvas>
+        <div class="gres" id="g_res" hidden><span class="gt" id="g_rt"></span><span class="gm" id="g_rm"></span><span class="gy" id="g_ry"></span><p id="g_rl"></p><p class="gd" id="g_rdup"></p><div class="gbatch" id="g_batch" hidden></div><span class="gtap">触れて閉じる</span></div>
+      </div>
+      <div class="gact"><button type="button" id="g_pull1" class="gpull">一振り引く　<small>10銭</small></button><button type="button" id="g_all" class="gpull sec">全部引く</button></div>
+      <p class="gnote" id="g_msg"></p>
+      <p class="gnote">出る確率　並 60%・上 28%・極 10%・幻 2%。すでに持っている刀が出たら銭が少し戻ります（並2・上4・極10・幻30）。</p>
+    </section>
+    <section id="g_book" hidden>
+      <p class="gcount" id="g_count"></p>
+      <div class="ggrid" id="g_grid"></div>
+    </section>
+    <div class="gdetail" id="g_detail" hidden>
+      <div class="gdsheet">
+        <canvas id="gd_img" width="900" height="106"></canvas>
+        <div class="gdh"><span class="gt" id="gd_t"></span><span class="gm" id="gd_m"></span></div>
+        <p class="gy" id="gd_y"></p>
+        <p class="gl" id="gd_l"></p>
+        <h3>この刀での決着</h3>
+        <ul class="grec" id="gd_rec"></ul>
+        <div class="geq"><button type="button" id="gd_e0"></button><button type="button" id="gd_e1"></button></div>
+        <p class="gnote">CPU戦では朱の刀を使います。</p>
+        <button type="button" id="gd_close" class="gback">閉じる</button>
+      </div>
+    </div>
+  </div>
+</div>
+<button id="gear" type="button" aria-label="一時停止">一時停止</button>
+<div id="pausep" hidden>
+  <div class="psheet" role="dialog" aria-label="一時停止">
+    <h2>一時停止</h2>
+    <label class="pchk"><input type="checkbox" id="ps_sound">効果音</label>
+    <div class="pacts"><button type="button" class="pri" id="ps_resume">続ける</button><button type="button" id="ps_title">タイトルへ戻る</button></div>
+  </div>
+</div>
+
+<div id="panel" hidden>
+  <div class="sheet" role="dialog" aria-label="調整">
+    <h2>調整</h2>
+    <p class="lead">初期値は確定済みの値です。動かすとすぐ反映され、この端末に保存されます。開いている間は試合が止まります。</p>
+    <div class="export">
+      <div class="note">今の値はこの端末に自動で保存されています。試作の初期値として反映したいときは、下の文をコピーしてClaudeに送ってください。</div>
+      <textarea id="p_text" readonly rows="3"></textarea>
+      <button type="button" id="p_copy">値をコピー</button> <span id="p_copied" class="note"></span>
+    </div>
+    <div id="rows"></div>
+    <label class="chk"><input type="checkbox" id="c_gauges">溜め・見切りのゲージと判定タイミングを表示</label>
+    <label class="chk"><input type="checkbox" id="c_sound">効果音</label>
+    <div class="acts">
+      <button type="button" class="pri" id="p_close">閉じて続ける</button>
+      <button type="button" id="p_restart">タイトルへ戻る</button>
+      <button type="button" id="p_reset">初期値に戻す</button>
+    </div>
+  </div>
+</div>
+
+<div id="rotate" hidden>
+  <div class="big">一閃</div>
+  <p>端末を横向きにしてください。</p>
+  <button type="button" id="r_ok">このまま遊ぶ</button>
+</div>
+
+<script src="js/katana-image.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

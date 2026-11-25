@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="css/style.css">
 <link rel="stylesheet" href="css/online.css">
 <link rel="stylesheet" href="css/team.css">
+<link rel="stylesheet" href="css/chat.css">
 </head>
 <body>
 
@@ -25,6 +26,7 @@
     <button type="button" id="m_online" class="mb"><span class="mk">オンライン</span><span class="ms" id="m_online_s">フレンドと対戦</span></button>
     <button type="button" id="m_rank" class="mb"><span class="mk">番付</span><span class="ms">フレンドと競う</span></button>
     <button type="button" id="m_team" class="mb"><span class="mk">団体戦</span><span class="ms" id="m_team_s">赤と青に分かれて</span></button>
+    <button type="button" id="m_chat" class="mb" hidden><span class="mk">寄合<span id="m_chat_b" class="cbadge" hidden></span></span><span class="ms" id="m_chat_s">フレンドと話す</span></button>
   </div>
 </div>
 <div id="gacha" hidden>
@@ -209,6 +211,39 @@
   <div class="oacts"><button type="button" class="obtn pri" id="t_invok">参陣</button><button type="button" class="obtn" id="t_invno">あとで</button></div>
 </div>
 <div id="t_turn" class="ocover tturn" hidden><div class="obig" id="t_turnt">出番</div><p id="t_turns"></p></div>
+<div id="chat" hidden>
+  <div class="cwrap">
+    <div class="gtop">
+      <button type="button" id="c_back" class="gback">戻る</button>
+      <div class="otitle">寄合</div>
+      <button type="button" id="c_rec" class="obtn pri">相手求む</button>
+    </div>
+    <div class="gtabs ctabs" role="tablist"><button type="button" data-tab="open" class="on">皆で<span class="cbadge named" id="c_tabopen" hidden></span></button><button type="button" data-tab="dm">密書<span class="cbadge named" id="c_tabdm" hidden></span></button></div>
+    <div class="cdmhead" id="c_dmhead" hidden><button type="button" class="olink" id="c_dmback">‹ 一覧</button><span><b id="c_dmname"></b>さんとの密書</span></div>
+    <ul class="clist" id="c_list"></ul>
+    <div class="csugg" id="c_sugg" hidden></div>
+    <form id="c_form" class="cform" autocomplete="off">
+      <button type="button" class="obtn cat-btn" id="c_at" aria-label="名指し">＠</button>
+      <input id="c_text" maxlength="120" enterkeyhint="send" placeholder="ひとこと（@で名指し）">
+      <span class="ccount" id="c_count"></span>
+      <button type="submit" class="obtn pri" id="c_send">送る</button>
+    </form>
+    <div class="cfoot"><span id="c_foottext"></span><button type="button" class="olink" id="c_mutes" hidden>見えなくした人</button></div>
+    <div class="csheet" id="c_sheet" hidden></div>
+  </div>
+</div>
+<div id="c_herald" class="cherald" hidden role="status"><span class="chseal" id="c_hseal">便</span><b id="c_hfrom"></b><span id="c_hbody"></span></div>
+<div id="c_wait" class="obar cwait" hidden>
+  <div>相手を求めています　<span class="osec" id="c_waitsec"></span></div>
+  <div class="oacts"><button type="button" class="obtn" id="c_waitshut">しめる</button></div>
+</div>
+<button type="button" id="mc_btn" class="mcbtn" hidden aria-label="ひとこと">言</button>
+<div id="mc_panel" class="mcpanel" hidden>
+  <div class="mcphr" id="mc_phr"></div>
+  <form id="mc_form" class="mcform" autocomplete="off"><input id="mc_text" maxlength="30" enterkeyhint="send" placeholder="一本の合間はひとこと自由に"><button type="submit" class="obtn pri">送る</button></form>
+</div>
+<div id="mc_b0" class="mcbub left" hidden></div>
+<div id="mc_b1" class="mcbub right" hidden></div>
 <div id="o_inv" class="obar" hidden>
   <div><b id="o_invname"></b>さんから対戦の招待　<span class="osec"><span id="o_invsec"></span>秒</span></div>
   <div class="oacts"><button type="button" class="obtn pri" id="o_invok">受ける</button><button type="button" class="obtn" id="o_invno">ことわる</button></div>
@@ -229,5 +264,6 @@
 <script src="js/online-ui.js"></script>
 <script src="js/ranking-ui.js"></script>
 <script src="js/team.js"></script>
+<script src="js/chat.js"></script>
 </body>
 </html>

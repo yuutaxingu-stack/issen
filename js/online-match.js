@@ -7,6 +7,7 @@
      in     … 押した瞬間 {t: 時刻, a: 'iai'|'mk', s: 何度目の決着の後か}
      h      … 「この時刻までの操作は全部送った」という知らせ（0.5秒ごと）
      rep    … 結果を報告した合図
+     say    … 対戦中のひとこと（寄合の「言」。30文字まで）
      bye    … 退出
    どの送り物にも p（送った側 0=朱 / 1=藍）を付ける。団体戦の観戦者はこれを見て二人の動きを再生する（M.watch）。
    勝ち負けの判定は二人の端末が同じ計算で行い、最後にサーバーで結果を照らし合わせる。
@@ -72,6 +73,7 @@
       case 'in': if (st.started) { I.netHorizon(m.t); I.netInput(m.t, m.a, m.s); } break;
       case 'h': if (st.started) I.netHorizon(m.h); break;
       case 'rep': if (st.report) report(st); break;
+      case 'say': if (window.IssenChat && IssenChat.matchSay) IssenChat.matchSay(String(m.t || '').slice(0, 30)); break;
       case 'bye': if (!st.ended) end(st, '相手が退出しました。この試合は記録しません'); break;
     }
   }
@@ -229,6 +231,8 @@
 
   // ページを閉じるときは、相手にすぐ知らせる
   window.addEventListener('pagehide', () => { const st = M.active; if (st && !st.ended && st.started) { send(st, { k: 'bye' }); } });
+  // 対戦中のひとこと（相手にだけ届く。保存しない）
+  M.say = function(t){ const st = M.active; if (st && st.started && !st.ended) send(st, { k: 'say', t: String(t).slice(0, 30) }); };
   N.onMatch = (id, me) => M.start(id, me);
   window.IssenMatch = M;
 })();

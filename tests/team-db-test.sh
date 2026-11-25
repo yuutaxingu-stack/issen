@@ -15,6 +15,7 @@ $Q -f tests/supabase-stub.sql
 $Q -f supabase/schema.sql
 $Q -f supabase/save-data.sql
 $Q -f supabase/ranking.sql
+$Q -f supabase/chat.sql
 $Q -f supabase/team.sql
 $Q -f tests/team-db-test.sql
 echo '--- SQLをもう一度すべて実行（アップデートのまね）'
@@ -22,6 +23,7 @@ $Q -Atc "select count(*), string_agg(status, ',' order by id) from public.team_r
 $Q -f supabase/schema.sql
 $Q -f supabase/save-data.sql
 $Q -f supabase/ranking.sql
+$Q -f supabase/chat.sql
 $Q -f supabase/team.sql
 $Q -Atc "select count(*), string_agg(status, ',' order by id) from public.team_rooms; select count(*) from public.matches; select count(*) from public.rating_log" > "$D/after.txt"
 if cmp -s "$D/before.txt" "$D/after.txt"; then echo 'OK もう一度実行しても部屋と記録は変わらない'; else echo 'NG 変わった'; diff "$D/before.txt" "$D/after.txt"; exit 1; fi

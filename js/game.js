@@ -1005,11 +1005,13 @@ function advance(){
 const KEYS={a:[0,'iai'],s:[0,'mk'],l:[1,'iai'],k:[1,'mk']};
 window.addEventListener('keydown',e=>{
   if(!document.getElementById('panel').hidden||!document.getElementById('gacha').hidden||!document.getElementById('pausep').hidden) return;
+  const onl=document.getElementById('online'); if((onl&&!onl.hidden)||(e.target&&/^(INPUT|TEXTAREA|BUTTON)$/.test(e.target.tagName))) return;
   if(e.repeat) return; const k=KEYS[e.key.toLowerCase()];
-  if(k&&(k[0]===0||G.mode==='vs')){ ensureAudio(); press(k[0],k[1]); }
+  if(k&&G.mode==='online'){ ensureAudio(); press(NET.me,k[1]); }
+  else if(k&&(k[0]===0||G.mode==='vs')){ ensureAudio(); press(k[0],k[1]); }
   else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); advance(); }
 });
-document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')) e.preventDefault(); },{passive:false});
+document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')&&!e.target.closest('#online')) e.preventDefault(); },{passive:false});
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 

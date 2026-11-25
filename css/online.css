@@ -1,0 +1,43 @@
+/* オンライン（ログイン・フレンド・招待）の見た目。刀ガチャの画面と同じ墨と和紙の色づかい */
+#online{position:fixed;inset:0;z-index:15;background:#0e0f0c;color:#e9e2cf;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;}
+#online .gwrap{max-width:640px;}
+.otitle{flex:1;text-align:center;font-family:var(--display);font-size:22px;letter-spacing:.2em;}
+.ospacer{width:58px;}
+.oerr{margin:0;color:#f0a090;font-size:12.5px;text-align:center;} .oerr:empty{display:none;}
+#online input{font-family:var(--ui);font-size:16px;color:#e9e2cf;background:rgba(233,226,207,.06);border:1px solid rgba(233,226,207,.25);border-radius:4px;padding:9px 10px;box-sizing:border-box;width:100%;user-select:text;-webkit-user-select:text;}
+#online input:focus{outline:none;border-color:#a8322a;}
+#online input::placeholder{color:rgba(233,226,207,.35);}
+.otabs{margin:4px 0 8px;}
+.oform{display:flex;flex-direction:column;gap:10px;max-width:360px;margin:0 auto;width:100%;}
+.oform label{display:flex;flex-direction:column;gap:4px;font-size:12px;letter-spacing:.08em;opacity:.85;}
+.oform .gpull{align-self:center;margin-top:4px;}
+.omsg{margin:0;font-size:13px;text-align:center;color:#e8c35a;min-height:1.2em;}
+.ome{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border:1px solid rgba(233,226,207,.14);border-radius:6px;background:rgba(233,226,207,.03);}
+.omyname{font-family:var(--display);font-size:24px;letter-spacing:.12em;}
+.oid{font-size:13px;letter-spacing:.06em;display:flex;align-items:center;gap:8px;}
+.oid b{font-family:ui-monospace,Menlo,monospace;font-size:20px;letter-spacing:.18em;color:#e8c35a;font-weight:500;user-select:text;-webkit-user-select:text;}
+.olog{font-size:11.5px;opacity:.6;display:flex;gap:10px;align-items:center;}
+.olink{background:none;border:none;border-bottom:1px dashed rgba(233,226,207,.35);color:#e9e2cf;opacity:.7;font-size:11.5px;padding:2px 0;cursor:pointer;font-family:var(--ui);}
+.oadd{display:flex;gap:8px;margin-top:6px;} .oadd input{flex:1;text-transform:uppercase;letter-spacing:.15em;}
+#online h3{margin:8px 0 0;font-size:12px;font-weight:700;letter-spacing:.14em;opacity:.6;}
+.olist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.olist li{display:flex;align-items:center;gap:8px;padding:9px 2px;border-bottom:1px solid rgba(233,226,207,.08);}
+.olist li.none{font-size:12.5px;opacity:.55;border:none;}
+.onm{font-family:var(--display);font-size:18px;letter-spacing:.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ost{font-size:11.5px;opacity:.6;margin-right:auto;white-space:nowrap;}
+.odot{width:9px;height:9px;border-radius:50%;flex:none;}
+.odot.on{background:#8fbf7a;box-shadow:0 0 8px rgba(143,191,122,.6);} .odot.play{background:#e8c35a;} .odot.off{background:none;border:1px solid #6c6a5f;}
+.obtn{font-family:var(--ui);font-size:13px;padding:7px 12px;border-radius:4px;border:1px solid rgba(233,226,207,.3);background:none;color:#e9e2cf;cursor:pointer;white-space:nowrap;}
+.obtn.pri{background:#a8322a;border-color:#a8322a;color:#f2ede1;}
+.obtn:disabled{opacity:.35;cursor:default;}
+.obar{position:fixed;left:50%;transform:translateX(-50%);top:max(10px,env(safe-area-inset-top,0px));z-index:26;display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:center;
+  background:#16170f;color:#e9e2cf;border:1px solid rgba(168,50,42,.7);border-radius:6px;padding:10px 14px;box-shadow:0 6px 24px rgba(0,0,0,.45);font-size:14px;max-width:calc(100% - 32px);box-sizing:border-box;}
+.obar b{font-family:var(--display);font-size:18px;font-weight:400;letter-spacing:.08em;}
+.osec{font-size:12px;opacity:.6;font-variant-numeric:tabular-nums;}
+.oacts{display:flex;gap:8px;}
+.ocover{position:fixed;inset:0;z-index:24;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(6,7,5,.82);color:#e9e2cf;text-align:center;}
+.obig{font-family:var(--display);font-size:34px;letter-spacing:.2em;animation:obreath 1.6s ease-in-out infinite;}
+.ocover p{margin:0;font-size:13px;opacity:.6;}
+@keyframes obreath{50%{opacity:.45;}}
+.onote{position:fixed;left:50%;transform:translateX(-50%);bottom:max(18px,env(safe-area-inset-bottom,0px));z-index:27;background:rgba(22,23,15,.94);color:#e9e2cf;border:1px solid rgba(233,226,207,.2);border-radius:6px;padding:9px 16px;font-size:13.5px;max-width:calc(100% - 32px);box-sizing:border-box;text-align:center;}
+@media (prefers-reduced-motion: reduce){.obig{animation:none;}}

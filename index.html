@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/online.css">
 </head>
 <body>
 
@@ -20,6 +21,7 @@
     <button type="button" id="m_cpu" class="mb pri"><span class="mk">CPU戦</span><span class="ms">勝ち抜き</span></button>
     <button type="button" id="m_vs" class="mb"><span class="mk">二人対戦</span><span class="ms">向かい合って一台で</span></button>
     <button type="button" id="m_gacha" class="mb"><span class="mk">刀ガチャ</span><span class="ms">刀帳</span></button>
+    <button type="button" id="m_online" class="mb"><span class="mk">オンライン</span><span class="ms" id="m_online_s">フレンドと対戦</span></button>
   </div>
 </div>
 <div id="gacha" hidden>
@@ -50,7 +52,7 @@
         <h3>この刀での決着</h3>
         <ul class="grec" id="gd_rec"></ul>
         <div class="geq"><button type="button" id="gd_e0"></button><button type="button" id="gd_e1"></button></div>
-        <p class="gnote">CPU戦では朱の刀を使います。</p>
+        <p class="gnote">CPU戦とオンライン対戦では朱の刀を使います。</p>
         <button type="button" id="gd_close" class="gback">閉じる</button>
       </div>
     </div>
@@ -91,7 +93,61 @@
   <button type="button" id="r_ok">このまま遊ぶ</button>
 </div>
 
+<div id="online" hidden>
+  <div class="gwrap">
+    <div class="gtop">
+      <button type="button" id="o_back" class="gback">戻る</button>
+      <div class="otitle">オンライン</div>
+      <div class="ospacer"></div>
+    </div>
+    <p class="oerr" id="o_err"></p>
+    <section id="o_wait" hidden><p class="gnote">つないでいます…</p></section>
+    <section id="o_off" hidden><p class="gnote">オンライン対戦は準備中です。CPU戦・二人対戦・刀ガチャはいつも通り遊べます。</p></section>
+    <section id="o_auth" hidden>
+      <div class="gtabs otabs"><button type="button" data-tab="in" class="on">ログイン</button><button type="button" data-tab="up">はじめて</button></div>
+      <form id="o_aform" class="oform" autocomplete="on">
+        <label>ログインID<input id="o_login" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="16" placeholder="英小文字・数字・_ で3〜16文字"></label>
+        <label>パスワード<input id="o_pass" type="password" name="password" autocomplete="current-password" maxlength="72" placeholder="6文字以上"></label>
+        <label id="o_namerow" hidden>名前（相手に見えます）<input id="o_name" maxlength="10" placeholder="1〜10文字"></label>
+        <button type="submit" id="o_ago" class="gpull">ログイン</button>
+        <p class="omsg" id="o_amsg"></p>
+        <p class="gnote">パスワードを忘れると戻せません。どこかに控えておいてください。</p>
+      </form>
+    </section>
+    <section id="o_main" hidden>
+      <div class="ome">
+        <div><span class="omyname" id="o_myname"></span> <button type="button" class="olink" id="o_rename">名前を変える</button></div>
+        <div class="oid">あなたのID <b id="o_mycode"></b> <button type="button" class="obtn" id="o_copy">写す</button></div>
+        <div class="olog"><span id="o_mylogin"></span> <button type="button" class="olink" id="o_logout">ログアウト</button></div>
+      </div>
+      <form id="o_fform" class="oadd">
+        <input id="o_fcode" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="相手のID（6文字）">
+        <button type="submit" class="obtn pri">フレンド申請</button>
+      </form>
+      <p class="omsg" id="o_fmsg"></p>
+      <h3 id="o_inh" hidden>届いた申請</h3><ul class="olist" id="o_in"></ul>
+      <h3>フレンド</h3><ul class="olist" id="o_list"></ul>
+      <h3 id="o_outh" hidden>申請中</h3><ul class="olist" id="o_out"></ul>
+      <p class="gnote">オンライン対戦では、刀帳で朱に持たせた刀を使います。先に二本取った方の勝ちです。</p>
+    </section>
+  </div>
+</div>
+<div id="o_inv" class="obar" hidden>
+  <div><b id="o_invname"></b>さんから対戦の招待　<span class="osec"><span id="o_invsec"></span>秒</span></div>
+  <div class="oacts"><button type="button" class="obtn pri" id="o_invok">受ける</button><button type="button" class="obtn" id="o_invno">ことわる</button></div>
+</div>
+<div id="o_waitinv" class="obar" hidden>
+  <div><b id="o_waitname"></b>さんの返事を待っています　<span class="osec"><span id="o_waitsec"></span>秒</span></div>
+  <div class="oacts"><button type="button" class="obtn" id="o_waitcancel">取り消す</button></div>
+</div>
+<div id="o_conn" class="ocover" hidden><div class="obig">対戦の準備中</div><p>相手とつないで、時計を合わせています</p></div>
+<div id="o_note" class="onote" hidden></div>
+
 <script src="js/katana-image.js"></script>
 <script src="js/game.js"></script>
+<script src="js/online-config.js"></script>
+<script src="js/net.js"></script>
+<script src="js/online-match.js"></script>
+<script src="js/online-ui.js"></script>
 </body>
 </html>

@@ -54,9 +54,11 @@ function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a
 
 /* ---------- 時計（一時停止対応） ---------- */
 let pauseTotal=0,pausedAt=null;const pauseWhy=new Set();
-function gnow(){ return (pausedAt!=null?pausedAt:performance.now())-pauseTotal; }
+/* オンライン対戦中は、二人で合わせた時計（NETCLK）を使い、一時停止はしない */
+let NETCLK=null;
+function gnow(){ if(NETCLK) return performance.now()+NETCLK.off; return (pausedAt!=null?pausedAt:performance.now())-pauseTotal; }
 function pause(why,on){ if(on) pauseWhy.add(why); else pauseWhy.delete(why);
-  const want=pauseWhy.size>0;
+  const want=pauseWhy.size>0&&!NETCLK;
   if(want&&pausedAt==null) pausedAt=performance.now();
   else if(!want&&pausedAt!=null){ pauseTotal+=performance.now()-pausedAt; pausedAt=null; } }
 
@@ -100,6 +102,8 @@ function layoutViews(){
     const hw=SW/2, s={t:8,r:8,b:8,l:8};
     VIEWS=[{me:0,ctrl:[0],w:SH,h:hw,m:[0,1,-1,0,hw,0],rect:[0,0,hw,SH],mirror:false,sa:s,btns:[]},
            {me:1,ctrl:[1],w:SH,h:hw,m:[0,-1,1,0,hw,SH],rect:[hw,0,hw,SH],mirror:true,sa:s,btns:[]}];
+  } else if(G.mode==='online'){
+    VIEWS=[{me:NET.me,ctrl:[NET.me],w:SW,h:SH,m:[1,0,0,1,0,0],rect:[0,0,SW,SH],mirror:NET.me===1,sa:SAFE,btns:[]}];
   } else {
     VIEWS=[{me:0,ctrl:G.mode==='cpu'?[0]:[],w:SW,h:SH,m:[1,0,0,1,0,0],rect:[0,0,SW,SH],mirror:false,sa:SAFE,btns:[]}];
   }
@@ -247,11 +251,12 @@ let ARM={owned:{mumei:1},equip:['mumei','mumei'],rec:{}};
 try{ const a=JSON.parse(localStorage.getItem('issen-armory-v1')||'null'); if(a) ARM=Object.assign(ARM,a); }catch(e){}
 function saveArm(){ try{ localStorage.setItem('issen-armory-v1',JSON.stringify(ARM)); }catch(e){} }
 let CPUKAT='mumei';
-function katOf(i){ return KMAP[(G.mode==='cpu'&&i===1)?CPUKAT:(ARM.equip[i]||'mumei')]||KMAP.mumei; }
+function katOf(i){ if(G.mode==='online') return KMAP[i===NET.me?(ARM.equip[0]||'mumei'):NET.oppKat]||KMAP.mumei;
+  return KMAP[(G.mode==='cpu'&&i===1)?CPUKAT:(ARM.equip[i]||'mumei')]||KMAP.mumei; }
 function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x)],['上',lerp(0.12,0.45,x)],['極',lerp(0,0.22,x)],['幻',lerp(0,0.06,x)]];
   let r=Math.random()*w.reduce((s,v)=>s+v[1],0), t='並'; for(const [k,v] of w){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
-function recordWin(i,name){ if(G.mode==='cpu'&&i!==0) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); }
+function recordWin(i,name){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&i!==NET.me) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); }
 function rollKatana(){ let r=Math.random()*100, t='並'; for(const [k,v] of TIERRATE){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
 
@@ -262,6 +267,14 @@ const G={mode:'title',phase:'title',round:1,cueAt:0,roundEnd:0,frozenLeft:0,fx:n
   shakeUntil:0,shakeDur:1,shakeAmp:0,flashAt:-1e9,flashA:0,parts:[],startAt:-1e9};
 const RUN={n:1,coins:0,newBest:false};
 const inputQ=[];
+/* オンライン対戦の出入り口（js/online-match.js が使う）。ローカルの対戦では使わない */
+const NET={me:0,seq:0,oppH:-Infinity,remoteQ:[],fightFrom:0,rng:Math.random,send:null,oppKat:'mumei',oppName:'相手',myName:'あなた',wait:'',onPhase:null,onLeave:null};
+const ONLINE=()=>G.mode==='online';
+function opp(){ return P[1-NET.me]; }
+/* 相手から届いた操作（t: 合わせた時計での押した時刻、s: 何度目の決着の後か） */
+function netInput(t,a,s){ NET.remoteQ.push({t,a,s}); }
+function netHorizon(h){ if(h>NET.oppH) NET.oppH=h; }
+function qIns(q){ let i=inputQ.length; while(i>0&&(inputQ[i-1].t>q.t||(inputQ[i-1].t===q.t&&inputQ[i-1].p>q.p))) i--; inputQ.splice(i,0,q); }
 const TOWIN=()=>G.mode==='cpu'?1:CFG.toWin;
 
 /* コインと記録（この端末に保存） */
@@ -269,24 +282,36 @@ const COIN={'並':1,'上':3,'極':8,'幻':20,'絶':50,'分':0};
 let WALLET={coins:0,best:0};
 try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){}
 function saveWallet(){ try{ localStorage.setItem('issen-wallet-v1',JSON.stringify(WALLET)); }catch(e){} }
-window.__issen={G,P,CFG,RUN,WALLET};
+window.__issen={G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
-function startMatch(mode){
+function startMatch(mode,base){
   G.mode=mode; layoutViews();
   P.forEach(p=>{p.score=0;}); G.round=1; G.history=[];
   RUN.n=1; RUN.coins=0; RUN.newBest=false;
-  startRound();
+  startRound(base);
 }
-function goTitle(){ G.mode='title'; G.phase='title'; G.fx=null; G.result=null; P.forEach(resetPlayer); layoutViews(); }
-function startRound(){ P.forEach(resetPlayer); G.mutualAt=0; G.fx=null; G.result=null; G.parts=[]; inputQ.length=0; G.debug=null;
+/* オンライン対戦を始める。o={me,seed,startAt,clockOff,oppKat,oppName,myName,send} */
+function startOnline(o){
+  NETCLK={off:o.clockOff}; NET.me=o.me; NET.seq=0; NET.oppH=-Infinity; NET.remoteQ.length=0; NET.fightFrom=Infinity;
+  NET.rng=mulberry32(o.seed|0); NET.send=o.send||null; NET.oppKat=o.oppKat||'mumei'; NET.oppName=o.oppName||'相手'; NET.myName=o.myName||'あなた'; NET.wait='';
+  pauseWhy.clear(); pausedAt=null;
+  startMatch('online',o.startAt);
+}
+function goTitle(){ if(G.mode==='online'){ const f=NET.onLeave; NETCLK=null; NET.send=null; if(f) try{ f(G.phase); }catch(e){} }
+  G.mode='title'; G.phase='title'; G.fx=null; G.result=null; P.forEach(resetPlayer); layoutViews(); }
+function startRound(base){ P.forEach(resetPlayer); P.forEach(p=>{p.lastEnd=-Infinity;}); G.mutualAt=0; G.fx=null; G.result=null; G.parts=[]; inputQ.length=0; G.debug=null;
   if(G.mode==='cpu'){ P.forEach(p=>{p.score=0;}); pickCpuKat(); }
   aiReset(gnow()+2600);
-  G.phase='ready'; G.cueAt=gnow()+1400+Math.random()*1200; }
+  const rnd=G.mode==='online'?NET.rng:Math.random;
+  G.phase='ready'; G.cueAt=(base!=null?base:gnow())+1400+rnd()*1200; }
 function setState(p,s,t,d){ p.state=s; p.start=t; p.end=(d!=null)?t+Math.max(1,d):0; }
 
-function input(pi,a){ ensureAudio(); if(G.phase!=='fight') return; const t=gnow(); inputQ.push({t,p:pi,a}); stepTo(t); }
+function input(pi,a){ ensureAudio(); if(G.phase!=='fight') return; const t=gnow();
+  if(G.mode==='online'){ if(pi!==NET.me) return; if(NET.send) NET.send({k:'in',t,a,s:NET.seq}); }
+  qIns({t,p:pi,a}); stepTo(t); }
 function stepTo(now){
+  if(G.mode==='online') return stepOnline(now);
   let guard=0;
   while(G.phase==='fight'&&guard++<64){
     const lim=Math.min(now,G.roundEnd); let best=null,bt=Infinity;
@@ -297,6 +322,33 @@ function stepTo(now){
   }
   if(G.phase==='fight'&&now>=G.roundEnd) timeUp(now);
 }
+/* オンライン対戦の進行。二人の端末が同じ順で同じ判定をするための決まり:
+   - 斬る瞬間（溜めの終わり）は、相手の「その時刻までの操作は全部送った」という知らせ（oppH）が届くまで待つ
+   - それより後の出来事は、斬る瞬間が決まるまで進めない
+   - 相手が知らせてくれた時刻＋溜めの長さより先へは進めない（まだ届いていない居合があり得るため） */
+function stepOnline(now){
+  const o=opp();
+  for(let i=0;i<NET.remoteQ.length;){
+    const r=NET.remoteQ[i];
+    if(r.s<NET.seq){ NET.remoteQ.splice(i,1); continue; }
+    if(r.s>NET.seq||G.phase!=='fight'){ i++; continue; }
+    NET.remoteQ.splice(i,1);
+    if(r.t<NET.fightFrom||r.t<o.lastEnd) continue;
+    qIns({t:r.t,p:o.i,a:r.a});
+  }
+  let guard=0;
+  while(G.phase==='fight'&&guard++<64){
+    const lim=Math.min(now,G.roundEnd,NET.oppH+CFG.charge-1);
+    let block=Infinity;
+    for(const p of P){ if(p.state==='charge'&&p.end>0&&p.end>Math.min(now,NET.oppH)) block=Math.min(block,p.end); }
+    let best=null,bt=Infinity;
+    for(const p of P){ if(p.end>0&&p.end<bt&&p.end<=lim&&(p.state==='charge'?p.end<=NET.oppH:p.end<block)){ best=p; bt=p.end; } }
+    const useIn=inputQ.length&&inputQ[0].t<=lim&&inputQ[0].t<block&&inputQ[0].t<bt;
+    if(!best&&!useIn) break;
+    if(useIn){ const q=inputQ.shift(); onInput(P[q.p],q.a,q.t); } else onEnd(best,bt);
+  }
+  if(G.phase==='fight'&&now>=G.roundEnd&&NET.oppH>=G.roundEnd&&!P.some(p=>p.end>0&&p.end<=G.roundEnd)) timeUp(G.roundEnd);
+}
 function onInput(p,a,t){
   if(a==='iai'){
     if(p.state==='idle'){ setState(p,'charge',t,CFG.charge); sfx('koi'); }
@@ -306,6 +358,7 @@ function onInput(p,a,t){
   }
 }
 function onEnd(p,t){
+  p.lastEnd=t; G.evT=t;
   if(p.state==='charge'){ p.state='struck'; p.end=0; strike(p,t); }
   else if(p.state==='mikiri') setState(p,'mkRec',t,CFG.mkRec);
   else setState(p,'idle',t,null);
@@ -336,8 +389,9 @@ function strike(A,t){
   finish(A,D,name,'iai');
 }
 const FXDUR={iai:1900,counter1:1350,counterWin:2100,just:2300,aiuchi:1100,issen:5600};
+const NET_FX_DELAY=250;
 function beginFx(kind,W,L,extra){
-  const now=gnow(); inputQ.length=0; AI.plans.length=0;
+  const now=G.mode==='online'?G.evT+NET_FX_DELAY:gnow(); inputQ.length=0; AI.plans.length=0; NET.seq++; NET.fightFrom=Infinity;
   G.frozenLeft=Math.max(0,G.roundEnd-now);
   G.fx=Object.assign({kind,W,L,t0:now,dur:FXDUR[kind],done:{},sW:W.side,sL:L.side,poseL:poseName(L),poseW:poseName(W)},extra);
   if(G.fx.mutual&&kind!=='issen') G.fx.dur+=700;
@@ -350,14 +404,21 @@ function finish(W,L,name,kind){
   const tier=FIN[name].tier;
   let coin=COIN[tier]||0;
   if(G.mode==='cpu'&&W.i!==0) coin=0;
+  if(G.mode==='online'&&W.i!==NET.me) coin=0;
   if(coin){ WALLET.coins+=coin; RUN.coins+=coin; saveWallet(); }
   G.result={name,winner:W.i,coin};
   recordWin(W.i,name);
   G.history.push({name,winner:W.i});
   beginFx(kind,W,L,{name,mutual:W.counters>=1&&L.counters>=1});
 }
-function timeUp(now){ G.frozenLeft=0; P.forEach(p=>setState(p,'idle',now,null)); G.result={name:'睨み合い',winner:null,coin:0}; G.history.push({name:'睨み合い',winner:null}); G.phase='result'; G.resultAt=now; }
+function timeUp(now){ inputQ.length=0; NET.seq++; NET.fightFrom=Infinity; G.frozenLeft=0; P.forEach(p=>setState(p,'idle',now,null)); G.result={name:'睨み合い',winner:null,coin:0}; G.history.push({name:'睨み合い',winner:null}); G.phase='result'; G.resultAt=now; }
 function nextFromResult(){
+  if(G.mode==='online'){
+    const base=G.resultAt+4800;
+    if(P.some(p=>p.score>=TOWIN())){ G.phase='match'; G.resultAt=base; sfx('gong'); if(NET.onPhase) NET.onPhase('match'); }
+    else { G.round++; startRound(base); }
+    return;
+  }
   if(G.mode==='cpu'){
     const r=G.result;
     if(r.winner===0){ RUN.n++; G.round=1; startRound(); }
@@ -374,10 +435,11 @@ function fxTick(now){
   for(const [ms,name] of cues){ if(e>=ms&&!fx.done[name+ms]){ fx.done[name+ms]=1; doCue(name,fx,now); } }
   if(fx.mutual&&fx.kind!=='issen'){ const ht={iai:320,counterWin:300,just:480}[fx.kind]; if(ht&&e>=ht&&!fx.done.burst){ fx.done.burst=1; sfx('drum'); shake(now,12,400); } }
   if(e>=fx.dur){
+    if(G.mode==='online') now=fx.t0+fx.dur;
     if(fx.kind==='counter1'){ const D=fx.W,A=fx.L; const s=A.side; A.side=D.side; D.side=s;
-      A.counteredAt=now; A.resumeAt=now; P.forEach(p=>setState(p,'idle',now,null)); G.fx=null; G.phase='fight'; aiReset(now+400);
+      A.counteredAt=now; A.resumeAt=now; P.forEach(p=>setState(p,'idle',now,null)); G.fx=null; G.phase='fight'; NET.fightFrom=now; aiReset(now+400);
       if(P[0].counters>=1&&P[1].counters>=1&&!G.mutualAt){ G.mutualAt=now; sfx('drum'); } }
-    else if(fx.kind==='aiuchi'){ P.forEach(p=>setState(p,'idle',now,null)); G.fx=null; G.phase='fight'; aiReset(now+400); }
+    else if(fx.kind==='aiuchi'){ P.forEach(p=>setState(p,'idle',now,null)); G.fx=null; G.phase='fight'; NET.fightFrom=now; aiReset(now+400); }
     else { G.phase='result'; G.resultAt=now; const f=FIN[G.result.name]; if(f&&(f.tier==='極'||f.tier==='幻'||f.tier==='絶')) sfx('gong'); }
   }
 }
@@ -641,11 +703,12 @@ function drawHUD(c,now,vw){
   const tw=TOWIN();
   for(let i=0;i<2;i++){
     const p=P[i], L=i===vw.me, x0=L?SA.l+12:VW-SA.r-12, al=L?'left':'right', sz=clamp(VH*0.06,16,34), y=SA.t+10+sz*0.6;
-    const label=G.mode==='cpu'?(i===0?'あなた':'其の'+kn(RUN.n)):COL[i].name;
-    const lw=G.mode==='cpu'?sz*(label.length*0.6+0.55):sz*1.2;
+    const named=G.mode==='cpu'||G.mode==='online';
+    const label=G.mode==='cpu'?(i===0?'あなた':'其の'+kn(RUN.n)):G.mode==='online'?(i===NET.me?NET.myName:NET.oppName):COL[i].name;
+    const lw=named?sz*(label.length*0.6+0.55):sz*1.2;
     c.save(); c.fillStyle='rgba(242,237,225,0.82)'; const bw2=lw+tw*sz*0.62+10;
     c.beginPath(); c.roundRect(L?x0-6:x0-bw2+6,y-sz*0.68,bw2,sz*1.36+sz*0.55,8); c.fill(); c.restore();
-    txt(c,label,L?x0+lw/2-sz*0.1:x0-lw/2+sz*0.1,y,G.mode==='cpu'?sz*0.6:sz,G.mode==='cpu'?UIF:DISPLAY,COL[i].main,'center');
+    txt(c,label,L?x0+lw/2-sz*0.1:x0-lw/2+sz*0.1,y,named?sz*0.6:sz,named?UIF:DISPLAY,COL[i].main,'center');
     for(let k=0;k<tw;k++){ const cx=L?x0+lw+sz*0.05+k*sz*0.62:x0-lw-sz*0.05-k*sz*0.62; c.beginPath(); c.arc(cx,y,sz*0.2,0,7);
       if(k<p.score){ c.fillStyle=COL[i].main; c.fill(); } else { c.strokeStyle=COL[i].main; c.lineWidth=1.5; c.stroke(); } }
     const y2=y+sz*0.72; const ls=Math.max(10,sz*0.36);
@@ -682,9 +745,11 @@ function drawCenterTexts(c,now,vw){
     c.save(); c.shadowColor='rgba(255,255,255,0.9)'; c.shadowBlur=30; txt(c,'一閃',VW/2,VH*0.3,sz*(1+0.04*clamp((e-3000)/2000)),DISPLAY,rainbow(a,now),'center',1); c.restore();
     txt(c,'互いに後なし　寸分違わぬ見切り',VW/2,VH*0.3+sz*0.68,Math.max(11,sz*0.11),UIF,'rgba(240,235,220,'+a+')','center'); } }
   if(fx&&fx.kind==='aiuchi'){ const e=now-fx.t0; if(e>320) txt(c,'相打ち',VW/2,VH*0.3,big*0.6,DISPLAY,PALE,'center',clamp(1-(e-800)/300)); }
+  if(G.mode==='online'&&NET.wait){ const ws=clamp(VH*0.04,13,22); c.save(); c.fillStyle='rgba(18,22,19,0.66)'; c.beginPath(); c.roundRect(VW/2-ws*4.5,VH*0.16-ws*0.8,ws*9,ws*1.6,ws*0.4); c.fill(); c.restore();
+    txt(c,NET.wait,VW/2,VH*0.16+1,ws,UIF,PALE,'center',0.75+0.25*Math.sin(now/220)); }
   if(G.debug&&CFG.gauges&&now-G.debug.at<3000) txt(c,G.debug.text,VW/2,GY+FH*0.18,clamp(VH*0.032,11,18),UIF,'#f6f1e4','center',0.95);
 }
-function whoName(i){ return G.mode==='cpu'?(i===0?'あなた':'其の'+kn(RUN.n)):COL[i].name; }
+function whoName(i){ return G.mode==='cpu'?(i===0?'あなた':'其の'+kn(RUN.n)):G.mode==='online'?(i===NET.me?NET.myName:NET.oppName):COL[i].name; }
 function drawResult(c,now,vw){
   const e=now-G.resultAt, a=clamp(e/300), r=G.result, f=FIN[r.name];
   const cy=VH*0.4, bh=VH*0.5;
@@ -707,10 +772,11 @@ function drawResult(c,now,vw){
   let line;
   if(r.winner==null) line='一本にならず';
   else if(G.mode==='cpu') line=r.winner===0?'勝ち　'+RUN.n+'人抜き':'敗れた　'+(RUN.n-1)+'人抜きで終わり';
+  else if(G.mode==='online') line=(r.winner===NET.me?'あなたの一本':whoName(r.winner)+'の一本')+'　　'+P[NET.me].score+' − '+P[1-NET.me].score;
   else line=COL[r.winner].name+'の一本　　朱 '+P[0].score+' − '+P[1].score+' 藍';
   txt(c,line,VW/2,cy+bh/2-sl*2.4,sl*1.15,UIF,r.winner==null?'#e6dfcd':COL[r.winner].light,'center',a);
   if(r.coin) txt(c,'銭 +'+r.coin+'　（所持 '+WALLET.coins+'）',VW/2,cy+bh/2-sl*1.0,sl*0.95,UIF,'#e8c35a','center',a);
-  if(e>1200) txt(c,'画面をタップで次へ',VW/2,cy+bh/2+sl*1.3,sl*0.95,UIF,'#1b1e19','center',0.55+0.35*Math.sin(now/260));
+  if(e>1200&&G.mode!=='online') txt(c,'画面をタップで次へ',VW/2,cy+bh/2+sl*1.3,sl*0.95,UIF,'#1b1e19','center',0.55+0.35*Math.sin(now/260));
 }
 function drawMatch(c,now,vw){
   const e=now-G.resultAt, a=clamp(e/400);
@@ -727,11 +793,11 @@ function drawMatch(c,now,vw){
     return;
   }
   const w=P[0].score>=TOWIN()?0:1;
-  const mine=w===vw.me;
-  txt(c,COL[w].name+'の勝ち',VW/2,VH*0.28,big,DISPLAY,COL[w].light,'center',a);
+  const mine=w===vw.me, on=G.mode==='online';
+  txt(c,on?(mine?'勝ち':'負け'):COL[w].name+'の勝ち',VW/2,VH*0.28,big,DISPLAY,COL[w].light,'center',a);
   txt(c,mine?'見事':'無念',VW/2,VH*0.28+big*0.72,sl*1.3,UIF,PALE,'center',a);
-  txt(c,'朱 '+P[0].score+' − '+P[1].score+' 藍',VW/2,VH*0.28+big*0.72+sl*2,sl*1.3,UIF,PALE,'center',a);
-  const hist=G.history.map((h,i)=>kn(i+1)+'本目 '+h.name+(h.winner==null?'':'（'+COL[h.winner].name+'）')).join('　');
+  txt(c,on?whoName(NET.me)+' '+P[NET.me].score+' − '+P[1-NET.me].score+' '+whoName(1-NET.me):'朱 '+P[0].score+' − '+P[1].score+' 藍',VW/2,VH*0.28+big*0.72+sl*2,sl*1.3,UIF,PALE,'center',a);
+  const hist=G.history.map((h,i)=>kn(i+1)+'本目 '+h.name+(h.winner==null?'':'（'+(on?whoName(h.winner):COL[h.winner].name)+'）')).join('　');
   c.save(); let hs=sl; c.font=hs+'px '+UIF; while(c.measureText(hist).width>VW-24&&hs>8){ hs-=1; c.font=hs+'px '+UIF; } c.restore();
   txt(c,hist,VW/2,VH*0.28+big*0.72+sl*4,hs,UIF,'#cfc8b6','center',a);
   if(e>1200) txt(c,'画面をタップでタイトルへ',VW/2,VH*0.28+big*0.72+sl*6.2,sl*1.1,UIF,PALE,'center',0.55+0.35*Math.sin(now/260));
@@ -846,7 +912,7 @@ function frame(){
   const now=gnow(), running=pausedAt==null;
   setView(VIEWS[0]);
   if(running){
-    if(G.phase==='ready'&&now>=G.cueAt){ G.phase='fight'; G.roundEnd=G.cueAt+CFG.roundSec*1000; G.startAt=now; sfx('clack'); aiReset(now); }
+    if(G.phase==='ready'&&now>=G.cueAt){ G.phase='fight'; G.roundEnd=G.cueAt+CFG.roundSec*1000; G.startAt=now; NET.fightFrom=G.cueAt; sfx('clack'); aiReset(now); }
     if(G.phase==='fight'){ aiTick(now); stepTo(now); }
     if(G.phase==='fx') fxTick(now);
     if(G.phase==='result'&&now-G.resultAt>4800) nextFromResult();
@@ -933,7 +999,7 @@ cv.addEventListener('pointerdown',e=>{
 });
 function advance(){
   const now=gnow();
-  if(G.phase==='result'&&now-G.resultAt>900) nextFromResult();
+  if(G.phase==='result'&&now-G.resultAt>900&&G.mode!=='online') nextFromResult();
   else if(G.phase==='match'&&now-G.resultAt>1200) goTitle();
 }
 const KEYS={a:[0,'iai'],s:[0,'mk'],l:[1,'iai'],k:[1,'mk']};
@@ -955,7 +1021,10 @@ function updateUI(){
   const menuOn=G.phase==='title'&&gachaEl.hidden;
   const key=gearOn+'|'+menuOn+'|'+G.mode+'|'+WALLET.coins+'|'+WALLET.best+'|'+JSON.stringify(ARM.owned);
   if(key===uiCache) return; uiCache=key;
-  gearEl.hidden=!gearOn; gearEl.classList.toggle('mid',G.mode==='vs'); gearEl.textContent=G.mode==='vs'?'止':'一時停止';
+  gearEl.hidden=!gearOn; gearEl.classList.toggle('mid',G.mode==='vs'); gearEl.textContent=G.mode==='vs'?'止':G.mode==='online'?'退出':'一時停止';
+  document.querySelector('#pausep h2').textContent=G.mode==='online'?'退出しますか':'一時停止';
+  document.getElementById('ps_resume').textContent=G.mode==='online'?'続ける（試合は止まりません）':'続ける';
+  document.getElementById('ps_title').textContent=G.mode==='online'?'退出してタイトルへ':'タイトルへ戻る';
   menuEl.hidden=!menuOn;
   document.getElementById('m_meta').textContent='所持 '+WALLET.coins+' 銭　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き';
 }

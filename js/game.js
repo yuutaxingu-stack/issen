@@ -30,6 +30,7 @@ const kn=n=>n<=10?KNUM[n]:String(n);
 
 /* ---------- 調整値（すべて仮） ---------- */
 const DEF={charge:800,cancelRec:150,window:400,just:30,mkRec:850,ryuten:700,roundSec:120,toWin:2,gauges:false,sound:true};
+const TIMING_KEYS=['charge','cancelRec','window','just','mkRec','ryuten','roundSec'];
 const SPEC=[
   ['charge','居合の溜め','ms',150,1500,10,'押してから斬撃が出るまで。この間は相手に構えが見える。'],
   ['cancelRec','居合を解いた後の硬直','ms',0,800,10,'溜め中にもう一度押して解いた後、動けない時間。'],
@@ -274,7 +275,7 @@ const inputQ=[];
 /* オンライン対戦の出入り口（js/online-match.js が使う）。ローカルの対戦では使わない */
 /* 観戦（watch）のときは、二人とも届いた操作で動かす。me=0（朱）の目線で見せ、myH は朱の「ここまで送った」知らせ */
 const NET={me:0,seq:0,oppH:-Infinity,remoteQ:[],fightFrom:0,rng:Math.random,send:null,oppKat:'mumei',oppName:'相手',myName:'あなた',wait:'',onPhase:null,onLeave:null,rate:null,
-  watch:false,myH:-Infinity,myKat:'mumei',toWin:0,tag:'',back:''};
+  watch:false,myH:-Infinity,myKat:'mumei',toWin:0,tag:'',back:'',hSent:-Infinity};
 const ONLINE=()=>G.mode==='online';
 function opp(){ return P[1-NET.me]; }
 /* 相手から届いた操作（t: 合わせた時計での押した時刻、s: 何度目の決着の後か） */
@@ -314,7 +315,8 @@ function startMatch(mode,base){
 function startOnline(o){
   NETCLK={off:o.clockOff}; NET.me=o.me; NET.seq=0; NET.oppH=-Infinity; NET.remoteQ.length=0; NET.fightFrom=Infinity;
   NET.rng=mulberry32(o.seed|0); NET.send=o.send||null; NET.oppKat=o.oppKat||'mumei'; NET.oppName=o.oppName||'相手'; NET.myName=o.myName||'あなた'; NET.wait=''; NET.rate=null;
-  NET.watch=!!o.watch; NET.myH=-Infinity; NET.myKat=o.myKat||'mumei'; NET.toWin=o.toWin|0; NET.tag=o.tag||''; NET.back=o.back||'';
+  NET.watch=!!o.watch; NET.myH=-Infinity; NET.myKat=o.myKat||'mumei'; NET.toWin=o.toWin|0; NET.tag=o.tag||''; NET.back=o.back||''; NET.hSent=-Infinity;
+  for(const k of TIMING_KEYS) CFG[k]=DEF[k];   // 二人の判定を必ずそろえるため、オンラインでは確定値だけを使う
   pauseWhy.clear(); pausedAt=null;
   startMatch('online',o.startAt);
 }
@@ -346,6 +348,16 @@ function stepTo(now){
    - 斬る瞬間（溜めの終わり）は、相手の「その時刻までの操作は全部送った」という知らせ（oppH）が届くまで待つ
    - それより後の出来事は、斬る瞬間が決まるまで進めない
    - 相手が知らせてくれた時刻＋溜めの長さより先へは進めない（まだ届いていない居合があり得るため） */
+/* 斬る瞬間が来たら、すぐ相手に「ここまでの操作は全部送った」と知らせる。
+   0.5秒ごとの知らせだけを待つと、斬撃が出るまでに最大0.5秒＋通信の遅れだけ止まって見えるため */
+function netPulse(now){
+  if(NET.watch||!NET.send) return;
+  let need=Infinity;
+  for(const p of P) if(p.state==='charge'&&p.end>0&&p.end<need) need=p.end;
+  for(const q of inputQ) if(q.a==='iai'&&q.t+CFG.charge<need) need=q.t+CFG.charge;
+  for(const r of NET.remoteQ) if(r.a==='iai'&&r.s===NET.seq&&r.t+CFG.charge<need) need=r.t+CFG.charge;
+  if(need<=now&&NET.hSent<need){ NET.hSent=now; NET.send({k:'h',h:now}); }
+}
 function stepOnline(now){
   const o=opp();
   for(let i=0;i<NET.remoteQ.length;){
@@ -357,6 +369,7 @@ function stepOnline(now){
     if(r.t<NET.fightFrom||r.t<rp.lastEnd) continue;
     qIns({t:r.t,p:rp.i,a:r.a});
   }
+  netPulse(now);
   let guard=0; const H=netH();
   while(G.phase==='fight'&&guard++<64){
     const lim=Math.min(now,G.roundEnd,H+CFG.charge-1);
@@ -414,7 +427,7 @@ const NET_FX_DELAY=250;
 function beginFx(kind,W,L,extra){
   const now=G.mode==='online'?G.evT+NET_FX_DELAY:gnow(); inputQ.length=0; AI.plans.length=0; NET.seq++; NET.fightFrom=Infinity;
   G.frozenLeft=Math.max(0,G.roundEnd-now);
-  G.fx=Object.assign({kind,W,L,t0:now,dur:FXDUR[kind],done:{},sW:W.side,sL:L.side,poseL:poseName(L),poseW:poseName(W)},extra);
+  G.fx=Object.assign({kind,W,L,t0:now,v0:Math.max(now,gnow()),dur:FXDUR[kind],done:{},sW:W.side,sL:L.side,poseL:poseName(L),poseW:poseName(W)},extra);
   if(G.fx.mutual&&kind!=='issen') G.fx.dur+=700;
   G.roundEnd+=G.fx.dur;
   P.forEach(p=>{p.end=0;});
@@ -450,12 +463,19 @@ function nextFromResult(){
   if(P.some(p=>p.score>=TOWIN())){ G.phase='match'; G.resultAt=gnow(); sfx('gong'); }
   else { G.round++; startRound(); }
 }
+/* 演出の見た目の経過時間。通信の遅れで決着が分かるのが遅れたときは、頭から少し速めに再生して、
+   終わる時刻（二人で同じ）に間に合わせる。頭の一閃が飛ばされて見えないように */
+function fxE(fx,now){
+  if(!(fx.v0>fx.t0)) return now-fx.t0;
+  const span=Math.max(fx.t0+fx.dur-fx.v0,fx.dur*0.6);
+  return Math.max(0,now-fx.v0)*fx.dur/span;
+}
 function fxTick(now){
-  const fx=G.fx, e=now-fx.t0;
+  const fx=G.fx, e=fxE(fx,now);
   const cues=CUES[fx.kind];
   for(const [ms,name] of cues){ if(e>=ms&&!fx.done[name+ms]){ fx.done[name+ms]=1; doCue(name,fx,now); } }
   if(fx.mutual&&fx.kind!=='issen'){ const ht={iai:320,counterWin:300,just:480}[fx.kind]; if(ht&&e>=ht&&!fx.done.burst){ fx.done.burst=1; sfx('drum'); shake(now,12,400); } }
-  if(e>=fx.dur){
+  if(now-fx.t0>=fx.dur){
     if(G.mode==='online') now=fx.t0+fx.dur;
     if(fx.kind==='counter1'){ const D=fx.W,A=fx.L; const s=A.side; A.side=D.side; D.side=s;
       A.counteredAt=now; A.resumeAt=now; P.forEach(p=>setState(p,'idle',now,null)); G.fx=null; G.phase='fight'; NET.fightFrom=now; aiReset(now+400);
@@ -551,7 +571,7 @@ function views(now){
   const fx=G.fx;
   if(!fx) return [baseView(P[0],now),baseView(P[1],now)];
   const v=[null,null];
-  const e=Math.min(now-fx.t0,fx.dur), W=fx.W, L=fx.L, xW0=sideX(fx.sW), xL0=sideX(fx.sL);
+  const e=Math.min(fxE(fx,now),fx.dur), W=fx.W, L=fx.L, xW0=sideX(fx.sW), xL0=sideX(fx.sL);
   const dirWL=Math.sign(xL0-xW0), dirLW=-dirWL;
   if(fx.kind==='iai'){
     const u=ease(clamp((e-120)/200)); const endX=dirWL>0?VW*0.93:VW*0.07;
@@ -578,7 +598,7 @@ function views(now){
   return v;
 }
 function darkAlpha(now){
-  const fx=G.fx; if(!fx) return 0; const e=Math.min(now-fx.t0,fx.dur);
+  const fx=G.fx; if(!fx) return 0; const e=Math.min(fxE(fx,now),fx.dur);
   switch(fx.kind){
     case 'iai': return e<120?0.88*e/120:e<1500?0.88:0.88-0.33*clamp((e-1500)/400);
     case 'counterWin': return e<100?0.85*e/100:e<1600?0.85:0.85-0.3*clamp((e-1600)/400);
@@ -681,7 +701,7 @@ function slash(c,x0,y0,x1,y1,h1,w,st){
   c.restore();
 }
 function drawSlashes(c,now){
-  const fx=G.fx; if(!fx) return; const e=Math.min(now-fx.t0,fx.dur);
+  const fx=G.fx; if(!fx) return; const e=Math.min(fxE(fx,now),fx.dur);
   const xW0=sideX(fx.sW), xL0=sideX(fx.sL), dirWL=Math.sign(xL0-xW0), dirLW=-dirWL, base=Math.max(3,VH*0.014)*(fx.mutual?1.6:1);
   if(fx.kind==='iai'&&e>=120){
     const u=ease(clamp((e-120)/200)), life=1-clamp((e-380)/800), y=GY-0.58*FH;
@@ -759,13 +779,13 @@ function drawCenterTexts(c,now,vw){
     c.save(); c.fillStyle='rgba(18,22,19,0.6)'; c.beginPath(); c.roundRect(VW/2-ms*3.6,my-ms*0.75,ms*7.2,ms*1.5,ms*0.4); c.fill(); c.restore();
     txt(c,'互いに後なし',VW/2,my+1,ms,DISPLAY,'#ffb3a8','center',0.8+0.2*Math.sin(now/200)); }
   const fx=G.fx;
-  if(fx&&fx.kind==='counter1'){ const e=now-fx.t0; if(e>380&&e<1350){ const a=e<520?(e-380)/140:e>1150?1-(e-1150)/200:1; const xW1=mx(sideX(fx.sL));
+  if(fx&&fx.kind==='counter1'){ const e=fxE(fx,now); if(e>380&&e<1350){ const a=e<520?(e-380)/140:e>1150?1-(e-1150)/200:1; const xW1=mx(sideX(fx.sL));
     txt(c,'見切',xW1,GY-1.32*FH,big*0.55,DISPLAY,COL[fx.W.i].light,'center',a);
     txt(c,'あと一度で一本',xW1,GY-1.32*FH+big*0.42,big*0.17,UIF,PALE,'center',a); } }
-  if(fx&&fx.kind==='issen'){ const e=now-fx.t0; if(e>3000&&e<5300){ const a=clamp((e-3000)/500)*(1-clamp((e-4800)/500)), sz=Math.min(VH*0.32,VW*0.3);
+  if(fx&&fx.kind==='issen'){ const e=fxE(fx,now); if(e>3000&&e<5300){ const a=clamp((e-3000)/500)*(1-clamp((e-4800)/500)), sz=Math.min(VH*0.32,VW*0.3);
     c.save(); c.shadowColor='rgba(255,255,255,0.9)'; c.shadowBlur=30; txt(c,'一閃',VW/2,VH*0.3,sz*(1+0.04*clamp((e-3000)/2000)),DISPLAY,rainbow(a,now),'center',1); c.restore();
     txt(c,'互いに後なし　寸分違わぬ見切り',VW/2,VH*0.3+sz*0.68,Math.max(11,sz*0.11),UIF,'rgba(240,235,220,'+a+')','center'); } }
-  if(fx&&fx.kind==='aiuchi'){ const e=now-fx.t0; if(e>320) txt(c,'相打ち',VW/2,VH*0.3,big*0.6,DISPLAY,PALE,'center',clamp(1-(e-800)/300)); }
+  if(fx&&fx.kind==='aiuchi'){ const e=fxE(fx,now); if(e>320) txt(c,'相打ち',VW/2,VH*0.3,big*0.6,DISPLAY,PALE,'center',clamp(1-(e-800)/300)); }
   if(G.mode==='online'&&NET.tag&&G.phase!=='match'){ const tg=(NET.watch?'観戦　':'')+NET.tag, ts2=clamp(VH*0.03,11,16), ty2=Math.max(VH*0.215,SA.t+clamp(VH*0.065,18,38)*2.6);
     c.save(); c.font=ts2+'px '+UIF; const tw2=c.measureText(tg).width+ts2*1.6; c.fillStyle='rgba(18,22,19,0.62)'; c.beginPath(); c.roundRect(VW/2-tw2/2,ty2-ts2*0.85,tw2,ts2*1.7,ts2*0.5); c.fill(); c.restore();
     txt(c,tg,VW/2,ty2,ts2,UIF,'#e8c35a','center',0.95); }
@@ -912,7 +932,7 @@ function drawMutualStage(c,now){
 }
 function drawMutualBurst(c,now){
   const fx=G.fx; if(!fx||!fx.mutual||fx.kind==='issen') return; const ht={iai:320,counterWin:300,just:480}[fx.kind]; if(!ht) return;
-  const e=Math.min(now-fx.t0,fx.dur); if(e<ht) return; const t=clamp((e-ht)/900);
+  const e=Math.min(fxE(fx,now),fx.dur); if(e<ht) return; const t=clamp((e-ht)/900);
   const x=fx.kind==='iai'?sideX(fx.sL):VW/2, y=GY-0.58*FH, r=mulberry32(13);
   c.save(); c.fillStyle='rgba(150,28,20,'+(0.85*(1-t))+')';
   for(let i=0;i<26;i++){ const an=r()*Math.PI*2, d=FH*(0.2+r()*1.4)*ease(t), s=FH*(0.02+r()*0.07)*(1-t*0.5); c.beginPath(); c.ellipse(x+Math.cos(an)*d,y+Math.sin(an)*d*0.6,s*1.6,s,an,0,7); c.fill(); }
@@ -920,7 +940,7 @@ function drawMutualBurst(c,now){
   c.save(); c.globalAlpha=0.8*(1-t); enso(c,x,y,FH*(0.5+0.6*ease(t)),'rgba(200,40,30,0.9)',31); c.restore();
 }
 function drawIssenFx(c,now){
-  const fx=G.fx; if(!fx||fx.kind!=='issen') return; const e=Math.min(now-fx.t0,fx.dur);
+  const fx=G.fx; if(!fx||fx.kind!=='issen') return; const e=Math.min(fxE(fx,now),fx.dur);
   const xW0=sideX(fx.sW), xL0=sideX(fx.sL), dirLW=Math.sign(xW0-xL0), base=Math.max(3,VH*0.014), y=GY-0.58*FH;
   const stL=katOf(fx.L.i).slash;
   if(e>=900&&e<1300){ const u=ease(clamp((e-900)/150)), life=1-clamp((e-1050)/200); slash(c,dirLW>0?-40:VW+40,y,VW/2,y,u,base*life,stL); }

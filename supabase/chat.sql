@@ -193,11 +193,14 @@ $$;
 create or replace function public.chat_match_news() returns trigger
 language plpgsql security definer set search_path = '' as $$
 declare
-  s jsonb; w uuid; fin text; e text;
+  s jsonb; w uuid; fin text; e text; nm jsonb;
 begin
+  -- 二人の名前も入れておく（フレンドのフレンドの名前は表から読めないため）
+  nm := jsonb_build_object('n0', (select name from public.profiles where id = new.p0),
+                           'n1', (select name from public.profiles where id = new.p1));
   if tg_op = 'INSERT' then
     insert into public.chat_messages (author, partner, kind, ref)
-      values (new.p0, new.p1, 'match_start', jsonb_build_object('match_id', new.id));
+      values (new.p0, new.p1, 'match_start', nm || jsonb_build_object('match_id', new.id));
   elsif new.status <> old.status and new.status in ('done', 'void', 'abandoned') then
     s := new.result -> 's';
     if new.status = 'done' and jsonb_typeof(s) = 'array' and (s ->> 0) is distinct from (s ->> 1) then
@@ -208,7 +211,7 @@ begin
         where split_part(x, ':', 2) in ('0', '1') order by i desc limit 1;
     end if;
     insert into public.chat_messages (author, partner, kind, ref)
-      values (new.p0, new.p1, 'match_end', jsonb_build_object(
+      values (new.p0, new.p1, 'match_end', nm || jsonb_build_object(
         'match_id', new.id, 'status', new.status, 'winner', w, 'finish', fin, 'score', s));
   end if;
   return new;
@@ -240,3 +243,8 @@ do $$ begin
     alter publication supabase_realtime add table public.chat_messages;
   end if;
 end $$;
+
+-- 寄合の部屋 chat:<自分のid> に入れるようにする（schema.sql の部屋の守りに足す形。どちらを先に実行してもよい）
+drop policy if exists "issen: 寄合を読む" on realtime.messages;
+create policy "issen: 寄合を読む" on realtime.messages for select to authenticated
+  using (auth.uid() is not null and realtime.topic() = 'chat:' || auth.uid()::text);

@@ -80,3 +80,4 @@
 @keyframes cslide{from{transform:translateY(-8px);opacity:0;}}
 @keyframes cpulse{50%{box-shadow:0 0 0 4px rgba(168,50,42,.25);}}
 @media (prefers-reduced-motion: reduce){.cmsg,.csheet,.cherald{animation:none;}.cbadge.named{animation:none;}}
+.cnews .cteam{font-size:10.5px;letter-spacing:.14em;border:1px solid rgba(232,195,90,.5);color:#e8c35a;border-radius:2px;padding:1px 5px;margin-right:6px;}

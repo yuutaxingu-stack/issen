@@ -198,6 +198,10 @@ begin
   -- 二人の名前も入れておく（フレンドのフレンドの名前は表から読めないため）
   nm := jsonb_build_object('n0', (select name from public.profiles where id = new.p0),
                            'n1', (select name from public.profiles where id = new.p1));
+  -- 団体戦の試合なら部屋の id も（room_id 列は団体戦の SQL が足す。無くても動く）
+  if to_jsonb(new) ? 'room_id' and to_jsonb(new) ->> 'room_id' is not null then
+    nm := nm || jsonb_build_object('room', to_jsonb(new) ->> 'room_id');
+  end if;
   if tg_op = 'INSERT' then
     insert into public.chat_messages (author, partner, kind, ref)
       values (new.p0, new.p1, 'match_start', nm || jsonb_build_object('match_id', new.id));

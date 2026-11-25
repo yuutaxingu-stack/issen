@@ -237,7 +237,7 @@
   function line(m){
     const r = m.ref || {};
     if (m.kind === 'match_start') {
-      return '<li class="cnews" data-id="' + m.id + '"><span class="cnm">' + esc(r.n0 || nameOf(m.author)) + '</span> 対 <span class="cnm">' +
+      return '<li class="cnews" data-id="' + m.id + '">' + (r.room ? '<span class="cteam">団体戦</span>' : '') + '<span class="cnm">' + esc(r.n0 || nameOf(m.author)) + '</span> 対 <span class="cnm">' +
         esc(r.n1 || nameOf(m.partner)) + '</span>　立ち合い<time>' + when(m.created_at) + '</time></li>';
     }
     if (m.kind === 'match_end') {
@@ -250,7 +250,7 @@
         t = '<span class="cnm">' + esc(r.n0 || nameOf(m.author)) + '</span> 対 <span class="cnm">' + esc(r.n1 || nameOf(m.partner)) + '</span>　' +
           (r.status === 'done' ? '引き分け' : '決着つかず');
       }
-      return '<li class="cnews end" data-id="' + m.id + '">' + t + '<time>' + when(m.created_at) + '</time></li>';
+      return '<li class="cnews end" data-id="' + m.id + '">' + (r.room ? '<span class="cteam">団体戦</span>' : '') + t + '<time>' + when(m.created_at) + '</time></li>';
     }
     const mine = m.author === me();
     const cls = ['cmsg', mine ? 'mine' : '', forMe(m) ? 'forme' : '', m.to_id ? 'whisper' : ''].join(' ');
@@ -262,7 +262,11 @@
         (open && !mine ? '<button type="button" class="obtn pri" data-take="' + m.id + '">受けて立つ</button>' : '') +
         (open && mine ? '<button type="button" class="obtn" data-op="shut">しめる</button>' : '') + '</div>';
     } else if (m.kind === 'team') {
-      body = '<div class="crec"><span class="crt">団体戦</span><span class="crl">' + esc(m.body || '参陣を募る') + '</span></div>';
+      const RULE = { free: '自由戦', taisho: '大将戦', tournament: 'トーナメント', kachinuki: '勝ち抜き団体戦' };
+      const open = r.open && !m.deleted, canJoin = open && !mine && r.room && window.IssenTeam && IssenTeam.join;
+      body = '<div class="crec' + (open ? '' : ' shut') + '"><span class="crt">団体戦</span><span class="crl">' +
+        esc([RULE[r.rule] || '', r.n ? r.n + '人' : '', m.body || '参陣を募る'].filter(Boolean).join('・')) + (open ? '' : '　しめ切り') + '</span>' +
+        (canJoin ? '<button type="button" class="obtn pri" data-team="' + esc(r.room) + '">参陣</button>' : '') + '</div>';
     } else {
       body = '<p>' + bodyHtml(m) + '</p>';
     }
@@ -335,6 +339,7 @@
   el.addEventListener('click', async e => {
     const t = e.target.closest('button'); if (!t) { if (e.target.id === 'c_sheet') closeSheet(); return; }
     if (t.dataset.take) return take(Number(t.dataset.take), t);
+    if (t.dataset.team) { if (window.IssenTeam) { close(); IssenTeam.join(t.dataset.team); } return; }
     if (t.dataset.who) { const m = C.msgs.find(x => String(x.id) === t.dataset.who); if (m) msgSheet(m); return; }
     if (t.dataset.pick) { const f = N.friends.find(x => x.id === t.dataset.pick); if (f) pickFriend(f); return; }
     if (t.dataset.sheet === 'close') return closeSheet();

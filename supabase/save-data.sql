@@ -73,6 +73,15 @@ create table if not exists public.saves (
 alter table public.saves add column if not exists steel bigint not null default 0 check (steel >= 0);
 alter table public.saves add column if not exists forges int not null default 0;   -- 鍛えた回数
 
+-- ---------- 運営アカウント（2026-11-26） ----------
+-- ここに入っている人だけ、ガチャで銭が減らず、ピックアップ（選んだ刀が必ず出る）で引ける
+create table if not exists public.god_accounts (
+  id uuid primary key references public.profiles(id) on delete cascade,
+  added_at timestamptz not null default now()
+);
+alter table public.god_accounts enable row level security;
+revoke all on public.god_accounts from anon, authenticated;
+
 alter table public.katana_catalog enable row level security;
 alter table public.gacha_tiers enable row level security;
 alter table public.finish_coins enable row level security;
@@ -140,7 +149,8 @@ $$;
 create or replace function public.save_json(s public.saves) returns jsonb
 language sql stable set search_path = '' as $$
   select jsonb_build_object('coins', s.coins, 'steel', s.steel, 'best', s.cpu_best, 'owned', s.owned, 'rec', s.rec, 'equip', s.equip,
-    'imports', s.imports, 'cost', (select c.pull_cost from public.app_config c where c.id = 1));
+    'imports', s.imports, 'cost', (select c.pull_cost from public.app_config c where c.id = 1),
+    'god', exists (select 1 from public.god_accounts g where g.id = s.id));
 $$;
 
 -- 自分の行を（なければ作って）鍵をかけて取る
@@ -270,18 +280,24 @@ end;
 $$;
 
 -- ガチャを引く。くじはサーバーが引き、銭を減らして刀を渡す
+-- 運営アカウントは銭が減らず、p_pick に刀idを渡すとその刀が必ず出る（ほかの人が渡すと断る）
 -- 返す got: [{ id, new, steel }]（new = 初めての刀、steel = 持っていた刀が変わった玉鋼）、back: 重なって戻った銭、steel_got: 玉鋼の合計
-create or replace function public.pull_gacha(p_n int) returns jsonb
+drop function if exists public.pull_gacha(int);   -- 前の形（p_pick なし）を外す。p_n だけでも呼べる
+create or replace function public.pull_gacha(p_n int, p_pick text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   s public.saves;
   cost int; total numeric; r numeric; t text; k text; had bigint; back int := 0; st int; steel_got bigint := 0;
   got jsonb := '[]';
-  i int;
+  i int; god boolean;
 begin
   s := public.save_lock();
   if p_n is null or p_n < 1 or p_n > 1000 then raise exception '回数が正しくありません'; end if;
+  god := exists (select 1 from public.god_accounts g where g.id = s.id);
+  if p_pick is not null and not god then raise exception 'ピックアップは使えません'; end if;
+  if p_pick is not null and not exists (select 1 from public.katana_catalog c where c.id = p_pick) then raise exception 'その刀はありません'; end if;
   select x.pull_cost into cost from public.app_config x where x.id = 1;
+  if god then cost := 0; end if;
   if s.coins < p_n::bigint * cost then raise exception '銭が足りません。勝負に勝って銭を集めてください'; end if;
   -- 刀が1本もない階級はくじから外す
   select sum(g.weight) into total from public.gacha_tiers g
@@ -297,6 +313,7 @@ begin
       exit when r <= 0;
     end loop;
     select c.id into k from public.katana_catalog c where c.tier = t and c.in_gacha order by random() limit 1;
+    if p_pick is not null then k := p_pick; select c.tier into t from public.katana_catalog c where c.id = k; end if;
     had := coalesce((s.owned ->> k)::bigint, 0);
     s.owned := jsonb_set(s.owned, array[k], to_jsonb(had + 1));
     st := 0;
@@ -369,9 +386,9 @@ grant execute on function public.zetsu_owners(uuid[]) to authenticated;
 revoke execute on function
   public.save_num(jsonb, bigint), public.save_json(public.saves), public.save_lock(), public.save_has(public.saves, text),
   public.get_save(), public.import_local(jsonb), public.record_win(text, text), public.record_cpu_best(int),
-  public.pull_gacha(int), public.set_equip(text, text), public.forge_katana(text)
+  public.pull_gacha(int, text), public.set_equip(text, text), public.forge_katana(text)
   from public, anon, authenticated;
 grant execute on function
   public.get_save(), public.import_local(jsonb), public.record_win(text, text), public.record_cpu_best(int),
-  public.pull_gacha(int), public.set_equip(text, text), public.forge_katana(text)
+  public.pull_gacha(int, text), public.set_equip(text, text), public.forge_katana(text)
   to authenticated;

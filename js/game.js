@@ -254,6 +254,7 @@ function buildKatanas(){
 }
 /* 自分の刀。ログインしていなければこの端末に、ログイン中はアカウントに保存する（js/save-sync.js）
    刀は id（英字の名前）で覚えるので、刀を足したり並べ替えたりしても記録は崩れない */
+let GOD=false;   // 運営アカウント（サーバーが god:true を返す）: 銭が減らず、ピックアップで刀を選べる
 let ACCT=null;   // ログイン中だけ入る、アカウントへ保存する出入り口 {win,best,pull,equip}
 let ARM;
 function loadGuestArm(){ ARM={owned:{mumei:1},equip:['mumei','mumei'],rec:{}};
@@ -303,10 +304,10 @@ function guestData(){ // この端末に保存されている記録（ログイ�
   a=a||{}; w=w||{}; return {coins:w.coins||0,best:w.best||0,steel:w.steel||0,owned:a.owned||{},rec:a.rec||{},equip:a.equip||['mumei','mumei']}; }
 function applySave(d,pend){ // アカウントの持ち物を画面に映す。pend: まだサーバーに届いていない銭
   ARM.owned=Object.assign({mumei:1},d.owned||{}); ARM.rec=d.rec||{}; ARM.equip=Array.isArray(d.equip)&&d.equip.length===2?d.equip.slice():['mumei','mumei'];
-  WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; WALLET.steel=d.steel||0; if(d.cost>0) PULLCOST=d.cost;
+  WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; WALLET.steel=d.steel||0; if(d.cost>0) PULLCOST=d.cost; GOD=!!d.god;
   uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
 function useAccount(api){ ACCT=api; }
-function useGuest(){ ACCT=null; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
+function useGuest(){ ACCT=null; GOD=false; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
 window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
@@ -1107,7 +1108,7 @@ function updateUI(){
   document.getElementById('ps_resume').textContent=G.mode==='online'?'続ける（試合は止まりません）':'続ける';
   document.getElementById('ps_title').textContent=G.mode==='online'?'退出してタイトルへ':'タイトルへ戻る';
   menuEl.hidden=!menuOn;
-  document.getElementById('m_meta').textContent='所持 '+WALLET.coins+' 銭・玉鋼 '+(WALLET.steel||0)+'　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
+  document.getElementById('m_meta').textContent='所持 '+(GOD?'無限':WALLET.coins)+' 銭・玉鋼 '+(WALLET.steel||0)+'　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
 }
 document.getElementById('m_cpu').addEventListener('click',()=>{ ensureAudio(); startMatch('cpu'); });
 document.getElementById('m_vs').addEventListener('click',()=>{ ensureAudio(); startMatch('vs'); });
@@ -1143,18 +1144,23 @@ function shownTier(k,e){ if(k.tier==='絶') return e<1000?'並':e<1700?'極':e<2
 function gSize(){ const r=gcv.getBoundingClientRect(); GA.W=Math.max(200,r.width); GA.H=Math.max(120,r.height); gcv.width=Math.round(GA.W*DPR); gcv.height=Math.round(GA.H*DPR); }
 function openGacha(tab){ gachaEl.hidden=false; uiCache=''; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
-function refreshCoins(){ document.getElementById('g_coins').textContent=WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=Math.floor(WALLET.coins/PULLCOST), busy=gBusy();
-  document.getElementById('g_pull1').disabled=busy||n<1; const all=document.getElementById('g_all'); all.disabled=busy||n<2; all.innerHTML='全部引く　<small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>'; }
+const GOD_N=10;   // 運営アカウントの「十振り引く」
+function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.floor(WALLET.coins/PULLCOST), busy=gBusy();
+  const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='一振り引く　<small>'+(GOD?'無料':PULLCOST+'銭')+'</small>'; const all=document.getElementById('g_all'); all.disabled=busy||n<2;
+  all.innerHTML=GOD?'十振り引く　<small>銭は減りません</small>':'全部引く　<small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>';
+  const pk=document.getElementById('g_pick'); if(pk){ pk.hidden=!GOD; if(GOD&&pk.options.length<2) fillPick(pk); pk.disabled=busy; } }
+// ピックアップ: 選んだ刀が必ず出る（運営アカウントだけ。サーバーでも確かめる）
+function fillPick(pk){ pk.innerHTML='<option value="">ピックアップなし（ふつうのくじ）</option>'+['絶','幻','極','上','並'].map(t=>'<optgroup label="'+t+'">'+KATANA.filter(k=>k.tier===t).map(k=>'<option value="'+k.id+'">'+k.mei+'</option>').join('')+'</optgroup>').join(''); }
 function setTab(t){ document.querySelectorAll('.gtabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
   document.getElementById('g_pull').hidden=t!=='pull'; document.getElementById('g_book').hidden=t!=='book'; if(t==='book') renderBook(); else gSize(); }
 function doPull(n){
   if(gBusy()) return;
-  const msg=document.getElementById('g_msg'); n=Math.min(n,Math.floor(WALLET.coins/PULLCOST));
+  const msg=document.getElementById('g_msg'); n=GOD?Math.min(n,GOD_N):Math.min(n,Math.floor(WALLET.coins/PULLCOST));
   if(n<1){ msg.textContent='銭が足りません。勝負に勝って銭を集めてください。'; return; }
   msg.textContent=''; ensureAudio();
   if(ACCT){ // ログイン中: くじはサーバーが引く
     GA.phase='wait'; msg.textContent='引いています…'; refreshCoins();
-    ACCT.pull(n).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
+    ACCT.pull(n,GOD?(document.getElementById('g_pick').value||null):null).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
       startDraw(r.got.map(g=>{ const k=KMAP[g.id]||KMAP.mumei; return {k,isNew:!!g.new,steel:g.new?0:(g.steel!=null?g.steel:STEEL[k.tier])}; }),r.back||0); },
       e=>{ if(GA.phase==='wait') GA.phase='idle'; msg.textContent=e.message; refreshCoins(); });
     return;

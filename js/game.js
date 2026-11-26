@@ -1318,7 +1318,7 @@ function renderBook(){
   const grid=document.getElementById('g_grid'); grid.innerHTML='';
   const got=KATANA.filter(k=>ARM.owned[k.id]).length;
   document.getElementById('g_count').innerHTML='集めた刀　'+got+' / '+KATANA.length+'<small>玉鋼 <b>'+(WALLET.steel||0)+'</b>　まだ持っていない刀に触れると、玉鋼で鍛えられます</small>';
-  KATANA.map((k,i)=>[k,i]).sort((a,b)=>TORD[b[0].tier]-TORD[a[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
+  KATANA.map((k,i)=>[k,i]).sort((a,b)=>TORD[a[0].tier]-TORD[b[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
     const b=document.createElement('button'); b.type='button'; b.className='gcard t'+TORD[k.tier]+(own?'':' unk');
     const cvs=document.createElement('canvas'); cvs.width=420; cvs.height=Math.round(420*KIMG_H/KIMG_W)+8;
     const x=cvs.getContext('2d'); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,4,420,420*KIMG_H/KIMG_W);

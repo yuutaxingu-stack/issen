@@ -75,6 +75,7 @@
       else if (act === 'del') { if (confirmTwice(b, '本当に削除')) await N.remove(id); }
       else if (act === 'undo') await N.remove(id);
       else if (act === 'inv') { b.disabled = true; await N.sendInvite(id); }
+      else if (act === 'inv2') { b.disabled = true; await N.sendInvite(id, 'action'); }
     } catch (err) { N.toast(err.message); b.disabled = false; }
   });
 
@@ -105,6 +106,7 @@
         const s = N.statusOf(f.id), [lab, cls] = STATUS[s];
         return '<li><span class="odot ' + cls + '"></span><span class="onm">' + esc(f.name) + '</span><span class="ost">' + lab + '</span>' +
           '<button type="button" class="obtn pri" data-act="inv" data-id="' + f.id + '"' + (s === 'online' && !busy ? '' : ' disabled') + '>招待</button>' +
+          '<button type="button" class="obtn pri" data-act="inv2" data-id="' + f.id + '"' + (s === 'online' && !busy ? '' : ' disabled') + ' title="新・一閃（動いて斬り合う）で招待">新・一閃</button>' +
           '<button type="button" class="obtn" data-act="del" data-id="' + f.id + '">削除</button></li>';
       }).join('') : '<li class="none">まだフレンドがいません。相手のIDを上に入れて申請しましょう</li>';
       $('o_in').innerHTML = N.incoming.map(f => '<li><span class="onm">' + esc(f.name) + '</span><span class="ost">ID ' + esc(f.code) + '</span>' +
@@ -122,9 +124,9 @@
     const box = $('o_inv'), w = $('o_waitinv'), inOnline = I.G.mode === 'online';
     const inv = N.invite;
     box.hidden = !inv || inOnline;
-    if (inv) $('o_invname').textContent = N.nameOf(inv.from_id);
+    if (inv) { $('o_invname').textContent = N.nameOf(inv.from_id); $('o_invgame').textContent = inv.game === 'action' ? '新・一閃で' : ''; }
     w.hidden = !N.waiting;
-    if (N.waiting) $('o_waitname').textContent = N.nameOf(N.waiting.to_id);
+    if (N.waiting) { $('o_waitname').textContent = N.nameOf(N.waiting.to_id); $('o_waitgame').textContent = N.waiting.game === 'action' ? '（新・一閃）' : ''; }
     countdown();
   }
   function countdown(){

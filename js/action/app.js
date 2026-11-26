@@ -283,6 +283,7 @@ let acc = 0, lastT = performance.now();
 function tick(now){
   let dt = now - lastT; lastT = now; if (dt > 250) dt = 250;
   acc += dt;
+  if (GAME.mode === 'online') { acc = 0; onlineTick(); }
   while (acc >= 1000 / 60) { acc -= 1000 / 60; stepOnce(); }
   draw();
   requestAnimationFrame(tick);
@@ -293,7 +294,7 @@ function inputSym(i){
   return ar + (i.C ? '斬' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.C] : '') + (i.A ? '技' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
 }
 function stepOnce(){
-  if (DBG.pause || GAME.mode === 'menu' || PAUSED || EDIT) return;
+  if (DBG.pause || GAME.mode === 'menu' || GAME.mode === 'online' || PAUSED || EDIT) return;
   stepN++;
   if (GAME.phase === 'over') { tickParts(); return; }
   if (GAME.phase === 'intro') { GAME.t++; if (GAME.t === 1 && GAME.zin) SND.play('draw'); if (GAME.t > 80 + GAME.zin) { GAME.phase = 'fight'; GAME.t = 0; GAME.zin = 0; } tickParts(); return; }
@@ -847,10 +848,11 @@ function bar(x, y, w, h, frac, col, right){
   const fw = w * clamp(frac, 0, 1);
   cx.fillStyle = col; cx.fillRect(right ? x + w - fw : x, y, fw, h);
 }
-function lastBout(){ return GAME.mode === 'vs' && sim.wins[0] === 1 && sim.wins[1] === 1; } // 互いに後がない
+function lastBout(){ return (GAME.mode === 'vs' || GAME.mode === 'online') && sim.wins[0] === 1 && sim.wins[1] === 1; } // 互いに後がない
 function whoName(i){
   if (GAME.mode === 'train') return i ? '藍（木偶）' : '朱（あなた）';
   if (GAME.mode === 'cpu') return i ? '其の' + kn(GAME.n) : '朱（あなた）';
+  if (GAME.mode === 'online' && ON) return COL[i].name + '　' + ON.names[i] + (i === ON.me ? '（あなた）' : '');
   return COL[i].name;
 }
 function drawHud(){
@@ -860,7 +862,7 @@ function drawHud(){
     const p = sim.p[i], right = (i === 1) !== (MIR < 0), x = right ? W - m - bw : m;
     cx.font = `700 15px ${UIF}`; cx.fillStyle = red ? '#ffd9cf' : COL[i].main; cx.textAlign = right ? 'right' : 'left';
     let nm = whoName(i);
-    if (GAME.mode === 'vs') nm += '　' + '●'.repeat(sim.wins[i]) + '○'.repeat(Math.max(0, 2 - sim.wins[i]));
+    if (GAME.mode === 'vs' || GAME.mode === 'online') nm += '　' + '●'.repeat(sim.wins[i]) + '○'.repeat(Math.max(0, 2 - sim.wins[i]));
     cx.fillText(nm, right ? W - m : m, top + 12);
     bar(x, top + 20, bw, 12, p.hp / A.HP_MAX, red ? '#f2e6d8' : INK, right);
     bar(x, top + 36, bw * 0.8 + 0, 5, p.gd / A.GD_MAX, p.gd <= 2000 ? COL[0].main : '#3d5a6c', right);
@@ -989,6 +991,8 @@ function draw(){
     cx.restore();
   }
   if (VIEWS.length > 1) { cx.setTransform(DPR, 0, 0, DPR, 0, 0); cx.fillStyle = '#141512'; cx.fillRect(SW / 2 - 1, 0, 2, SH); }
+  if (GAME.mode === 'online' && ON && ON.msg) { cx.setTransform(DPR, 0, 0, DPR, 0, 0); cx.font = `500 13px ${UIF}`; cx.textAlign = 'center';
+    const tw = cx.measureText(ON.msg).width + 24; cx.fillStyle = 'rgba(20,21,18,.72)'; cx.fillRect(SW / 2 - tw / 2, SH * 0.3 - 14, tw, 28); cx.fillStyle = PALE; cx.fillText(ON.msg, SW / 2, SH * 0.3 + 5); }
 }
 function drawView(v){
   const sh = 0; // 画面揺れは酔うのでなし（2026-11-26 ユーザー指定）
@@ -1104,10 +1108,11 @@ function showOver(on){
   const lines = GAME.log.filter(l => l.winner >= 0);
   let head, sub;
   if (GAME.mode === 'cpu') { head = GAME.n - 1 ? `${GAME.n - 1}人抜き` : '敗れる'; sub = `其の${kn(GAME.n)}に敗れる` + (GAME.n - 1 >= GAME.best && GAME.n > 1 ? '　最高記録' : `　最高 ${GAME.best}人抜き`); }
+  else if (GAME.mode === 'online' && ON) { const w = sim.wins[0] > sim.wins[1] ? 0 : 1; head = w === ON.me ? '勝ち' : '負け'; sub = `${ON.names[0]} ${sim.wins[0]} 対 ${sim.wins[1]} ${ON.names[1]}`; }
   else { const w = sim.wins[0] > sim.wins[1] ? 0 : 1; head = COL[w].name + 'の勝ち'; sub = `${sim.wins[0]} 対 ${sim.wins[1]}`; }
   if (GAME.coins) sub += `　・　得た銭 ${GAME.coins}`;
   $('ov_h').textContent = head; $('ov_s').textContent = sub;
-  $('ov_l').innerHTML = lines.map((l, k) => `<li><span class="w" style="color:${COL[l.winner].light}">${GAME.mode === 'cpu' ? (l.winner ? '相手' : 'あなた') : COL[l.winner].name}</span><b style="color:${TIERC[l.tier] || PALE}">${l.name}</b><small>${l.tier === '分' ? '' : l.tier}</small></li>`).join('');
+  $('ov_l').innerHTML = lines.map((l, k) => `<li><span class="w" style="color:${COL[l.winner].light}">${GAME.mode === 'cpu' ? (l.winner ? '相手' : 'あなた') : GAME.mode === 'online' && ON ? (l.winner === ON.me ? 'あなた' : ON.names[l.winner]) : COL[l.winner].name}</span><b style="color:${TIERC[l.tier] || PALE}">${l.name}</b><small>${l.tier === '分' ? '' : l.tier}</small></li>`).join('');
 }
 function setPause(on){ PAUSED = on; $('pausep').hidden = !on; }
 function setupMenu(){
@@ -1115,8 +1120,11 @@ function setupMenu(){
   $('mn_vs').onclick = () => startMode('vs');
   $('mn_train').onclick = () => startMode('train');
   $('ov_again').onclick = () => startMode(GAME.mode);
-  $('ov_menu').onclick = () => { showOver(false); showMenu(true); };
-  $('a_pause').onclick = () => setPause(true);
+  $('ov_menu').onclick = () => { if (GAME.mode === 'online' && ON) { ON.onExit(); return; } showOver(false); showMenu(true); };
+  $('a_pause').onclick = () => { if (GAME.mode === 'online' && ON) { // ネット対戦は止められない。二度押しで退出
+      const b = $('a_pause'); if (b.dataset.armed) { ON.onExit('leave'); return; }
+      b.dataset.armed = '1'; b.textContent = 'もう一度押すと退出（記録しない）'; setTimeout(() => { b.dataset.armed = ''; b.textContent = '退出'; }, 2500); return; }
+    setPause(true); };
   $('ps_resume').onclick = () => setPause(false);
   $('ps_retry').onclick = () => { setPause(false); startMode(GAME.mode); };
   $('ps_menu').onclick = () => { setPause(false); showMenu(true); };
@@ -1134,10 +1142,99 @@ function setupMenu(){
       if (id === 'a_kit' && GAME.mode === 'train') startMode('train'); }; }
 }
 
+/* ---------- ネット対戦（フレンドと1対1・二本先取） ----------
+   つなぐのは online.js。ここは計算と見せ方。二人の端末は同じ時計のコマ番号で同じ計算を進め、
+   相手の入力が遅れたら見込みで進めて、届いたら巻き戻して計算し直す（netplay.js）。
+   一本の始まり（立ち合い）・決着の間・次の一本への切り替えも、コマ数で決めて二人で揃える。 */
+const NPL = window.IssenNetPlay;
+let ON = null;
+const FRAME_MS = 1000 / 60;
+/* o = { me, kits:[朱,藍], names:[朱,藍], kat: 自分の刀のid, startAt: 始まりの時刻（自分の時計）, delay,
+         onLocal(f, code) 自分の入力を送る, onOver(log, wins) 決着を知らせる, onExit() 戻る } */
+function onlineStart(o){
+  GAME.mode = 'online'; GAME.log = []; GAME.coins = 0; GAME.n = 1;
+  sim = new A.Sim({ toWin: 2, kits: o.kits });
+  const zin = sim.p.some(p => p.kit === 'ouka') ? 110 : 0;
+  ON = Object.assign({ L: { ph: 'intro', t: 0, zin, log: [] }, played: new Map(), hashes: {}, round: sim.roundNo, msg: '', done: false, wait: 0 }, o);
+  ON.np = NPL.NetPlay({ me: o.me, delay: o.delay == null ? 2 : o.delay, maxRoll: 12, save: onSave, load: onLoad, step: onStep });
+  GAME.phase = 'intro'; GAME.t = 0; GAME.zin = zin;
+  clearFx(); FX.hist = []; FX.last = null;
+  document.body.dataset.mode = 'online';
+  showMenu(false); showOver(false); setPause(false);
+  $('a_pause').textContent = '退出'; $('ov_again').hidden = true; $('ov_menu').textContent = '一閃へ戻る';
+  layoutViews();
+  return ON;
+}
+function onSave(){ return { s: structuredClone(Object.assign({}, sim)), L: structuredClone(ON.L) }; }
+function onLoad(z){ const s = new A.Sim(sim.opts); Object.assign(s, structuredClone(z.s)); sim = s; ON.L = structuredClone(z.L); }
+function onStep(inp, resim, f){
+  const L = ON.L;
+  if (L.ph === 'intro') { L.t++; if (L.t === 1 && L.zin && !resim) SND.play('draw'); if (L.t > 80 + L.zin) { L.ph = 'fight'; L.t = 0; L.zin = 0; } }
+  else if (L.ph === 'fight') {
+    sim.step(inp);
+    for (const e of sim.ev) { // 見込みで一度見せた出来事は、計算し直しても二度は見せない
+      const k = f + ':' + e.t + ':' + (e.p != null ? e.p : e.by != null ? e.by : '') + ':' + (e.mv || '');
+      if (!ON.played.has(k)) { ON.played.set(k, f); onEvent(e); }
+    }
+    sim.ev = [];
+    if (sim.over) { L.ph = 'fin'; L.t = 0; }
+    if (!resim) for (const p of sim.p) recordTrail(p);
+  } else if (L.ph === 'fin') {
+    if (++L.t > 200) { const r = sim.result; L.log.push({ name: r.name, tier: r.tier, winner: r.winner });
+      if (r.matchOver) L.ph = 'over'; else { sim.resetRound(); L.ph = 'intro'; L.t = 0; } }
+  }
+  ON.hashes[f] = (sim.hash() ^ Math.imul(L.log.length + 1, 40503) ^ Math.imul(L.t + 7, 2654435761)) >>> 0; // ずれの検出用
+  if (f % 600 === 0) for (const k in ON.hashes) if (k < f - 1200) delete ON.hashes[k];
+}
+/* 計算の結果を画面の状態に写す（巻き戻しで決着が取り消されたら、決着の演出も消す） */
+function onlineSync(){
+  const L = ON.L;
+  GAME.phase = L.ph === 'intro' ? 'intro' : L.ph === 'over' ? 'over' : 'fight';
+  GAME.t = L.t; GAME.zin = L.zin; GAME.log = L.log;
+  if (sim.roundNo !== ON.round) { ON.round = sim.roundNo; clearFx(); }
+  if (L.ph === 'fin' || L.ph === 'over') {
+    if (!FX.finish && sim.result) { const r = sim.result, w = r.winner, l = w >= 0 ? sim.p[1 - w] : sim.p[0];
+      FX.finish = { t: 0, how: r.how, name: r.name, p: w, tier: r.tier, x: l.x / FP, y: l.y / FP + 60, zetsu: w >= 0 && sim.p[w].kit === 'ouka' }; }
+    if (FX.finish) FX.finish.t = L.ph === 'over' ? 201 : L.t;
+  } else if (FX.finish) FX.finish = null;
+}
+function onlineTick(){
+  if (!ON) return;
+  const np = ON.np, target = Math.floor((ON.now() - ON.startAt) / FRAME_MS);
+  let n = 0;
+  while (np.frame < target && n < 8) {
+    if (np.lh < np.frame + np.D) { const i = readHuman(0); stepN++; const code = NPL.encode(i); ON.onLocal(np.local(code), code); }
+    if (!np.advance()) break;
+    n++; tickParts();
+  }
+  np.resolve();
+  onlineSync();
+  if (ON.played.size > 400) { const c = np.confirmed() - 60; for (const [k, f] of ON.played) if (f < c) ON.played.delete(k); }
+  // 相手の入力が来ないまま先に進みすぎたら待つ
+  const behind = target - np.frame;
+  ON.wait = behind > 2 && !np.canAdvance() ? ON.wait + 1 : 0;
+  ON.msg = ON.wait > 20 ? '通信待ち…' : ON.extMsg || '';
+  // 決着がもう巻き戻らなくなったら、結果を知らせる
+  if (ON.L.ph === 'over' && !ON.done && np.confirmed() >= np.frame - 1) {
+    ON.done = true; GAME.log = ON.L.log;
+    for (const l of ON.L.log) if (l.winner === ON.me) recordOnlineWin(l);
+    showOver(true);
+    if (ON.onOver) ON.onOver(ON.L.log.slice(), sim.wins.slice());
+  }
+}
+function recordOnlineWin(l){ // 勝った一本ごとに、自分の刀の戦績と銭
+  const id = ON.kat; if (!owns(id)) return;
+  const coin = COIN[l.tier] || 0;
+  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); a.push({ f: l.name, k: id, acct: !!SNAP.acct, t: Date.now() }); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
+  GAME.coins = (GAME.coins || 0) + coin;
+}
+function onlineEnd(){ ON = null; }
+
 resize(); setupBar(); setupMenu();
-{ const m = (location.search.match(/[?&]m=(\w+)/) || [])[1]; if (m === 'train' || m === 'cpu' || m === 'vs') startMode(m); else showMenu(true); }
+{ const m = (location.search.match(/[?&]m=(\w+)/) || [])[1]; if (m === 'train' || m === 'cpu' || m === 'vs') startMode(m); else if (!/[?&]match=/.test(location.search)) showMenu(true); }
 
 const DBG = { pause: false };
-window.__action = { step: () => stepOnce(), get sim(){ return sim; }, GAME, startMode, CPU, FX, OPT, resetRound, DBG, recordTrail, draw, cam, get W(){ return W; }, get GROUND(){ return GROUND; } };
+window.__action = { onlineStart, onlineEnd, get ON(){ return ON; },
+  myKat(){ const k = SNAP.owned.find(q => q.id === KITS[0]) || SNAP.owned[0]; return { id: k.id, mei: k.mei, tier: k.tier, kit: kitOf(k.id, 'online') }; }, step: () => stepOnce(), get sim(){ return sim; }, GAME, startMode, CPU, FX, OPT, resetRound, DBG, recordTrail, draw, cam, get W(){ return W; }, get GROUND(){ return GROUND; } };
 requestAnimationFrame(t => { lastT = t; requestAnimationFrame(tick); });
 })();

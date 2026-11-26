@@ -212,7 +212,7 @@
     if (!inv || !inv.id) return;
     if (inv.status === 'pending') {
       if (!N.friends.some(f => f.id === inv.from_id)) refreshFriends();
-      N.invite = { id: inv.id, from_id: inv.from_id, until: untilOf(inv) };
+      N.invite = { id: inv.id, from_id: inv.from_id, until: untilOf(inv), game: inv.game || 'issen' };
     } else if (N.invite && N.invite.id === inv.id) N.invite = null;
     emit();
   }
@@ -220,18 +220,24 @@
     if (!N.waiting || inv.id !== N.waiting.id) return;
     if (inv.status === 'accepted' && inv.match_id) {
       N.waiting = null; emit();
-      if (N.onMatch) N.onMatch(inv.match_id, 0);
+      if (N.onMatch) N.onMatch(inv.match_id, 0, inv.game || N.waitingGame || 'issen');
     } else if (inv.status !== 'pending') {
       const why = { declined: 'ことわられました', expired: '返事がありませんでした', cancelled: '取り消されました' }[inv.status] || '';
       N.waiting = null; emit();
       if (N.toast) N.toast(N.nameOf(inv.to_id) + 'さんへの招待は' + why);
     }
   }
-  N.sendInvite = async function(to){
-    const { data, error } = await N.sb.rpc('send_invite', { p_to: to });
-    if (error) throw new Error(jp(error));
+  /* game: 'issen'（今までの一閃）/ 'action'（新・一閃。action-online.sql が要る） */
+  N.sendInvite = async function(to, game){
+    const act = game === 'action';
+    const { data, error } = await N.sb.rpc('send_invite', act ? { p_to: to, p_game: 'action' } : { p_to: to });
+    if (error) {
+      if (act && /function|p_game|schema cache/i.test(String(error.message || ''))) throw new Error('新・一閃のオンライン対戦は、サーバーの準備がまだです');
+      throw new Error(jp(error));
+    }
+    N.waitingGame = act ? 'action' : 'issen';
     const r = await N.sb.from('invites').select('*').eq('id', data).maybeSingle();
-    N.waiting = { id: data, to_id: to, until: r.data ? untilOf(r.data) : performance.now() + 60000 };
+    N.waiting = { id: data, to_id: to, game: N.waitingGame, until: r.data ? untilOf(r.data) : performance.now() + 60000 };
     emit();
   };
   N.cancelInvite = async function(){
@@ -243,7 +249,7 @@
     if (!inv) return;
     const { data, error } = await N.sb.rpc('respond_invite', { p_id: inv.id, p_accept: ok });
     if (error) throw new Error(jp(error));
-    if (ok && data && N.onMatch) N.onMatch(data, 1);
+    if (ok && data && N.onMatch) N.onMatch(data, 1, inv.game || 'issen');
   };
   // 期限切れを画面から消す
   setInterval(() => {

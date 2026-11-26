@@ -236,6 +236,7 @@
   window.addEventListener('pagehide', () => { const st = M.active; if (st && !st.ended && st.started) { send(st, { k: 'bye' }); } });
   // 対戦中のひとこと（相手にだけ届く。保存しない）
   M.say = function(t){ const st = M.active; if (st && st.started && !st.ended) send(st, { k: 'say', t: String(t).slice(0, 30) }); };
-  N.onMatch = (id, me) => M.start(id, me);
+  // 新・一閃の試合は、新・一閃のページで戦う
+  N.onMatch = (id, me, game) => { if (game === 'action') { N.setStatus('playing'); location.href = 'action.html?match=' + encodeURIComponent(id) + '&me=' + me; } else M.start(id, me); };
   window.IssenMatch = M;
 })();

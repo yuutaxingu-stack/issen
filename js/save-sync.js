@@ -64,11 +64,11 @@
     win(f, k, c){ push({ t: 'win', f, k, c: c || 0 }); },
     best(n){ push({ t: 'best', n }); },
     equip(eq){ push({ t: 'equip', a: eq[0], b: eq[1] }); },
-    async pull(n){
+    async pull(n, pick){   // pick: ピックアップする刀（運営アカウントだけ）
       await flush();
       if (queue().length) throw new Error('通信できませんでした。電波のよい所でもう一度引いてください');
       let d;
-      try { d = await rpc('pull_gacha', { p_n: n }); }
+      try { d = await rpc('pull_gacha', pick ? { p_n: n, p_pick: pick } : { p_n: n }); }
       catch (e) { if (last) apply(last); throw new Error(N.jp(e)); }   // 断られたらサーバーの銭に戻す
       apply(d);
       return d;

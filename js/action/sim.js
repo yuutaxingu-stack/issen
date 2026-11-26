@@ -3,14 +3,14 @@
    - 1秒60回の固定の歩み。位置・速さ・体力はすべて整数（1px = 100）で数える。
      同じ操作を入れれば、どの端末でも必ず同じ結果になる（ネット対戦・観戦の土台）。
    - 描画や音は持たない。毎フレーム step([入力0, 入力1]) を呼ぶだけ。
-   - 入力は { L, R, U, D, A(斬), J(跳), G(守) } の真偽値。
+   - 入力は { L, R, U, D, A(斬), J(跳), G(守), F(スティックを素早く倒した瞬間), V(技の向き 'u'|'d'|'h'|'n'、省略可), C(攻撃スティックを弾いた瞬間 'u'|'d'|'l'|'r'|'n') }。
    ===================================================================== */
 (function(root){
 'use strict';
 const FP = 100;
 const WALL_L = 40 * FP, WALL_R = 1560 * FP;
 const PLATS = [{ x0: 330 * FP, x1: 630 * FP, y: 190 * FP }, { x0: 970 * FP, x1: 1270 * FP, y: 190 * FP }];
-const PH = { walk: 420, airMax: 520, airAcc: 70, grav: 62, fallMax: 1150, ffall: 1700, jumpS: 1150, jumpF: 1550, jump2: 1350,
+const PH = { walk: 340, dash: 800, airMax: 520, airAcc: 70, grav: 62, fallMax: 1150, ffall: 1700, jumpS: 1150, jumpF: 1550, jump2: 1350,
              wallVX: 750, wallVY: 1350, gFric: 90, roll: 650 };
 const HP_MAX = 10000, GD_MAX = 10000;
 const C = {
@@ -44,9 +44,9 @@ const MV = {
   gatk:  { n:'起き上がり斬り', k:'g', s:18, a:4, r:8, dmg:500, gd:800, hs:24, blk:-4, kb:[650,300], box:[-72,0,144,60], arc:[-170,170], inv:[1,12] },
   nair:  { n:'空中斬', k:'a', s:5, a:6, r:14, land:8, dmg:400, gd:600, hs:18, kb:[320,320], box:[-44,26,104,84], arc:[-150,150] },
   fair:  { n:'前空斬', k:'a', s:8, a:4, r:18, land:12, dmg:600, gd:900, hs:22, kb:[720,360], box:[8,28,98,72], arc:[120,-60] },
-  bair:  { n:'後空斬', k:'a', s:7, a:3, r:16, land:11, dmg:700, gd:1000, hs:22, kb:[820,420], box:[-104,36,92,62], arc:[200,280] },
-  uair:  { n:'上空斬', k:'a', s:6, a:5, r:14, land:10, dmg:500, gd:700, hs:24, kb:[100,1150], box:[-44,92,88,74], arc:[-10,190] },
-  dair:  { n:'下空斬（兜割り）', k:'a', s:12, a:4, r:22, land:18, dmg:800, gd:1200, hs:26, kb:[120,-1350], kd:1, box:[-32,-34,64,70], arc:[60,-100] },
+  bair:  { n:'後空斬', k:'a', s:5, a:3, r:16, land:11, dmg:900, gd:1100, hs:24, kb:[860,430], box:[-104,36,92,62], arc:[200,280] },
+  uair:  { n:'上空斬', k:'a', s:8, a:5, r:14, land:10, dmg:500, gd:700, hs:24, kb:[100,1150], box:[-44,92,88,74], arc:[-10,190] },
+  dair:  { n:'下空斬（突き）', k:'a', s:16, a:2, r:20, land:18, dmg:800, gd:1200, hs:34, kb:[60,0], flinch:1, box:[-7,-40,14,62], arc:[-90,-90] },
   airiai:{ n:'空中居合', k:'a', s:10, a:4, r:30, land:20, dmg:1000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,10,132,100], iai:1, arc:[-165,10], lunge:[2,10,3000] },
 };
 for (const id in MV) {
@@ -102,8 +102,28 @@ function readInput(p, inp){
   p.hEdge = (h && h !== ph) ? h : 0;
   p.holdA = inp.A ? p.holdA + 1 : 0;
   p.lastG = (inp.G && !pi.G) ? 0 : p.lastG + 1;
+  takeC(p, inp);
+}
+/* 攻撃スティック: 弾いた瞬間を斬の先行入力として覚え、向きも一緒に覚える */
+function takeC(p, inp){
+  if (p.cb && --p.cb.n <= 0) p.cb = null;
+  if (inp.C) { p.buf.A = C.buf; p.cb = { d: inp.C, n: C.buf }; }
 }
 const horiz = p => (p.inp.R ? 1 : 0) - (p.inp.L ? 1 : 0);
+/* 技の向き。スティックは強く倒した方（V）、キーボードなどは斜めなら横を優先（急降下しながらでも空前・空後が出る） */
+function hsign(p){ return p.cb ? (p.cb.d === 'r' ? 1 : p.cb.d === 'l' ? -1 : 0) : horiz(p); }
+function adir(p, air){
+  if (p.cb) return p.cb.d === 'l' || p.cb.d === 'r' ? 'h' : p.cb.d;
+  const i = p.inp, h = horiz(p);
+  if (i.V === 'h' && h) return 'h';
+  if (i.V === 'u' && i.U) return 'u';
+  if (i.V === 'd' && i.D) return 'd';
+  if (i.V === 'n') return 'n';
+  if (air && h) return 'h';
+  if (i.D) return 'd';
+  if (i.U) return 'u';
+  return h ? 'h' : 'n';
+}
 
 function hurt(p){
   if (p.st === 'down') return [-50, 0, 100, 28];
@@ -122,8 +142,8 @@ function invuln(p){
 }
 
 Sim.prototype.startMove = function(p, id){
-  p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0;
-  if (id === 'iai' || id === 'airiai') p.buf.G = 0;
+  p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null;
+  if (id === 'iai' || id === 'airiai') { p.buf.G = 0; const o = this.p[1 - p.i]; if (o.x !== p.x) p.face = sgn(o.x - p.x); }
   this.ev.push({ t: 'start', p: p.i, mv: id });
 };
 
@@ -131,9 +151,6 @@ Sim.prototype.think = function(p, o){
   const h = horiz(p), i = p.inp;
   const oppStun = o.st === 'stun';
   const canIai = oppStun && p.buf.G > 0;
-  if (p.ground && (p.st === 'idle' || p.st === 'walk' || p.st === 'crouch' || p.st === 'guard')) {
-    if (o.x !== p.x) p.face = sgn(o.x - p.x);
-  }
   switch (p.st) {
     case 'idle': case 'walk': case 'crouch':
       if (canIai) return this.startMove(p, 'iai');
@@ -148,12 +165,24 @@ Sim.prototype.think = function(p, o){
         p.st = 'jsq'; p.f = 0; return;
       }
       if (p.buf.A) {
-        if (i.D) return this.startMove(p, 'dtilt');
-        if (i.U) return this.startMove(p, 'utilt');
-        if (h) return this.startMove(p, 'side');
+        const d = adir(p);
+        if (d === 'd') return this.startMove(p, 'dtilt');
+        if (d === 'u') return this.startMove(p, 'utilt');
+        if (d === 'h') { p.face = hsign(p); return this.startMove(p, 'side'); }
         return this.startMove(p, 'jab1');
       }
+      if (i.F && h && !i.D) { p.st = 'dash'; p.face = h; p.f = 0; this.ev.push({ t: 'dash', p: p.i }); return; }
+      if (h && !i.D) p.face = h;
       p.st = i.D ? 'crouch' : h ? 'walk' : 'idle';
+      return;
+    case 'dash':
+      if (canIai) return this.startMove(p, 'iai');
+      if (i.G && !oppStun) { p.st = 'guard'; p.f = 0; return; }
+      if (p.buf.J) { p.buf.J = 0; p.st = 'jsq'; p.f = 0; return; }
+      if (p.buf.A) { const hs = hsign(p); if (hs) p.face = hs; return this.startMove(p, 'side'); }
+      if (i.D) { p.st = 'crouch'; return; }
+      if (h === -p.face) { p.face = h; p.f = 0; return; }
+      if (!h) { p.st = 'idle'; return; } // 手を離すと滑って止まる
       return;
     case 'guard':
       if (!i.G) { p.st = 'unguard'; p.f = 0; return; }
@@ -167,14 +196,13 @@ Sim.prototype.think = function(p, o){
       if (p.buf.J) {
         const atL = p.x <= WALL_L + 600, atR = p.x >= WALL_R - 600;
         if ((atL && h > 0) || (atR && h < 0)) { p.buf.J = 0; p.vy = PH.wallVY; p.vx = h * PH.wallVX; p.face = h; p.ff = false; this.ev.push({ t: 'walljump', p: p.i }); return; }
-        if (p.jumps > 0) { p.buf.J = 0; p.jumps--; p.vy = PH.jump2; p.vx = h * PH.airMax; p.ff = false; if (h) p.face = h; this.ev.push({ t: 'jump2', p: p.i }); return; }
+        if (p.jumps > 0) { p.buf.J = 0; p.jumps--; p.vy = PH.jump2; p.vx = h * PH.airMax; p.ff = false; this.ev.push({ t: 'jump2', p: p.i }); return; }
       }
       if (p.buf.A) {
-        const d = h * p.face;
-        if (i.U && !i.D) return this.startMove(p, 'uair');
-        if (i.D) return this.startMove(p, 'dair');
-        if (d > 0) return this.startMove(p, 'fair');
-        if (d < 0) return this.startMove(p, 'bair');
+        const dv = adir(p, true);
+        if (dv === 'u') return this.startMove(p, 'uair');
+        if (dv === 'd') return this.startMove(p, 'dair');
+        if (dv === 'h') return this.startMove(p, hsign(p) * p.face > 0 ? 'fair' : 'bair');
         return this.startMove(p, 'nair');
       }
       if (i.D && !p.pi.D && p.vy <= 200) p.ff = true;
@@ -204,6 +232,7 @@ Sim.prototype.update = function(p, o){
     case 'idle': case 'crouch': case 'guard': case 'unguard': case 'bstun': case 'hit': case 'land': case 'tech': case 'stun':
       p.vx = toward(p.vx, 0, PH.gFric); break;
     case 'walk': p.vx = h * PH.walk; break;
+    case 'dash': p.f++; p.vx = p.face * PH.dash; break;
     case 'jsq':
       p.f++;
       if (p.f >= C.jsq) { p.st = 'air'; p.ground = false; p.plat = -1; p.vy = p.inp.J ? PH.jumpF : PH.jumpS; p.vx = h * Math.floor(PH.airMax * 4 / 5); p.ff = false; this.ev.push({ t: 'jump', p: p.i }); }
@@ -249,7 +278,7 @@ Sim.prototype.update = function(p, o){
   // 当たった・守った後の固まり
   if (p.st === 'hit' || p.st === 'bstun' || p.st === 'tumble') {
     if (p.hs > 0) p.hs--;
-    if (p.hs <= 0) { if (p.st === 'tumble') { p.st = 'air'; } else p.st = 'idle'; }
+    if (p.hs <= 0) { if (p.st === 'tumble' || !p.ground) { p.st = 'air'; } else p.st = 'idle'; }
   }
   if (p.st === 'unguard' || p.st === 'land' || p.st === 'tech') {
     p.f--; if (p.f <= 0) p.st = 'idle';
@@ -316,7 +345,7 @@ Sim.prototype.land = function(p, y, plat){
     } else { p.st = 'land'; p.f = 4; p.hs = 0; }
   } else if (p.st === 'adodge') { p.st = 'land'; p.f = 10; }
   else if (p.st === 'air') { p.st = 'land'; p.f = C.landF; }
-  else if (p.st === 'stun') { /* 立ったまま気絶が続く */ }
+  else if (p.st === 'stun' || p.st === 'hit') { /* そのまま続く */ }
 };
 
 function box(p, b){
@@ -401,7 +430,9 @@ Sim.prototype.applyHit = function(a, d, m, s){
   } else {
     let kx = Math.floor(m.kb[0] * kbs / 100), ky = Math.floor(m.kb[1] * kbs / 100);
     d.mv = null; d.chargeF = 0;
-    if (ky > 0 || !d.ground) {
+    if (m.flinch) {
+      d.st = 'hit'; d.vx = dir * kx; if (!d.ground) d.vy = Math.min(d.vy, 0); d.ff = false;
+    } else if (ky > 0 || !d.ground) {
       d.st = 'tumble'; d.ground = false; d.plat = -1; d.vx = dir * kx; d.vy = ky > 0 ? ky : m.kb[1] < 0 ? ky : Math.max(300, d.vy); d.ff = false;
       if (d.y === 0 && d.vy < 0) { d.vy = 0; }
       d.kd = !!m.kd;
@@ -458,6 +489,7 @@ Sim.prototype.step = function(inputs){
     for (const p of P) { // 止まっている間も押した瞬間は覚えておく
       const inp = inputs[p.i] || NOIN;
       for (const k of ['A', 'J', 'G']) if (inp[k] && !p.inp[k]) p.buf[k] = C.buf;
+      if (inp.C) p.cb = { d: inp.C, n: C.buf + 1 }, p.buf.A = C.buf + 1;
       p.inp = Object.assign({}, p.inp, { A: inp.A, J: inp.J, G: inp.G });
     }
     return;

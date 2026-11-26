@@ -31,7 +31,8 @@ const DUMMY = [['stand', '立つだけ'], ['guard', '守り続ける'], ['jump',
 const key = {};
 addEventListener('keydown', e => { key[e.code] = true; if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault(); });
 addEventListener('keyup', e => { key[e.code] = false; });
-const pad = { stick: null, btn: {}, owners: {} };
+const pad = { stick: null, btn: {}, owners: {}, cs: null, cPend: null };
+let CS = { x: 0, y: 0, r: 40 };
 let BTN = [];
 function layoutPad(){
   const r = clamp(Math.min(W, H) * 0.085, 30, 54);
@@ -40,28 +41,60 @@ function layoutPad(){
     { id: 'J', label: '跳', x: W - r * 1.15, y: H - r * 2.95, r: r * 0.92 },
     { id: 'G', label: '守', x: W - r * 4.95, y: H - r * 1.25, r: r * 0.92 },
   ];
+  CS = { x: W - r * 4.35, y: H - r * 3.45, r: r * 0.95 };
 }
 function inBtn(x, y){ for (const b of BTN) { const dx = x - b.x, dy = y - b.y; if (dx * dx + dy * dy <= (b.r * 1.25) ** 2) return b.id; } return null; }
 cv.addEventListener('pointerdown', e => {
   e.preventDefault(); cv.setPointerCapture(e.pointerId);
   if (FX.finish && FX.finish.t > 40) { /* 演出中のタップで早送り */ FX.finish.t = Math.max(FX.finish.t, 150); }
+  { const dx = e.clientX - CS.x, dy = e.clientY - CS.y;
+    if (dx * dx + dy * dy <= CS.r * CS.r && !pad.cs) { pad.cs = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY, fired: false }; pad.owners[e.pointerId] = 'C'; return; } }
   const b = inBtn(e.clientX, e.clientY);
   if (b) { pad.btn[b] = true; pad.owners[e.pointerId] = b; return; }
   if (e.clientX < W * 0.5 && !pad.stick) { pad.stick = { id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY }; pad.owners[e.pointerId] = 'S'; }
 }, { passive: false });
-cv.addEventListener('pointermove', e => { if (pad.stick && pad.stick.id === e.pointerId) { pad.stick.x = e.clientX; pad.stick.y = e.clientY; } });
-function upPtr(e){ const o = pad.owners[e.pointerId]; if (o === 'S') pad.stick = null; else if (o) pad.btn[o] = false; delete pad.owners[e.pointerId]; }
+cv.addEventListener('pointermove', e => {
+  if (pad.stick && pad.stick.id === e.pointerId) { pad.stick.x = e.clientX; pad.stick.y = e.clientY; }
+  const c = pad.cs;
+  if (c && c.id === e.pointerId) {
+    c.x = e.clientX; c.y = e.clientY;
+    const dx = c.x - c.ox, dy = c.y - c.oy;
+    if (!c.fired && Math.hypot(dx, dy) > CS.r * 0.45) { c.fired = true; pad.cPend = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy < 0 ? 'u' : 'd'); c.dir = pad.cPend; }
+  }
+});
+function upPtr(e){ const o = pad.owners[e.pointerId];
+  if (o === 'S') pad.stick = null;
+  else if (o === 'C') { if (pad.cs && !pad.cs.fired) pad.cPend = 'n'; pad.cs = null; } // 弾かずに離したら向きなしの斬
+  else if (o) pad.btn[o] = false;
+  delete pad.owners[e.pointerId]; }
 cv.addEventListener('pointerup', upPtr); cv.addEventListener('pointercancel', upPtr);
+const stk = { hist: [0, 0, 0, 0] }, kb = { L: -99, R: -99, pl: false, pr: false };
+let stepN = 0;
 function readP0(){
+  stepN++;
   const k = c => !!key[c];
   const i = { L: k('KeyA') || k('ArrowLeft'), R: k('KeyD') || k('ArrowRight'), U: k('KeyW') || k('ArrowUp'), D: k('KeyS') || k('ArrowDown'),
     A: k('KeyJ') || k('KeyZ') || !!pad.btn.A, J: k('KeyK') || k('KeyX') || k('Space') || !!pad.btn.J, G: k('KeyL') || k('KeyC') || !!pad.btn.G };
+  // キーボード: 同じ向きを素早く二回押すとダッシュ
+  const kl = k('KeyA') || k('ArrowLeft'), kr = k('KeyD') || k('ArrowRight');
+  if (kl && !kb.pl) { if (stepN - kb.L < 14) i.F = true; kb.L = stepN; }
+  if (kr && !kb.pr) { if (stepN - kb.R < 14) i.F = true; kb.R = stepN; }
+  kb.pl = kl; kb.pr = kr;
+  const T = Math.min(W, H) * 0.045;
+  let dx = 0, dy = 0;
   if (pad.stick) {
-    const dx = pad.stick.x - pad.stick.ox, dy = pad.stick.y - pad.stick.oy;
-    const T = Math.min(W, H) * 0.045;
+    dx = pad.stick.x - pad.stick.ox; dy = pad.stick.y - pad.stick.oy;
     if (dx < -T) i.L = true; if (dx > T) i.R = true;
     if (dy < -T * 1.5) i.U = true; if (dy > T * 1.3) i.D = true;
+    // 技の向きは強く倒した方
+    if (Math.abs(dx) > T || Math.abs(dy) > T) i.V = Math.abs(dx) >= Math.abs(dy) ? 'h' : dy < 0 ? 'u' : 'd'; else i.V = 'n';
+    // 素早く倒した（3F以内に真ん中付近から大きく）ならダッシュ
+    if (Math.abs(dx) > T * 1.7 && stk.hist.slice(-3).some(v => Math.abs(v) < T * 0.6)) i.F = true;
   }
+  stk.hist.push(dx); if (stk.hist.length > 4) stk.hist.shift();
+  if (pad.cPend) { i.C = pad.cPend; pad.cPend = null; }
+  // キーボードの攻撃スティック: I/J/K/L ではなく テンキー 8/4/6/2
+  for (const [c, d] of [['Numpad8', 'u'], ['Numpad2', 'd'], ['Numpad4', 'l'], ['Numpad6', 'r']]) { if (key[c] && !kb[c]) i.C = d; kb[c] = key[c]; }
   return i;
 }
 
@@ -110,7 +143,7 @@ function tick(now){
 function inputSym(i){
   const h = (i.R ? 1 : 0) - (i.L ? 1 : 0), v = (i.U ? 1 : 0) - (i.D ? 1 : 0);
   const ar = ['↙', '↓', '↘', '←', '・', '→', '↖', '↑', '↗'][(1 - v) * 3 + (h + 1)];
-  return ar + (i.A ? '斬' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
+  return ar + (i.C ? '攻' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.C] : '') + (i.A ? '斬' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
 }
 function stepOnce(){
   if (FX.finish) {
@@ -177,6 +210,7 @@ function pose(p, fr){
   const st = p.st;
   const breathe = Math.sin(fr * 0.08) * 1.2;
   P.hip += breathe * 0.5;
+  if (st === 'dash') { const ph = fr * 0.55; P.hip = 44; P.lean = 38; P.fA = [-6 + Math.sin(ph) * 26, Math.max(0, Math.cos(ph) * 12)]; P.fB = [8 - Math.sin(ph) * 26, Math.max(0, -Math.cos(ph) * 12)]; P.sw = -160; P.arm = -140; }
   if (st === 'walk') { const ph = fr * 0.28; P.fA = [-4 + Math.sin(ph) * 16, Math.max(0, Math.cos(ph) * 7)]; P.fB = [6 - Math.sin(ph) * 16, Math.max(0, -Math.cos(ph) * 7)]; P.lean = 10; }
   if (st === 'crouch' || st === 'jsq' || st === 'land') { P.hip = 38; P.fA = [-20, 0]; P.fB = [22, 0]; P.lean = 18; P.sw = 10; }
   if (st === 'guard' || st === 'bstun') { P.lean = -6; P.sw = 92; P.arm = 10; P.hip = 52; P.fA = [-22, 0]; P.fB = [14, 0]; }
@@ -384,14 +418,14 @@ function drawFrames(){
   if (p.combo >= 2) lines.push([`連撃 ${p.combo}　与えた体力 ${Math.round(p.comboDmg / 100)}`, '#3b3d33']);
   cx.textAlign = 'left';
   cx.fillStyle = 'rgba(239,232,214,.72)';
-  cx.fillRect(x - 8, y0 - 16, Math.min(W * 0.5, 440), lines.length * 18 + 10);
+  cx.fillRect(x - 8, y0 - 16, Math.min(W * 0.42, 440), lines.length * 18 + 10);
   lines.forEach(([s, c], k) => { cx.font = `${k ? 500 : 700} 12.5px ${UIF}`; cx.fillStyle = c; cx.fillText(s, x, y0 + k * 18); });
   // 入力の履歴
   const hx = W - Math.max(16, W * 0.03), hy = 92;
   cx.textAlign = 'right'; cx.font = `500 12px ${UIF}`;
   FX.hist.slice(0, 12).forEach((h, k) => { cx.fillStyle = `rgba(20,21,18,${0.85 - k * 0.06})`; cx.fillText(`${h.s}　${h.n > 99 ? '99+' : h.n}`, hx, hy + k * 15); });
 }
-const STN = { idle: '待ち', walk: '歩き', crouch: 'しゃがみ', jsq: '踏み切り', air: '空中', land: '着地', guard: 'ガード', unguard: 'ガードを解く', bstun: 'ガード硬直', roll: '転がり', hit: 'のけぞり', tumble: '吹き飛び', down: 'ダウン', getup: '起き上がり', stun: '気絶', adodge: '空中回避', tech: '受け身', ko: '一本' };
+const STN = { idle: '待ち', walk: '歩き', dash: 'ダッシュ', crouch: 'しゃがみ', jsq: '踏み切り', air: '空中', land: '着地', guard: 'ガード', unguard: 'ガードを解く', bstun: 'ガード硬直', roll: '転がり', hit: 'のけぞり', tumble: '吹き飛び', down: 'ダウン', getup: '起き上がり', stun: '気絶', adodge: '空中回避', tech: '受け身', ko: '一本' };
 function drawPad(){
   const stunO = sim.p[1].st === 'stun';
   if (pad.stick) {
@@ -400,6 +434,20 @@ function drawPad(){
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.beginPath(); cx.arc(pad.stick.ox + dx * k, pad.stick.oy + dy * k, 20, 0, Math.PI * 2); cx.fill();
   } else if (matchMedia('(pointer: coarse)').matches) {
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.font = `500 11px ${UIF}`; cx.textAlign = 'center'; cx.fillText('左半分を押して動かす', W * 0.22, H - 22);
+  }
+  { // 攻撃スティック
+    const c = pad.cs;
+    cx.globalAlpha = c ? 0.95 : 0.6;
+    cx.strokeStyle = 'rgba(20,21,18,.7)'; cx.lineWidth = 2; cx.fillStyle = 'rgba(239,232,214,.35)';
+    cx.beginPath(); cx.arc(CS.x, CS.y, CS.r, 0, Math.PI * 2); cx.fill(); cx.stroke();
+    cx.fillStyle = INK;
+    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; cx.save(); cx.translate(CS.x + Math.cos(a) * CS.r * 0.72, CS.y + Math.sin(a) * CS.r * 0.72); cx.rotate(a);
+      cx.beginPath(); cx.moveTo(5, 0); cx.lineTo(-3, -5); cx.lineTo(-3, 5); cx.closePath(); cx.fill(); cx.restore(); }
+    let kx = CS.x, ky = CS.y;
+    if (c) { const dx = c.x - c.ox, dy = c.y - c.oy, d = Math.hypot(dx, dy), m = d > CS.r * 0.6 ? CS.r * 0.6 / d : 1; kx += dx * m; ky += dy * m; }
+    cx.fillStyle = c && c.fired ? COL[0].main : 'rgba(20,21,18,.55)'; cx.beginPath(); cx.arc(kx, ky, CS.r * 0.36, 0, Math.PI * 2); cx.fill();
+    cx.fillStyle = PALE; cx.font = `${Math.round(CS.r * 0.4)}px ${DISPLAY}`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('攻', kx, ky + 1); cx.textBaseline = 'alphabetic';
+    cx.globalAlpha = 1;
   }
   for (const b of BTN) {
     const iai = b.id === 'G' && stunO;
@@ -466,6 +514,16 @@ function draw(){
   for (const p of sim.p) { const gy = p.plat >= 0 ? A.PLATS[p.plat].y / FP : (p.y / FP >= 190 && Math.abs(p.x / FP - 480) < 150) || (p.y / FP >= 190 && Math.abs(p.x / FP - 1120) < 150) ? 190 : 0;
     cx.fillStyle = 'rgba(20,21,18,.25)'; cx.beginPath(); cx.ellipse(wx(p.x / FP), wy(gy), 30 * cam.z, 5 * cam.z, 0, 0, Math.PI * 2); cx.fill(); }
   for (const p of [sim.p[1], sim.p[0]]) drawFighter(p, FR + p.i * 37);
+  // シールド: 耐久が減るほど小さく、残り2割で朱く
+  for (const p of sim.p) if (p.st === 'guard' || p.st === 'bstun' || p.st === 'unguard') {
+    const k = p.gd / A.GD_MAX, r = (28 + 50 * k) * cam.z, x = wx(p.x / FP), y = wy(p.y / FP + 62);
+    const low = p.gd <= 2000, c = low ? '200,55,45' : p.i ? '60,100,190' : '210,80,60';
+    const fade = p.st === 'unguard' ? 0.4 : 1, hitk = p.st === 'bstun' ? 1.25 : 1;
+    const g = cx.createRadialGradient(x, y, r * 0.2, x, y, r);
+    g.addColorStop(0, `rgba(${c},${0.08 * fade})`); g.addColorStop(0.8, `rgba(${c},${0.26 * fade * hitk})`); g.addColorStop(1, `rgba(${c},${0.5 * fade * hitk})`);
+    cx.fillStyle = g; cx.beginPath(); cx.arc(x, y, r, 0, Math.PI * 2); cx.fill();
+    cx.strokeStyle = `rgba(255,255,255,${0.5 * fade})`; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(x, y, r - 1, Math.PI * 1.1, Math.PI * 1.5); cx.stroke();
+  }
   drawTrails();
   for (const q of FX.parts) { cx.globalAlpha = 1 - q.t / q.life; cx.fillStyle = q.col; const r = q.r * cam.z; cx.fillRect(wx(q.x) - r, wy(q.y) - r, r * 2, r * 2); }
   cx.globalAlpha = 1;

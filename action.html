@@ -11,7 +11,7 @@
 <style>
 html,body{margin:0;height:100%;background:#3a3d30;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 canvas{display:block;touch-action:none}
-#bar{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(6px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;align-items:center;flex-wrap:nowrap;white-space:nowrap;justify-content:center;
+#bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(74px + env(safe-area-inset-top,0px));display:flex;gap:8px;align-items:center;flex-wrap:nowrap;white-space:nowrap;justify-content:center;
   font:500 12px 'Zen Kaku Gothic New','Hiragino Sans',sans-serif;color:#141512;background:rgba(239,232,214,.6);padding:4px 10px;border-radius:4px;max-width:calc(100vw - 32px)}
 #bar a,#bar button{font:inherit;color:#141512;background:none;border:1px solid rgba(20,21,18,.4);border-radius:3px;padding:2px 8px;text-decoration:none;cursor:pointer}
 #bar select{font:inherit;background:rgba(255,255,255,.5);border:1px solid rgba(20,21,18,.4);border-radius:3px}
@@ -23,6 +23,8 @@ canvas{display:block;touch-action:none}
 #help td{padding:2px 10px 2px 0;vertical-align:top}
 #help button{margin-top:12px;font:inherit;background:#c8372d;color:#fff;border:0;border-radius:3px;padding:6px 18px}
 #help[hidden]{display:none}
+#bar:not(.open)>*:not(#a_more){display:none}
+#bar.open{flex-wrap:wrap;white-space:normal;max-width:min(560px,calc(100vw - 32px))}
 #rot{position:fixed;inset:0;background:#141512;color:#efe8d6;display:none;place-items:center;text-align:center;font:22px 'Yuji Syuku',serif;z-index:9}
 @media (orientation:portrait) and (pointer:coarse){#rot{display:grid}}
 </style>
@@ -30,6 +32,7 @@ canvas{display:block;touch-action:none}
 <body>
 <canvas id="cv" aria-label="一閃 稽古の画面"></canvas>
 <div id="bar">
+  <button type="button" id="a_more">設定</button>
   <a href="index.html">戻る</a>
   <label>相手 <select id="a_dummy"></select></label>
   <label><input type="checkbox" id="a_frames">フレーム</label>
@@ -41,11 +44,12 @@ canvas{display:block;touch-action:none}
   <h2>稽古（試作）</h2>
   <p>勝ち方は二つ。連撃で体力を削りきるか、ガードを削って気絶させ、朱く光った「居」で居合を当てるか。</p>
   <table>
-    <tr><td>左半分を押して滑らす</td><td>歩く・上・しゃがむ（キーボードは WASD か矢印）</td></tr>
+    <tr><td>左半分を押して滑らす</td><td>ゆっくり倒す＝歩く　素早く倒す＝ダッシュ（キーボードは同じ向きを二回）　上・しゃがむ（キーボードは WASD か矢印）。向きは歩いた方を向く</td></tr>
     <tr><td>斬（J / Z）</td><td>立ち止まって＝弱斬り三段　横＋斬＝踏み込み斬り　上＋斬＝上斬り（打ち上げ）　下＋斬＝下斬り　押し続ける＝溜め斬り</td></tr>
+    <tr><td>攻（攻撃スティック）</td><td>弾いた向きの技がすぐ出る。空中なら空前・空後・空上・空下（向きは変わらない）、地上なら踏み込み斬り・上斬り・下斬り。弾かずに離すと向きなしの斬（キーボードはテンキー 8・4・6・2）</td></tr>
     <tr><td>空中で斬</td><td>向きなし・前・後ろ・上・下で五つの空中技</td></tr>
     <tr><td>跳（K / X / Space）</td><td>軽く＝小跳び　長め＝大跳び　空中でもう一回　端の竹で壁蹴り</td></tr>
-    <tr><td>守（L / C）</td><td>押している間ガード　守りながら横＝転がり　守りながら斬＝組み打ち　空中で守＝空中回避　叩きつけられる直前＝受け身</td></tr>
+    <tr><td>守（L / C）</td><td>押している間シールドを張る（耐久が減るほど小さくなる）　守りながら横＝転がり　守りながら斬＝組み打ち　空中で守＝空中回避　叩きつけられる直前＝受け身</td></tr>
     <tr><td>居</td><td>相手が気絶すると守が居に変わる。当たれば一本</td></tr>
   </table>
   <p>右上に入力の履歴、左上に今の技のフレームと直前の有利F（＋は先に動ける）が出ます。数字はすべて叩き台です。</p>
@@ -54,5 +58,6 @@ canvas{display:block;touch-action:none}
 <div id="rot">横向きにしてください</div>
 <script src="js/action/sim.js"></script>
 <script src="js/action/app.js"></script>
+<script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>
 </body>
 </html>

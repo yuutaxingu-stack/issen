@@ -34,4 +34,18 @@ function drain(s){ const e = s.ev; s.ev = []; return e; }
   ok(play() === play(), '同じ操作で同じ盤面（ずれない）'); }
 // 9) 時間切れでサドンデス、一発で刹那
 { const s = sim(60); s.frame = A.C.roundF - 1; run(s, 2); ok(s.sd, 'サドンデスに入る'); run(s, 1, () => I({ A: 1 })); run(s, 20); ok(s.result && s.result.name === '刹那', 'サドンデスは一発で刹那'); }
+// 10) 素早く倒すとダッシュ、歩きより速い
+{ const s = sim(600); run(s, 1, () => I({ R: 1, F: 1 })); ok(s.p[0].st === 'dash', 'ダッシュに入る'); const x0 = s.p[0].x; run(s, 10, () => I({ R: 1 })); ok(s.p[0].x - x0 === 10 * A.PH.dash, 'ダッシュの速さ'); run(s, 1); ok(s.p[0].st === 'idle', '離すと止まる'); }
+// 11) 相手の後ろに回っても自動で振り向かない
+{ const s = sim(60); s.p[0].x = 900 * A.FP; s.p[1].x = 700 * A.FP; run(s, 5); ok(s.p[0].face === 1, '自動で振り向かない'); run(s, 2, () => I({ L: 1 })); ok(s.p[0].face === -1, '歩いた方を向く'); }
+// 12) 急降下しながら前に倒して斬ると空前（斜め下でも空下にならない）
+{ const s = sim(600); run(s, 1, () => I({ J: 1 })); run(s, 30); run(s, 1, () => I({ D: 1 })); ok(s.p[0].ff, '急降下'); run(s, 1, () => I({ D: 1, R: 1, A: 1 })); ok(s.p[0].mv === 'fair', '急降下中に空前 (' + s.p[0].mv + ')'); }
+// 13) スティックで強く下に倒していれば空下
+{ const s = sim(600); run(s, 1, () => I({ J: 1 })); run(s, 30); run(s, 1, () => I({ D: 1, R: 1, A: 1, V: 'd' })); ok(s.p[0].mv === 'dair', 'スティックで空下'); }
+// 14) 空後は空前より発生が早い、空上は空前と同じくらい
+ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.uair.s - A.MV.fair.s) <= 1, '空中技の性格');
+// 15) 攻撃スティック: 空中で後ろに弾くと空後（向きは変わらない）、地上で上に弾くと上斬り
+{ const s = sim(600); run(s, 1, () => I({ J: 1 })); run(s, 20); run(s, 1, () => I({ C: 'l' })); ok(s.p[0].mv === 'bair' && s.p[0].face === 1, '攻撃スティックで空後'); }
+{ const s = sim(600); run(s, 1, () => I({ C: 'u' })); ok(s.p[0].mv === 'utilt', '攻撃スティックで上斬り'); }
+{ const s = sim(600); run(s, 1, () => I({ C: 'l' })); ok(s.p[0].mv === 'side' && s.p[0].face === -1, '攻撃スティックで踏み込み斬り（弾いた向きへ）'); }
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

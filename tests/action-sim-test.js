@@ -78,6 +78,16 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 { const s = sim(600); run(s, 1, () => I({ R: 1, F: 1 })); run(s, 3, () => I({ R: 1 })); run(s, 1, () => I({ R: 1, C: 'r' })); ok(s.p[0].mv === 'dashatk', 'ダッシュ斬り'); }
 { const s = sim(250); run(s, 1, () => I({ A: 1, R: 1 })); const sts = new Set(); for (let k = 0; k < 80; k++) { s.step([I(), I()]); sts.add(s.p[1].st); } ok(sts.has('hit') && !sts.has('tumble') && !sts.has('down'), '飛ぶ斬撃は怯むだけ ' + [...sts]); }
 
+// 花嵐: 射程は無限で壁まで、遠いほど大きく重い
+{ const ou = d => { const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 200 * A.FP; s.p[1].x = (200 + d) * A.FP; return s; };
+  const dmgAt = d => { const s = ou(d); const h0 = s.p[1].hp; run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); let w = 0; for (let k = 0; k < 400 && s.p[1].hp === h0; k++) { run(s, 1); if (s.pj[0]) w = s.pj[0].w; } return { dmg: h0 - s.p[1].hp, w }; };
+  const near = dmgAt(150), far = dmgAt(1250);
+  ok(near.dmg > 0 && far.dmg > near.dmg * 2, '花嵐は遠くまで届き、遠いほど重い (' + near.dmg + '→' + far.dmg + ')');
+  ok(far.w > near.w * 2, '花嵐は遠いほど広がる (' + near.w + '→' + far.w + ')');
+  const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 200 * A.FP; s.p[1].x = 100 * A.FP;
+  run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); let maxX = 0; for (let k = 0; k < 400; k++) { run(s, 1); for (const q of s.pj) maxX = Math.max(maxX, q.x / A.FP); }
+  ok(maxX > 1500 && s.pj.length === 0, '花嵐は壁に当たるまで飛ぶ (' + Math.round(maxX) + ')');
+}
 // 桜華: 下Bで 植樹(開花)→満開→落花→撤去、強化は段階ごとに一度
 { const ou = d => { const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
   const down = s => { run(s, 1, () => I({ D: 1, A: 1, V: 'd' })); run(s, 40); };

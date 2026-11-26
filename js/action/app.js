@@ -416,7 +416,7 @@ function tickParts(){
   if (FX.pflash > 0) FX.pflash--;
   for (const o of FX.ouka) o.t++;
   // 花嵐の花びらは尾を引く。紅と黒が混じる
-  for (const q of sim.pj) if (q.petal) for (let k = 0; k < 2; k++) FX.parts.push({ x: q.x / FP + (rnd() - 0.5) * q.w * 0.6, y: q.y / FP + (rnd() - 0.5) * q.h * 0.6, vx: -Math.sign(q.vx) * (1 + rnd() * 2), vy: (rnd() - 0.3) * 1.5, life: 26 + rnd() * 20, t: 0, col: k ? SAKURA[FR % 3] : CRIM[(FR + k) % 3], r: 2.5 + rnd() * 2, petal: true, rot: rnd() * 6 });
+  for (const q of sim.pj) if (q.petal) for (let k = 0, n = q.hana ? 1 + Math.round(q.w / q.w0) : 2; k < n; k++) FX.parts.push({ x: q.x / FP + (rnd() - 0.5) * q.w * 0.6, y: q.y / FP + (rnd() - 0.5) * q.h * 0.6, vx: -Math.sign(q.vx) * (1 + rnd() * 2), vy: (rnd() - 0.3) * 1.5, life: 26 + rnd() * 20, t: 0, col: k ? SAKURA[FR % 3] : CRIM[(FR + k) % 3], r: 2.5 + rnd() * 2, petal: true, rot: rnd() * 6 });
   // 天桜: 体のまわりを花びらが渦を巻いて昇る / 降下は花の嵐
   for (const p of sim.p) if (p.st === 'atk' && OUKA_MV[p.mv] && p.mv.startsWith('ten')) {
     const n = p.mv === 'ten' ? 2 : 5, fall = p.mv === 'tenFall';
@@ -474,8 +474,7 @@ function drawFighter(p, fr){
   const P = pose(p, fr), col = COL[p.i];
   const sx = wx(p.x / FP), sy = wy(p.y / FP), z = cam.z;
   const c = cx;
-  let spin = 1; if (p.st === 'atk' && MV[p.mv].spin && p.mvf < MV[p.mv].s + MV[p.mv].a) spin = Math.cos(p.mvf * 0.9); // 天桜: こまのように回りながら昇る
-  c.save(); c.translate(sx, sy); c.scale(z * p.face * MIR * (Math.abs(spin) < 0.15 ? 0.15 * Math.sign(spin || 1) : spin), -z);
+  c.save(); c.translate(sx, sy); c.scale(z * p.face * MIR, -z);
   c.globalAlpha = P.alpha;
   if (WORLD.f > 0.3) { c.shadowColor = `rgba(255,214,224,${0.8 * WORLD.f})`; c.shadowBlur = 8; } // 落花の夜でも姿が見えるように縁を光らせる
   if (P.rot) { c.translate(0, P.hip); c.rotate(rad(P.rot)); c.translate(0, -P.hip); }
@@ -990,7 +989,7 @@ function draw(){
   if (VIEWS.length > 1) { cx.setTransform(DPR, 0, 0, DPR, 0, 0); cx.fillStyle = '#141512'; cx.fillRect(SW / 2 - 1, 0, 2, SH); }
 }
 function drawView(v){
-  const sh = FX.shake > 0.3 ? FX.shake : 0;
+  const sh = 0; // 画面揺れは酔うのでなし（2026-11-26 ユーザー指定）
   cx.save(); if (sh) cx.translate((rnd() - 0.5) * sh, (rnd() - 0.5) * sh);
   drawBg(FR);
   // 気絶の印

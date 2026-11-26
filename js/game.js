@@ -8,6 +8,13 @@ const INK='#141512', PALE='#efe8d6';
 const TIER={'並':'#d9d3c4','上':'#9cc4ea','極':'#e8c35a','幻':'#e9b8ff','絶':'#ffffff','分':'#bdb6a6'};
 const TIERNAME={'並':'並','上':'上','極':'極','幻':'幻','絶':'絶','分':'引き分け'};
 const FIN={
+  // 新・一閃の決着（刀帳の戦績に並ぶ）
+  '斬り伏せ':{tier:'並',yomi:'きりふせ',desc:'新・一閃　連撃で体力を削りきる'},
+  '背水':{tier:'上',yomi:'はいすい',desc:'新・一閃　追い詰められてから勝つ'},
+  '落花':{tier:'上',yomi:'らっか',desc:'新・一閃　空から斬り落として勝つ'},
+  '刹那':{tier:'上',yomi:'せつな',desc:'新・一閃　サドンデスの一太刀'},
+  '百花':{tier:'極',yomi:'ひゃっか',desc:'新・一閃　長い連撃で決める'},
+  '散華':{tier:'絶',yomi:'さんげ',desc:'新・一閃　桜華で勝つ'},
   '疾風':{tier:'並',yomi:'はやて',desc:'棒立ちを居合で斬る'},
   '先の先':{tier:'並',yomi:'せんのせん',desc:'居合同士、先に抜いた側が斬る'},
   '隙穿ち':{tier:'並',yomi:'すきうがち',desc:'見切りの硬直を斬る'},
@@ -306,8 +313,22 @@ function applySave(d,pend){ // アカウントの持ち物を画面に映す。p
   ARM.owned=Object.assign({mumei:1},d.owned||{}); ARM.rec=d.rec||{}; ARM.equip=Array.isArray(d.equip)&&d.equip.length===2?d.equip.slice():['mumei','mumei'];
   WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; WALLET.steel=d.steel||0; if(d.cost>0) PULLCOST=d.cost; GOD=!!d.god;
   uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
-function useAccount(api){ ACCT=api; }
-function useGuest(){ ACCT=null; GOD=false; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
+function useAccount(api){ ACCT=api; setTimeout(importAction,0); }
+/* 新・一閃（action.html）との受け渡し: 持っている刀をあちらへ見せ、あちらの勝ちを銭と戦績に足す */
+const AOUT='issen-action-out-v1', ASNAP='issen-action-arm-v1';
+function exportForAction(){ try{ localStorage.setItem(ASNAP,JSON.stringify({acct:!!ACCT,equip:ARM.equip,coins:GOD?-1:WALLET.coins,
+  owned:KATANA.filter(k=>ARM.owned[k.id]).map(k=>({id:k.id,mei:k.mei,tier:k.tier}))})); }catch(e){} }
+function importAction(){
+  let a; try{ a=JSON.parse(localStorage.getItem(AOUT)||'[]'); }catch(e){ a=[]; } if(!Array.isArray(a)||!a.length) return;
+  const keep=[]; let n=0;
+  for(const r of a){ if(!r||!FIN[r.f]||!KMAP[r.k]){ continue; } if(!!r.acct!==!!ACCT){ keep.push(r); continue; } if(!ARM.owned[r.k]) continue;
+    const coin=COIN[FIN[r.f].tier]||0; ARM.rec[r.k]=ARM.rec[r.k]||{}; ARM.rec[r.k][r.f]=(ARM.rec[r.k][r.f]||0)+1;
+    if(coin){ WALLET.coins+=coin; } if(ACCT) ACCT.win(r.f,r.k,coin); n++; }
+  try{ localStorage.setItem(AOUT,JSON.stringify(keep)); }catch(e){}
+  if(n){ saveArm(); saveWallet(); uiCache=''; }
+}
+setInterval(importAction,3000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) importAction(); });
+function useGuest(){ ACCT=null; GOD=false; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; setTimeout(importAction,0); if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
 window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
@@ -1175,7 +1196,7 @@ function updateUI(){
   const gearOn=G.mode!=='title'&&(G.phase==='ready'||G.phase==='fight');
   const menuOn=G.phase==='title'&&gachaEl.hidden;
   const key=gearOn+'|'+menuOn+'|'+G.mode+'|'+!!ACCT+'|'+WALLET.coins+'|'+WALLET.best+'|'+JSON.stringify(ARM.owned);
-  if(key===uiCache) return; uiCache=key;
+  if(key===uiCache) return; uiCache=key; exportForAction();
   gearEl.hidden=!gearOn; gearEl.classList.toggle('mid',G.mode==='vs'); gearEl.textContent=G.mode==='vs'?'止':G.mode==='online'?'退出':'一時停止';
   document.querySelector('#pausep h2').textContent=G.mode==='online'?'退出しますか':'一時停止';
   document.getElementById('ps_resume').textContent=G.mode==='online'?'続ける（試合は止まりません）':'続ける';

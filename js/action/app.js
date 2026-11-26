@@ -246,12 +246,28 @@ const cam = { x: 800, y: 0, z: 1 };
 function clearFx(){ FX.cut = null; WORLD.f = WORLD.m = 0; FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; }
 function resetRound(){ sim.resetRound(); clearFx(); }
 /* 持たせる刀（新・一閃の特殊技）。common＝今の共通の技、ouka＝桜華 */
-const KITS = ['common', 'common'];
-try { const k = JSON.parse(localStorage.getItem('issen-action-kit') || 'null'); if (Array.isArray(k)) k.forEach((v, i) => { if (A.KIT[v]) KITS[i] = v; }); } catch (e) {}
-function saveKits(){ try { localStorage.setItem('issen-action-kit', JSON.stringify(KITS)); } catch (e) {} }
-const kitsFor = mode => mode === 'vs' ? KITS.slice() : [KITS[0], 'common'];
+/* 持たせる刀: 一閃（index.html）で集めた刀から選ぶ。刀の技は桜華だけ固有、ほかは共通。
+   持っている刀の一覧は一閃のタイトルが置いていく（issen-action-arm-v1）。勝ちは issen-action-out-v1 に積み、一閃が銭と戦績に足す */
+const COIN = { '並': 3, '上': 9, '極': 24, '幻': 60, '絶': 150 };
+let SNAP = { acct: false, owned: [] };
+try { const q = JSON.parse(localStorage.getItem('issen-action-arm-v1') || 'null'); if (q && Array.isArray(q.owned)) SNAP = q; } catch (e) {}
+if (!SNAP.owned.some(k => k.id === 'mumei')) SNAP.owned.unshift({ id: 'mumei', mei: '無銘', tier: '並' });
+const owns = id => SNAP.owned.some(k => k.id === id);
+const KITS = [(SNAP.equip && owns(SNAP.equip[0])) ? SNAP.equip[0] : 'mumei', (SNAP.equip && owns(SNAP.equip[1])) ? SNAP.equip[1] : 'mumei'];
+try { const k = JSON.parse(localStorage.getItem('issen-action-kit2') || 'null'); if (Array.isArray(k)) k.forEach((v, i) => { if (owns(v) || (i === 0 && v === 'ouka')) KITS[i] = v; }); } catch (e) {}
+function saveKits(){ try { localStorage.setItem('issen-action-kit2', JSON.stringify(KITS)); } catch (e) {} }
+const kitOf = (id, mode) => id === 'ouka' && (mode === 'train' || owns('ouka')) ? 'ouka' : 'common';
+const kitsFor = mode => mode === 'vs' ? [kitOf(KITS[0], mode), kitOf(KITS[1], mode)] : [kitOf(KITS[0], mode), 'common'];
+function recordWin(r){ // 勝った刀の戦績と銭
+  const i = r.winner; if (i < 0 || GAME.mode === 'train' || (GAME.mode === 'cpu' && i !== 0)) return;
+  const id = KITS[i]; if (!owns(id)) return;
+  const coin = COIN[r.tier] || 0;
+  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); a.push({ f: r.name, k: id, acct: !!SNAP.acct, t: Date.now() }); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
+  GAME.coins = (GAME.coins || 0) + coin;
+  if (coin) FX.texts.push({ s: '銭 +' + coin, x: 0, y: 0, t: 0, life: 110, screen: true });
+}
 function startMode(mode){
-  GAME.mode = mode; GAME.log = []; GAME.n = 1; GAME.t = 0;
+  GAME.mode = mode; GAME.log = []; GAME.n = 1; GAME.t = 0; GAME.coins = 0;
   sim = new A.Sim(mode === 'train' ? { training: true, kits: kitsFor(mode) } : { toWin: mode === 'cpu' ? 1 : 2, kits: kitsFor(mode) });
   if (mode === 'cpu') cpuReset(1);
   GAME.phase = mode === 'train' ? 'fight' : 'intro';
@@ -310,6 +326,7 @@ function afterFinish(){
   const r = sim.result;
   if (GAME.mode === 'train') { resetRound(); return; }
   GAME.log.push({ name: r.name, tier: r.tier, winner: r.winner });
+  recordWin(r);
   if (GAME.mode === 'cpu') {
     if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu') }); cpuReset(GAME.n); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
     if (r.winner < 0) { resetRound(); GAME.phase = 'intro'; GAME.t = 0; return; } // 引き分けは同じ相手ともう一度
@@ -1088,6 +1105,7 @@ function showOver(on){
   let head, sub;
   if (GAME.mode === 'cpu') { head = GAME.n - 1 ? `${GAME.n - 1}人抜き` : '敗れる'; sub = `其の${kn(GAME.n)}に敗れる` + (GAME.n - 1 >= GAME.best && GAME.n > 1 ? '　最高記録' : `　最高 ${GAME.best}人抜き`); }
   else { const w = sim.wins[0] > sim.wins[1] ? 0 : 1; head = COL[w].name + 'の勝ち'; sub = `${sim.wins[0]} 対 ${sim.wins[1]}`; }
+  if (GAME.coins) sub += `　・　得た銭 ${GAME.coins}`;
   $('ov_h').textContent = head; $('ov_s').textContent = sub;
   $('ov_l').innerHTML = lines.map((l, k) => `<li><span class="w" style="color:${COL[l.winner].light}">${GAME.mode === 'cpu' ? (l.winner ? '相手' : 'あなた') : COL[l.winner].name}</span><b style="color:${TIERC[l.tier] || PALE}">${l.name}</b><small>${l.tier === '分' ? '' : l.tier}</small></li>`).join('');
 }
@@ -1108,9 +1126,10 @@ function setupMenu(){
   $('ed_small').onclick = () => editScale(1 / 1.12); $('ed_big').onclick = () => editScale(1.12);
   $('ed_reset').onclick = () => { BLAY = null; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); };
   $('ed_ok').onclick = () => endEdit(true); $('ed_cancel').onclick = () => endEdit(false);
-  const KOPT = [['common', 'いつもの刀（共通の技）'], ['ouka', '桜華〔絶〕（試し）']];
+  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : '')]);
   for (const [id, i] of [['kt0', 0], ['kt1', 1], ['a_kit', 0]]) { const el = $(id);
-    KOPT.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });
+    const opts = KOPT.slice(); if (id === 'a_kit' && !owns('ouka')) opts.push(['ouka', '桜華〔絶〕（稽古で試す）']);
+    opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });
     el.value = KITS[i]; el.onchange = () => { KITS[i] = el.value; saveKits(); ['kt0', 'kt1', 'a_kit'].forEach((q, j) => { $(q).value = KITS[j === 2 ? 0 : j]; }); el.blur();
       if (id === 'a_kit' && GAME.mode === 'train') startMode('train'); }; }
 }

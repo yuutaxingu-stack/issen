@@ -70,7 +70,7 @@ const DG = {
   fwd:  { n: '前方回避', i0: 4, i1: 15, total: 29, mv: [4, 22], v: 650 },
   back: { n: '後方回避', i0: 5, i1: 16, total: 34, mv: [5, 26], v: 560 },
   airN: { n: '空中回避', i0: 3, i1: 28, total: 44, land: 10 },
-  airD: { n: '空中回避（方向）', i0: 3, i1: 22, total: 60, land: 15, mv: [3, 14], v: 1500 },
+  airD: { n: '空中回避（方向）', i0: 3, i1: 22, total: 60, land: 15, mv: [3, 10], v: 1000 },
 };
 
 /* 決着名 */
@@ -222,7 +222,7 @@ Sim.prototype.think = function(p, o){
       return;
     case 'dash':
       if (canIai) return this.startMove(p, 'iai');
-      if (i.G && !oppStun) { p.st = 'guard'; p.f = 0; return; }
+      if (i.G && !oppStun) return this.dodge(p, 'fwd', p.face); // ダッシュ中の守は走る向きへ前方回避
       if (p.buf.J) { p.buf.J = 0; p.st = 'jsq'; p.f = 0; return; }
       if (p.buf.A) return this.groundAttack(p);
       if (i.D) { p.st = 'crouch'; return; }
@@ -285,7 +285,7 @@ Sim.prototype.update = function(p, o){
     case 'roll': {
       p.f++; const d = DG[p.rk];
       p.vx = (d.mv && p.f >= d.mv[0] && p.f <= d.mv[1]) ? p.rollDir * d.v : toward(p.vx, 0, PH.gFric * 2);
-      if (p.f >= d.total) { p.st = 'idle'; }
+      if (p.f >= d.total) { p.st = 'idle'; if (p.rk === 'fwd') p.face = -p.face; } // 前方回避の後は振り返る
       break; }
     case 'adodge': {
       p.f++; const d = DG[p.ak];

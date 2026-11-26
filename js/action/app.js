@@ -51,21 +51,25 @@ addEventListener('keydown', e => { key[e.code] = true; if (['Space', 'ArrowUp', 
 addEventListener('keyup', e => { key[e.code] = false; });
 /* キーの割り当て。一人のときは両方の手で使えるように広く、二人のときは左右に分ける */
 const KEYS = {
-  solo: { L: ['KeyA', 'ArrowLeft'], R: ['KeyD', 'ArrowRight'], U: ['KeyW', 'ArrowUp'], D: ['KeyS', 'ArrowDown'], A: ['KeyJ', 'KeyZ'], J: ['KeyK', 'KeyX', 'Space'], G: ['KeyL', 'KeyC'], C: { u: 'Numpad8', d: 'Numpad2', l: 'Numpad4', r: 'Numpad6' } },
-  p0: { L: ['KeyA'], R: ['KeyD'], U: ['KeyW'], D: ['KeyS'], A: ['KeyJ'], J: ['KeyK'], G: ['KeyL'], C: { u: 'KeyT', d: 'KeyG', l: 'KeyF', r: 'KeyH' } },
-  p1: { L: ['ArrowLeft'], R: ['ArrowRight'], U: ['ArrowUp'], D: ['ArrowDown'], A: ['Numpad1', 'Comma'], J: ['Numpad2', 'Period'], G: ['Numpad3', 'Slash'], C: { u: 'Numpad8', d: 'Numpad5', l: 'Numpad4', r: 'Numpad6' } },
+  solo: { L: ['KeyA', 'ArrowLeft'], R: ['KeyD', 'ArrowRight'], U: ['KeyW', 'ArrowUp'], D: ['KeyS', 'ArrowDown'], N: ['KeyJ', 'KeyZ'], A: ['KeyU', 'KeyV'], J: ['KeyK', 'KeyX', 'Space'], G: ['KeyL', 'KeyC'] },
+  p0: { L: ['KeyA'], R: ['KeyD'], U: ['KeyW'], D: ['KeyS'], N: ['KeyJ'], A: ['KeyU'], J: ['KeyK'], G: ['KeyL'] },
+  p1: { L: ['ArrowLeft'], R: ['ArrowRight'], U: ['ArrowUp'], D: ['ArrowDown'], N: ['Numpad1', 'Comma'], A: ['Numpad4', 'KeyM'], J: ['Numpad2', 'Period'], G: ['Numpad3', 'Slash'] },
 };
 const keyMap = pi => GAME.mode === 'vs' ? (pi ? KEYS.p1 : KEYS.p0) : pi ? null : KEYS.solo;
-function mkPad(){ return { stick: null, btn: {}, cs: null, cPend: null, CS: { x: 0, y: 0, r: 40 }, BTN: [], hist: [0, 0, 0, 0], kb: { L: -99, R: -99, pl: false, pr: false, c: {} } }; }
+function mkPad(){ return { stick: null, btn: {}, prevN: false, BTN: [], hist: [0, 0, 0, 0], kb: { L: -99, R: -99, pl: false, pr: false } }; }
 const PADS = [mkPad(), mkPad()], OWN = {};
+/* ボタン: 斬（通常技）・技（刀の技）・跳・守。置き場所と大きさは「ボタン配置」で変えられ、この端末に覚える */
+const BDEF = [['N', '斬', 1.12], ['A', '技', 0.98], ['J', '跳', 0.92], ['G', '守', 0.92]];
+const BLAY_KEY = 'issen-action-btns-v1';
+let BLAY = null; try { BLAY = JSON.parse(localStorage.getItem(BLAY_KEY) || 'null'); } catch (e) {}
+function saveBlay(){ try { if (BLAY) localStorage.setItem(BLAY_KEY, JSON.stringify(BLAY)); else localStorage.removeItem(BLAY_KEY); } catch (e) {} }
+function defaultPos(id, w, h, r){
+  return { N: [w - r * 2.7, h - r * 1.55], A: [w - r * 4.4, h - r * 3.35], J: [w - r * 1.15, h - r * 2.95], G: [w - r * 4.95, h - r * 1.25] }[id];
+}
 function layoutPad(pd, w, h){
-  const r = clamp(Math.min(w, h) * 0.085, 30, 54);
-  pd.BTN = [
-    { id: 'A', label: '斬', x: w - r * 2.7, y: h - r * 1.55, r: r * 1.12 },
-    { id: 'J', label: '跳', x: w - r * 1.15, y: h - r * 2.95, r: r * 0.92 },
-    { id: 'G', label: '守', x: w - r * 4.95, y: h - r * 1.25, r: r * 0.92 },
-  ];
-  pd.CS = { x: w - r * 4.35, y: h - r * 3.45, r: r * 0.95 };
+  const r = clamp(Math.min(w, h) * 0.085, 30, 54), sc = BLAY && BLAY.s ? BLAY.s : 1;
+  pd.BTN = BDEF.map(([id, label, k]) => { const d = defaultPos(id, w, h, r), q = BLAY && BLAY[id];
+    return { id, label, x: q ? q[0] * w : d[0], y: q ? q[1] * h : d[1], r: r * k * sc }; });
   pd.w = w; pd.h = h;
 }
 function inBtn(pd, x, y){ for (const b of pd.BTN) { const dx = x - b.x, dy = y - b.y; if (dx * dx + dy * dy <= (b.r * 1.25) ** 2) return b.id; } return null; }
@@ -74,9 +78,8 @@ cv.addEventListener('pointerdown', e => {
   if (FX.finish && FX.finish.t > 40) { /* 演出中のタップで早送り */ FX.finish.t = Math.max(FX.finish.t, 150); }
   const at = viewAt(e.clientX, e.clientY); if (!at) return;
   const pd = at.v.pad, x = at.x, y = at.y;
-  { const dx = x - pd.CS.x, dy = y - pd.CS.y;
-    if (dx * dx + dy * dy <= pd.CS.r * pd.CS.r && !pd.cs) { pd.cs = { id: e.pointerId, ox: x, oy: y, x, y, fired: false }; OWN[e.pointerId] = { v: at.v, r: 'C' }; return; } }
   const b = inBtn(pd, x, y);
+  if (EDIT) { if (b) { EDIT.sel = b; OWN[e.pointerId] = { v: at.v, r: 'E', id: b, dx: x - pd.BTN.find(q => q.id === b).x, dy: y - pd.BTN.find(q => q.id === b).y }; } return; }
   if (b) { pd.btn[b] = true; OWN[e.pointerId] = { v: at.v, r: b }; return; }
   if (x < at.v.w * 0.5 && !pd.stick) { pd.stick = { id: e.pointerId, ox: x, oy: y, x, y }; OWN[e.pointerId] = { v: at.v, r: 'S' }; }
 }, { passive: false });
@@ -85,17 +88,13 @@ cv.addEventListener('pointermove', e => {
   const o = OWN[e.pointerId]; if (!o) return;
   const pd = o.v.pad, [x, y] = localOf(o.v, e.clientX, e.clientY);
   if (o.r === 'S' && pd.stick) { pd.stick.x = x; pd.stick.y = y; }
-  const c = pd.cs;
-  if (o.r === 'C' && c) {
-    c.x = x; c.y = y;
-    const dx = c.x - c.ox, dy = c.y - c.oy;
-    if (!c.fired && Math.hypot(dx, dy) > pd.CS.r * 0.45) { c.fired = true; pd.cPend = Math.abs(dx) >= Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy < 0 ? 'u' : 'd'); c.dir = pd.cPend; }
-  }
+  if (o.r === 'E') { // 配置を変える: ボタンを指で動かす
+    const nx = clamp(x - o.dx, 20, pd.w - 20), ny = clamp(y - o.dy, 20, pd.h - 20);
+    BLAY = BLAY || { s: 1 }; BLAY[o.id] = [nx / pd.w, ny / pd.h]; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); }
 });
 function upPtr(e){ const o = OWN[e.pointerId]; if (!o) return; const pd = o.v.pad;
   if (o.r === 'S') pd.stick = null;
-  else if (o.r === 'C') { if (pd.cs && !pd.cs.fired) pd.cPend = 'n'; pd.cs = null; } // 弾かずに離したら向きなしの斬
-  else pd.btn[o.r] = false;
+  else if (o.r !== 'E') pd.btn[o.r] = false;
   delete OWN[e.pointerId]; }
 cv.addEventListener('pointerup', upPtr); cv.addEventListener('pointercancel', upPtr);
 let stepN = 0;
@@ -105,13 +104,13 @@ function readHuman(pi){
   const k = list => !!km && list.some(c => key[c]);
   const i = { L: km ? k(km.L) : false, R: km ? k(km.R) : false, U: km ? k(km.U) : false, D: km ? k(km.D) : false,
     A: (km && k(km.A)) || !!pd.btn.A, J: (km && k(km.J)) || !!pd.btn.J, G: (km && k(km.G)) || !!pd.btn.G };
+  i.S = i.A; // 技ボタンは向きなしでも刀の技
   // キーボード: 同じ向きを素早く二回押すとダッシュ
   if (km) {
     const kl = k(km.L), kr = k(km.R);
     if (kl && !kb.pl) { if (stepN - kb.L < 14) i.F = true; kb.L = stepN; }
     if (kr && !kb.pr) { if (stepN - kb.R < 14) i.F = true; kb.R = stepN; }
     kb.pl = kl; kb.pr = kr;
-    for (const d in km.C) { const c = km.C[d]; if (key[c] && !kb.c[c]) i.C = d; kb.c[c] = key[c]; }
   }
   const T = Math.min(pd.w || W, pd.h || H) * 0.045;
   const v = VIEWS.find(q => q.pad === pd), flip = v && v.mir < 0;
@@ -127,7 +126,15 @@ function readHuman(pi){
     if (Math.abs(dx) > T * 1.7 && pd.hist.slice(-3).some(q => Math.abs(q) < T * 0.6)) i.F = true;
   }
   pd.hist.push(dx); if (pd.hist.length > 4) pd.hist.shift();
-  if (pd.cPend) { let c = pd.cPend; if (flip && (c === 'l' || c === 'r')) c = c === 'l' ? 'r' : 'l'; i.C = c; pd.cPend = null; }
+  // 斬ボタン: 押した瞬間、倒している向きの通常技（横・上・下・向きなし。走りながらならダッシュ斬り、空中なら空中技）
+  const nOn = (km && k(km.N)) || !!pd.btn.N;
+  if (nOn && !pd.prevN) {
+    const h = (i.R ? 1 : 0) - (i.L ? 1 : 0);
+    let d = 'n';
+    if (i.V === 'h' && h) d = h > 0 ? 'r' : 'l'; else if (i.V === 'u' || (i.V == null && i.U)) d = 'u'; else if (i.V === 'd' || (i.V == null && i.D)) d = 'd'; else if (h) d = h > 0 ? 'r' : 'l';
+    i.C = d;
+  }
+  pd.prevN = nOn;
   return i;
 }
 
@@ -267,10 +274,10 @@ function tick(now){
 function inputSym(i){
   const h = (i.R ? 1 : 0) - (i.L ? 1 : 0), v = (i.U ? 1 : 0) - (i.D ? 1 : 0);
   const ar = ['↙', '↓', '↘', '←', '・', '→', '↖', '↑', '↗'][(1 - v) * 3 + (h + 1)];
-  return ar + (i.C ? '攻' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.C] : '') + (i.A ? '斬' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
+  return ar + (i.C ? '斬' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.C] : '') + (i.A ? '技' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
 }
 function stepOnce(){
-  if (DBG.pause || GAME.mode === 'menu' || PAUSED) return;
+  if (DBG.pause || GAME.mode === 'menu' || PAUSED || EDIT) return;
   stepN++;
   if (GAME.phase === 'over') { tickParts(); return; }
   if (GAME.phase === 'intro') { GAME.t++; if (GAME.t === 1 && GAME.zin) SND.play('draw'); if (GAME.t > 80 + GAME.zin) { GAME.phase = 'fight'; GAME.t = 0; GAME.zin = 0; } tickParts(); return; }
@@ -888,7 +895,7 @@ function drawFrames(){
 }
 const STN = { fall: '無防備落下', idle: '待ち', walk: '歩き', dash: 'ダッシュ', crouch: 'しゃがみ', jsq: '踏み切り', air: '空中', land: '着地', guard: 'ガード', unguard: 'ガードを解く', bstun: 'ガード硬直', roll: '転がり', hit: 'のけぞり', tumble: '吹き飛び', down: 'ダウン', getup: '起き上がり', stun: '気絶', adodge: '空中回避', tech: '受け身', ko: '一本' };
 function drawPad(v){
-  const pd = v.pad, me = v.me, CS = pd.CS;
+  const pd = v.pad, me = v.me;
   if (GAME.mode === 'cpu' && me !== 0) return;
   const stunO = sim.p[1 - me].st === 'stun';
   if (pd.stick) {
@@ -897,20 +904,6 @@ function drawPad(v){
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.beginPath(); cx.arc(pd.stick.ox + dx * k, pd.stick.oy + dy * k, 20, 0, Math.PI * 2); cx.fill();
   } else if (matchMedia('(pointer: coarse)').matches) {
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.font = `500 11px ${UIF}`; cx.textAlign = 'center'; cx.fillText('左半分を押して動かす', W * 0.22, H - 22);
-  }
-  { // 攻撃スティック
-    const c = pd.cs;
-    cx.globalAlpha = c ? 0.95 : 0.6;
-    cx.strokeStyle = 'rgba(20,21,18,.7)'; cx.lineWidth = 2; cx.fillStyle = 'rgba(239,232,214,.35)';
-    cx.beginPath(); cx.arc(CS.x, CS.y, CS.r, 0, Math.PI * 2); cx.fill(); cx.stroke();
-    cx.fillStyle = INK;
-    for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2; cx.save(); cx.translate(CS.x + Math.cos(a) * CS.r * 0.72, CS.y + Math.sin(a) * CS.r * 0.72); cx.rotate(a);
-      cx.beginPath(); cx.moveTo(5, 0); cx.lineTo(-3, -5); cx.lineTo(-3, 5); cx.closePath(); cx.fill(); cx.restore(); }
-    let kx = CS.x, ky = CS.y;
-    if (c) { const dx = c.x - c.ox, dy = c.y - c.oy, d = Math.hypot(dx, dy), m = d > CS.r * 0.6 ? CS.r * 0.6 / d : 1; kx += dx * m; ky += dy * m; }
-    cx.fillStyle = c && c.fired ? COL[me].main : 'rgba(20,21,18,.55)'; cx.beginPath(); cx.arc(kx, ky, CS.r * 0.36, 0, Math.PI * 2); cx.fill();
-    cx.fillStyle = PALE; cx.font = `${Math.round(CS.r * 0.4)}px ${DISPLAY}`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.fillText('攻', kx, ky + 1); cx.textBaseline = 'alphabetic';
-    cx.globalAlpha = 1;
   }
   for (const b of pd.BTN) {
     const iai = b.id === 'G' && stunO;
@@ -923,9 +916,12 @@ function drawPad(v){
     cx.fillStyle = iai || on ? PALE : INK; cx.font = `${Math.round(b.r * 0.85)}px ${DISPLAY}`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
     cx.fillText(iai ? '居' : b.label, b.x, b.y + 1);
     cx.textBaseline = 'alphabetic'; cx.globalAlpha = 1;
+    if (EDIT) { cx.setLineDash([6, 5]); cx.strokeStyle = EDIT.sel === b.id ? '#c8372d' : 'rgba(20,21,18,.6)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(b.x, b.y, b.r * 1.25, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); }
   }
+  if (EDIT) { cx.fillStyle = 'rgba(20,21,18,.55)'; cx.fillRect(0, 0, W * 0.5, H); cx.fillStyle = PALE; cx.font = `600 15px ${UIF}`; cx.textAlign = 'center';
+    cx.fillText('左半分は移動（どこを押しても動ける）', W * 0.25, H * 0.5); cx.fillText('ボタンを指で動かして置き場所を決める', W * 0.25, H * 0.5 + 24); }
 }
-function readKeyFor(pi, id){ const km = keyMap(pi); return !!km && km[id].some(c => key[c]); }
+function readKeyFor(pi, id){ const km = keyMap(pi); return !!km && !!km[id] && km[id].some(c => key[c]); }
 
 function drawFinish(){
   const f = FX.finish; if (!f) return;
@@ -1075,6 +1071,12 @@ function setupBar(){
 
 /* ---------- 選ぶ画面・試合の終わり・一時停止 ---------- */
 let PAUSED = false;
+/* ボタン配置: 稽古の場面を止めて、ボタンを指で動かす。大きさも変えられる */
+let EDIT = null;
+function startEdit(){ showMenu(false); setPause(false); if (GAME.mode !== 'train') startMode('train'); EDIT = { sel: null, from: GAME.mode }; $('edbar').hidden = false; document.body.dataset.edit = '1'; }
+function endEdit(save){ if (!save) { try { BLAY = JSON.parse(localStorage.getItem(BLAY_KEY) || 'null'); } catch (e) { BLAY = null; } } else saveBlay();
+  EDIT = null; $('edbar').hidden = true; delete document.body.dataset.edit; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); }
+function editScale(k){ BLAY = BLAY || { s: 1 }; BLAY.s = clamp((BLAY.s || 1) * k, 0.6, 1.7); for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); }
 const $ = id => document.getElementById(id);
 function showMenu(on){
   $('menu').hidden = !on;
@@ -1102,6 +1104,10 @@ function setupMenu(){
   $('ps_menu').onclick = () => { setPause(false); showMenu(true); };
   $('a_menu').onclick = () => showMenu(true);
   $('mn_help').onclick = () => { $('help').hidden = false; };
+  $('mn_btns').onclick = () => startEdit(); $('a_btns').onclick = () => startEdit(); $('ps_btns').onclick = () => startEdit();
+  $('ed_small').onclick = () => editScale(1 / 1.12); $('ed_big').onclick = () => editScale(1.12);
+  $('ed_reset').onclick = () => { BLAY = null; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); };
+  $('ed_ok').onclick = () => endEdit(true); $('ed_cancel').onclick = () => endEdit(false);
   const KOPT = [['common', 'いつもの刀（共通の技）'], ['ouka', '桜華〔絶〕（試し）']];
   for (const [id, i] of [['kt0', 0], ['kt1', 1], ['a_kit', 0]]) { const el = $(id);
     KOPT.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });

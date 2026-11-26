@@ -148,6 +148,7 @@ function readInput(p, inp){
   const h = (inp.R ? 1 : 0) - (inp.L ? 1 : 0), ph = (pi.R ? 1 : 0) - (pi.L ? 1 : 0);
   p.hEdge = (h && h !== ph) ? h : 0;
   p.holdA = inp.A ? p.holdA + 1 : 0;
+  if (inp.S && !pi.S) p.spB = C.buf; else if (p.spB > 0) p.spB--; // 技ボタン: 向きなしでも刀の技（横の技）が出る
   p.lastG = (inp.G && !pi.G) ? 0 : p.lastG + 1;
   takeC(p, inp);
 }
@@ -198,7 +199,7 @@ Sim.prototype.startMove = function(p, id){
     if (id === 'ten' && p.boost) id = ['ten', 'tenK', 'tenM', 'tenR'][p.boost];
   }
   p.treeHit = false;
-  p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null;
+  p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null; p.spB = 0;
   if (id === 'iai' || id === 'airiai') { p.buf.G = 0; const o = this.p[1 - p.i]; if (o.x !== p.x) p.face = sgn(o.x - p.x); }
   this.ev.push({ t: 'start', p: p.i, mv: id });
 };
@@ -214,7 +215,7 @@ Sim.prototype.groundAttack = function(p){
     return this.startMove(p, 'jab1');
   }
   const d = adir(p);
-  if (d === 'h') { p.face = horiz(p) || p.face; return this.startMove(p, kit.s1); }
+  if (d === 'h' || (d === 'n' && p.spB)) { p.face = horiz(p) || p.face; return this.startMove(p, kit.s1); }
   if (d === 'u') return this.startMove(p, kit.s2);
   if (d === 'd') return this.startMove(p, kit.s3);
   return this.startMove(p, 'jab1');
@@ -229,7 +230,7 @@ Sim.prototype.airAttack = function(p){
     return this.startMove(p, 'nair');
   }
   const dv = adir(p, true);
-  if (dv === 'h') { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; p.face = horiz(p) || p.face; return this.startMove(p, kit.s1a); }
+  if (dv === 'h' || (dv === 'n' && p.spB)) { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; p.face = horiz(p) || p.face; return this.startMove(p, kit.s1a); }
   if (dv === 'u') return this.startMove(p, kit.s2a);
   if (dv === 'd') return this.startMove(p, kit.s3a);
   return this.startMove(p, 'nair');

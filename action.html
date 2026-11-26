@@ -29,6 +29,12 @@ canvas{display:block;touch-action:none}
 @media (orientation:portrait) and (pointer:coarse){#rot{display:grid}}
 #bar,#a_pause{display:none}
 body[data-mode=train] #bar{display:flex}
+body[data-edit] #bar,body[data-edit] #a_pause{display:none!important}
+#edbar{position:fixed;top:max(10px,env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:30;display:flex;gap:6px;align-items:center;background:rgba(20,21,18,.88);color:#efe8d6;padding:8px 10px;border-radius:6px;font:500 13px var(--ui,sans-serif);flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 32px)}
+#edbar[hidden]{display:none}
+#edbar span{margin-right:6px;letter-spacing:.1em}
+#edbar button{padding:7px 12px;border-radius:4px;border:1px solid rgba(239,232,214,.4);background:none;color:#efe8d6;font:inherit;cursor:pointer}
+#edbar button.pri{background:#c8372d;border-color:#c8372d}
 body[data-mode=cpu] #a_pause,body[data-mode=vs] #a_pause{display:block}
 #a_pause{position:fixed;left:50%;top:calc(6px + env(safe-area-inset-top,0px));transform:translateX(-50%);font:500 11px 'Zen Kaku Gothic New',sans-serif;color:#141512;background:rgba(239,232,214,.6);border:1px solid rgba(20,21,18,.4);border-radius:3px;padding:2px 8px;z-index:3;margin-top:58px}
 body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) rotate(90deg)}
@@ -73,6 +79,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <label><input type="checkbox" id="a_boxes">判定</label>
   <label><input type="checkbox" id="a_refill">体力を戻す</label>
   <button type="button" id="a_reset">位置を戻す</button>
+  <button type="button" id="a_btns">ボタン配置</button>
   <button type="button" id="a_help">操作</button>
 </div>
 <button type="button" id="a_pause">一時停止</button>
@@ -85,7 +92,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
     <button type="button" id="mn_train" class="mb"><span class="mk">稽古</span><span class="ms">技とフレームの確かめ</span></button>
   </div>
   <div class="kits"><span>持たせる刀</span><label style="color:#f3a294">朱 <select id="kt0"></select></label><label style="color:#a9c1f0">藍 <select id="kt1"></select></label></div>
-  <div class="mlinks"><a href="index.html">タイトルへ</a><button type="button" id="mn_help">操作</button></div>
+  <div class="mlinks"><a href="index.html">タイトルへ</a><button type="button" id="mn_btns">ボタン配置</button><button type="button" id="mn_help">操作</button></div>
 </div></div>
 <div id="over" class="ov" hidden><div class="sheet">
   <p id="ov_h"></p><p id="ov_s"></p><ul id="ov_l"></ul>
@@ -94,29 +101,30 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
 <div id="pausep" class="ov" hidden><div class="sheet">
   <h2>一時停止</h2>
   <div class="acts"><button type="button" class="pri" id="ps_resume">続ける</button><button type="button" id="ps_retry">最初から</button><button type="button" id="ps_menu">やめる</button></div>
+  <div class="acts"><button type="button" id="ps_btns">ボタン配置</button></div>
 </div></div>
+<div id="edbar" hidden><span>ボタン配置</span><button type="button" id="ed_small">小さく</button><button type="button" id="ed_big">大きく</button><button type="button" id="ed_reset">元に戻す</button><button type="button" id="ed_cancel">やめる</button><button type="button" id="ed_ok" class="pri">決める</button></div>
 <div id="help" hidden><div class="sheet">
   <h2>操作</h2>
   <p>勝ち方は二つ。連撃で体力を削りきるか、ガードを削って気絶させ、朱く光った「居」で居合を当てるか。</p>
   <table>
     <tr><td>左半分を押して滑らす</td><td>ゆっくり倒す＝歩く　素早く倒す＝ダッシュ（キーボードは同じ向きを二回）　上・しゃがむ（キーボードは WASD か矢印）。向きは歩いた方を向く</td></tr>
-    <tr><td>斬（J / Z）</td><td>立ち止まって＝弱斬り三段　横＋斬＝踏み込み斬り　上＋斬＝上斬り（打ち上げ）　下＋斬＝下斬り　押し続ける＝溜め斬り</td></tr>
-    <tr><td>攻（攻撃スティック）</td><td>弾いた向きの通常技がすぐ出る。地上は 横＝横斬り・上＝上斬り・下＝下斬り、空中は 空前・空後・空上・空下（向きは変わらない）。弾かずに離すと向きなし。ダッシュ中に弾くとダッシュ斬り（キーボードはテンキー 8・4・6・2）</td></tr>
-    <tr><td>斬（J / Z）</td><td>向きなし＝三段斬り　横＝特殊技1　上＝特殊技2　下＝特殊技3。特殊技は刀ごとに変わる（今は共通の 飛ぶ斬撃・昇り斬り・カウンター）。昇り斬りの後は着地まで何もできない</td></tr>
+    <tr><td>斬（J / Z）</td><td>通常技。向きなし＝弱斬り三段　横＝横斬り　上＝上斬り　下＝下斬り。走りながら＝ダッシュ斬り。空中は 空中斬・空前・空後・空上・空下</td></tr>
+    <tr><td>技（U / V）</td><td>刀の技。向きなし・横＝特殊技1　上＝特殊技2　下＝特殊技3（共通の刀は 飛ぶ斬撃・昇り斬り・カウンター）。昇り斬りの後は着地まで何もできない</td></tr>
     <tr><td>跳（K / X / Space）</td><td>軽く＝小跳び　長め＝大跳び　空中でもう一回　端の竹で壁蹴り</td></tr>
     <tr><td>守（L / C）</td><td>押している間シールドを張る（耐久が減るほど小さくなる）　守りながら下＝その場回避　守りながら前・後＝前方・後方回避　守りながら斬＝組み打ち　空中で守＝空中回避（向きを入れると方向回避）　叩きつけられる直前＝受け身</td></tr>
-    <tr><td>刀「桜華」</td><td>下＋斬＝植樹。押すたび 開花→満開→落花→撤去。開花: 花嵐が速く・天桜が高く。満開: 花嵐が三枚、天桜のまわりに花びら、全部の技の威力1.4倍。落花: 花嵐が五枚に散る、天桜のあと降下攻撃、動きが1.5倍。強化は段階ごとに一度（上の◆が残り）。木は相手に斬られると折れる</td></tr>
+    <tr><td>刀「桜華」</td><td>下＋技＝植樹。押すたび 開花→満開→落花→撤去。開花: 花嵐が速く・天桜が高く。満開: 花嵐が三枚、天桜のまわりに花びら、全部の技の威力1.4倍。落花: 花嵐が五枚に散る、天桜のあと降下攻撃、動きが1.5倍。強化は段階ごとに一度（上の◆が残り）。木は相手に斬られると折れる</td></tr>
     <tr><td>居</td><td>相手が気絶すると守が居に変わる。当たれば一本</td></tr>
   </table>
-  <p>キーボードで二人対戦: 朱は WASD・J斬 K跳 L守・攻は T F G H、藍は 矢印・テンキー1斬 2跳 3守・攻は 8 4 5 6。</p>
+  <p>ボタンの置き場所と大きさは「ボタン配置」で変えられます。キーボードで二人対戦: 朱は WASD・J斬 U技 K跳 L守、藍は 矢印・テンキー1斬 4技 2跳 3守。</p>
   <p>稽古では右上に入力の履歴、左上に今の技のフレームと直前の有利F（＋は先に動ける）が出ます。数字はすべて叩き台です。</p>
   <button type="button" id="h_close">閉じる</button>
 </div></div>
 <div id="rot">横向きにしてください</div>
-<script src="js/action/pose.js?v=1795687558"></script>
-<script src="js/action/boxes.js?v=1795687558"></script>
-<script src="js/action/sim.js?v=1795687558"></script>
-<script src="js/action/app.js?v=1795687558"></script>
+<script src="js/action/pose.js?v=1795692680"></script>
+<script src="js/action/boxes.js?v=1795692680"></script>
+<script src="js/action/sim.js?v=1795692680"></script>
+<script src="js/action/app.js?v=1795692680"></script>
 <script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>
 </body>
 </html>

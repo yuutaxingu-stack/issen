@@ -633,17 +633,9 @@ let GROUND = 0;
 const wx = x => (x - cam.x) * cam.z * MIR + W / 2; // 向かい側の画面は左右を返す
 const wy = y => GROUND - (y - cam.y) * cam.z;
 function updateCam(){
+  // 画面は動かさない（キャラに合わせて動くと酔うので、2026-11-26 ユーザー指定）。戦場全体がいつも入るように固定
   setView(VIEWS[0]);
-  const a = sim.p[0], b = sim.p[1];
-  const mx = (a.x + b.x) / 2 / FP, dx = Math.abs(a.x - b.x) / FP;
-  const k = VIEWS.length > 1 ? 1.35 : 1; // 割った画面は狭いので寄る
-  const zt = clamp(W * k / (dx + 760), W / 1650, Math.min(W / 640, H / 360) * k);
-  cam.z = lerp(cam.z, zt, 0.08);
-  const half = W / 2 / cam.z;
-  const xt = clamp(mx, 0 + half, 1600 - half);
-  cam.x = lerp(cam.x, half * 2 >= 1600 ? 800 : xt, 0.12);
-  const top = Math.max(a.y, b.y) / FP;
-  cam.y = lerp(cam.y, Math.max(0, top - 150) * 0.7, 0.08);
+  cam.x = 800; cam.y = 0; cam.z = Math.min(W / 1640, GROUND / 560);
 }
 
 /* ---------- 背景 ---------- */
@@ -677,10 +669,6 @@ function drawBg(fr){
   const gy = wy(0);
   cx.fillStyle = sdOn ? '#2a0806' : '#3a3d30'; cx.fillRect(0, gy, W, H - gy);
   if (WORLD.b > 0.01) { cx.globalAlpha = WORLD.b * (1 - WORLD.f); cx.fillStyle = '#5b2f3b'; cx.fillRect(0, gy, W, H - gy); cx.globalAlpha = WORLD.f; cx.fillStyle = '#160204'; cx.fillRect(0, gy, W, H - gy); cx.globalAlpha = 1;
-    // 地面を埋める花びら
-    let sd = 7; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-    for (let k = 0; k < 220; k++) { const x = r() * W, y = gy + 3 + r() * (H - gy), c = WORLD.f > 0.5 ? (k % 3 ? CRIM[k % 3] : SAKURA[2]) : SAKURA[k % 3];
-      cx.globalAlpha = WORLD.b * (0.5 + r() * 0.5); cx.fillStyle = c; cx.beginPath(); cx.ellipse(x, y, 4 + r() * 3, 2 + r(), r() * 3, 0, Math.PI * 2); cx.fill(); }
     cx.globalAlpha = 1; }
   cx.fillStyle = sdOn ? 'rgba(255,120,90,.2)' : 'rgba(239,232,214,.18)'; cx.fillRect(0, gy, W, 2);
   // 端の太い竹
@@ -702,8 +690,9 @@ function drawBg(fr){
    木が満開になると竹林が桜の森に、落花になると赤黒い夜に花が吹き荒れる世界に塗り替わる（両方の画面とも） */
 const WORLD = { b: 0, f: 0, k: 0, m: 0 };
 const SKTREES = []; (function(){ let s = 4242; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let layer = 0; layer < 3; layer++) for (let k = 0; k < 9 - layer * 2; k++) { const blobs = []; for (let j = 0; j < 9; j++) blobs.push([(r() - 0.5) * 1.6, r() * 0.7, 0.35 + r() * 0.45]);
-    SKTREES.push({ layer, x: -300 + r() * 2200, h: [520, 420, 330][layer] * (0.8 + r() * 0.4), w: [190, 150, 120][layer] * (0.8 + r() * 0.4), blobs }); } })();
+  // 奥行きなし: 同じ大きさ・同じ色の木を一列に（2026-11-26 ユーザー指定）
+  for (let k = 0; k < 9; k++) { const blobs = []; for (let j = 0; j < 9; j++) blobs.push([(r() - 0.5) * 1.6, r() * 0.7, 0.35 + r() * 0.45]);
+    SKTREES.push({ layer: 1, x: 20 + k * 195 + (r() - 0.5) * 60, h: 470 * (0.9 + r() * 0.2), w: 175 * (0.9 + r() * 0.2), blobs }); } })();
 function updateWorld(){
   let st = 0; for (const p of sim.p) if (p.tree && p.tree.stage > st) st = p.tree.stage;
   const zetsu = sim.p.some(p => p.kit === 'ouka'); // 絶の刀を持つ者がいる戦場は、最初から桜の森
@@ -729,7 +718,7 @@ function drawSakuraWorld(fr){
   const par = [0.3, 0.55, 0.8];
   const trunk = [['#a7788a', '#7a4a5c', '#4a2430'], ['#2a0508', '#150204', '#000']], bloom = [['#f8d3de', '#f2b3c6', '#e88aa7'], ['#5a0a14', '#7d0f20', '#a3182c']];
   for (const t of SKTREES) {
-    const z = cam.z * par[t.layer] + (1 - par[t.layer]) * 0.6, x = W / 2 + MIR * ((t.x - cam.x * par[t.layer]) * z - (800 * (1 - par[t.layer])) * z);
+    const z = cam.z, x = wx(t.x);
     if (x < -t.w * z * 1.5 || x > W + t.w * z * 1.5) continue;
     const sway = Math.sin(fr * 0.01 + t.x) * 4 * z, h = t.h * z, w = t.w * z;
     for (const [mode, al] of [[0, b * (1 - f)], [1, b * f]]) { if (al < 0.01) continue; cx.globalAlpha = al;

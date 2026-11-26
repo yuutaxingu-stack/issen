@@ -1371,6 +1371,7 @@ function renderBook(){
 let DETAIL=null;
 // 絶の刀帳: 鞘から刃が抜け、赤黒い闇に桜が舞い続ける専用の頁
 const ZSAYA=new Image(); ZSAYA.src='assets/katana_ouka_saya.png';
+const ZHD=new Image(); let ZHDreq=false; // 細部まで見る用の大きな絵（刀帳を開いたときに読む）
 let ZST=null;
 /* 刀帳・桜華の抜刀: 闇に細い帯のカットが次々と斬り込む（鍔 → 鯉口の光 → 走る刃）。
    最後に一筋の斬線が帯を裂き、赤黒い頁に抜き身が据わる。画面全体は動かさない（帯の中だけ動く） */
@@ -1440,14 +1441,16 @@ function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
   if(ZST){ cancelAnimationFrame(ZST.raf); ZST=null; }
   c.hidden=!k; zw.hidden=!k; if(!k) return;
-  const W=c.width, H=c.height, x=c.getContext('2d');
-  const P=[]; for(let i=0;i<70;i++) P.push({x:Math.random()*W,y:Math.random()*H,v:20+Math.random()*50,s:4+Math.random()*7,r:Math.random()*6,w:Math.random()*6,d:Math.random()<.35});
+  if(!ZHDreq){ ZHDreq=true; ZHD.src='assets/katana_ouka_hd.png'; }
+  const W=1040, H=420, x=c.getContext('2d'); // 描くのは1040x420、実際は2倍の細かさ
+  const P=[]; for(let i=0;i<190;i++) P.push({x:Math.random()*W,y:Math.random()*H,v:20+Math.random()*50,s:3+Math.random()*8,r:Math.random()*6,w:Math.random()*6,d:Math.random()<.3,c:'rgba('+(170+Math.random()*60|0)+','+(14+Math.random()*40|0)+','+(36+Math.random()*30|0)+',.88)'});
   const t0=performance.now(); let last=t0;
   ZST={raf:0,burst:0};
-  c.onclick=()=>zetsuStage(k); // 触るともう一度抜く
+  c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
   const frame=now=>{
     if(!ZST) return; const rt=(now-t0)/1000*(window.__zslow||1), dt=Math.min(.05,(now-last)/1000); last=now;
     const t=rt<ZSLASH?0:2.9+(rt-ZSLASH); // 斬線で帯が裂けると、その下に抜き身が据わっている
+    x.setTransform(c.width/W,0,0,c.height/H,0,0);
     const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,'#5a0d18'); g.addColorStop(.55,'#250609'); g.addColorStop(1,'#070203');
     x.fillStyle=g; x.fillRect(0,0,W,H);
     // 朱の月
@@ -1455,14 +1458,14 @@ function zetsuStage(k){
     // 大きな「絶」
     x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore();
     // 抜刀: 鞘に納まった桜華が現れ → 鯉口を切り → 刃が鞘から滑り出て → 鞘が消え、抜き身が中央に据わる
-    const kw=W*0.56, sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.6, cxF=(W-kw)/2;
+    const kw=W*0.9, sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.56, cxF=(W-kw)/2;
     const A=0.8, B=1.3, Cd=2.3, D=2.9; // 現れる / 鯉口 / 抜き終わり / 据わる
     const eo=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),3), eio=v=>{v=Math.max(0,Math.min(1,v)); return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
     let pull=0; if(t>A) pull=8*sc*eo((t-A)/(B-A)); if(t>B) pull=8*sc+(bladeI-8*sc)*eio((t-B)/(Cd-B));
     const settle=eo((t-Cd-0.15)/(D-Cd)), bob=t>D?Math.sin((t-D)*1.3)*4:0;
     const bx=kx0-pull+(cxF-(kx0-bladeI))*settle; // 刀（柄の左端）の位置
     if(KREADY&&ZSAYA.complete&&ZSAYA.naturalWidth){
-      x.save(); x.translate(W/2,ky+bob); x.rotate(-0.1*(t<Cd?1:1-settle)-0.12*settle); x.translate(-W/2,-kh/2);
+      x.save(); x.translate(W/2,ky+bob); x.rotate(-0.1*(t<Cd?1:1-settle)-0.07*settle); x.translate(-W/2,-kh/2);
       if(t<B){ // 鞘に納まった姿
         x.globalAlpha=eo(t/A); x.shadowColor='rgba(255,40,70,.7)'; x.shadowBlur=18+10*Math.sin(t*8); x.drawImage(ZSAYA,kx0,0,kw,kh);
         if(t>A){ x.globalAlpha=1; x.save(); x.beginPath(); x.rect(0,-50,kx0+mouthI*sc,kh+100); x.clip(); x.shadowBlur=0; x.drawImage(k.canvas,bx,0,kw,kh); x.restore(); }
@@ -1471,7 +1474,8 @@ function zetsuStage(k){
         const sa=1-eo((t-Cd)/0.5); if(sa>0){ x.save(); x.globalAlpha=sa; x.translate(0,(1-sa)*40); x.beginPath(); x.rect(kx0+mouthI*sc,-50,W,kh+100); x.clip(); x.drawImage(ZSAYA,kx0,0,kw,kh); x.restore(); }
         // 刃: 鞘の中にある間は鯉口より先を隠す
         x.save(); if(t<Cd){ x.beginPath(); x.rect(-W,-200,kx0+mouthI*sc+W,kh+400); x.clip(); }
-        x.shadowColor='rgba(255,40,70,.85)'; x.shadowBlur=24; x.drawImage(k.canvas,bx,0,kw,kh); x.restore();
+        x.shadowColor='rgba(255,40,70,.85)'; x.shadowBlur=24;
+        if(t>=Cd&&ZHD.complete&&ZHD.naturalWidth){ const hh=kw*ZHD.naturalHeight/ZHD.naturalWidth; x.drawImage(ZHD,bx,(kh-hh)/2,kw,hh); } else x.drawImage(k.canvas,bx,0,kw,kh); x.restore();
         // 鯉口の火花
         if(t<Cd){ const mx=kx0+mouthI*sc, g2=x.createRadialGradient(mx,kh*.45,0,mx,kh*.45,60); g2.addColorStop(0,'rgba(255,240,245,.95)'); g2.addColorStop(1,'rgba(255,60,90,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=g2; x.fillRect(mx-60,kh*.45-60,120,120); x.globalCompositeOperation='source-over'; }
         // 抜き終わりの閃光と、刃を流れる光
@@ -1480,17 +1484,42 @@ function zetsuStage(k){
           x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(sx-60,kh*.25,120,kh*.3); x.globalCompositeOperation='source-over'; }
       }
       x.restore();
-      if(!ZST.burst&&t>Cd){ ZST.burst=1; for(const p of P){ p.x=W*.3+Math.random()*W*.4; p.y=ky+(Math.random()-.5)*60; p.v=-120+Math.random()*80; p.kx=(Math.random()-.5)*600; } }
+      if(!ZST.burst&&t>Cd){ ZST.burst=1; for(const p of P){ p.x=W*.15+Math.random()*W*.7; p.y=ky+(Math.random()-.5)*60; p.v=-120+Math.random()*80; p.kx=(Math.random()-.5)*600; } }
     }
     // 花びら
     for(const p of P){ if(p.kx){ p.x+=p.kx*dt; p.kx*=0.96; if(Math.abs(p.kx)<5) p.kx=0; } if(p.v<20) p.v+=160*dt; p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>H+10){p.y=-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
-      x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':'rgba('+(200+Math.random()*20|0)+',40,64,.85)'; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
+      x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':p.c; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
     // 落款
     x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore();
     drawManga(x,W,H,rt,k);
     ZST.raf=requestAnimationFrame(frame);
   };
   ZST.raf=requestAnimationFrame(frame);
+}
+/* 桜華を大きく見る: 指二本で拡大、なぞって動かす、二度触ると寄る/戻る */
+function zetsuZoom(k){
+  let v=document.getElementById('zzoom');
+  if(!v){ v=document.createElement('div'); v.id='zzoom';
+    v.innerHTML='<div class="zzst"><img alt="" draggable="false"></div><div class="zzbar"><button type="button" data-z="blade" class="on">抜き身</button><button type="button" data-z="saya">鞘</button><button type="button" data-z="again">抜刀をもう一度</button><button type="button" data-z="close">閉じる</button></div><p class="zzhint">指二本で拡大・なぞって動かす・二度触ると寄る</p>';
+    document.body.appendChild(v); }
+  const st=v.querySelector('.zzst'), im=v.querySelector('img');
+  const S={z:1,x:0,y:0}, pts=new Map(); let pinch=null, lastTap=0;
+  const apply=()=>{ const r=st.getBoundingClientRect(), bw=im.offsetWidth*S.z, bh=im.offsetHeight*S.z, mx=Math.max(0,(bw-r.width)/2), my=Math.max(0,(bh-r.height)/2);
+    S.x=Math.max(-mx,Math.min(mx,S.x)); S.y=Math.max(-my,Math.min(my,S.y)); im.style.transform='translate('+S.x+'px,'+S.y+'px) scale('+S.z+')'; };
+  const zoomAt=(nz,cx,cy)=>{ const r=st.getBoundingClientRect(); nz=Math.max(1,Math.min(8,nz)); const ox=cx-r.left-r.width/2, oy=cy-r.top-r.height/2;
+    S.x=ox-(ox-S.x)*nz/S.z; S.y=oy-(oy-S.y)*nz/S.z; S.z=nz; apply(); };
+  const show=w=>{ im.src=w==='saya'?'assets/katana_ouka_saya_hd.png':'assets/katana_ouka_hd.png'; S.z=1; S.x=S.y=0; apply(); v.querySelectorAll('[data-z]').forEach(b=>b.classList.toggle('on',b.dataset.z===w)); };
+  v.onclick=e=>{ const b=e.target.closest('[data-z]'); if(!b) return; const z=b.dataset.z;
+    if(z==='close'){ v.hidden=true; } else if(z==='again'){ v.hidden=true; zetsuStage(k); } else show(z); };
+  st.onpointerdown=e=>{ st.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(pts.size===2){ const [a,b]=[...pts.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:S.z}; }
+    else { const now=performance.now(); if(now-lastTap<300){ zoomAt(S.z>1.5?1:3,e.clientX,e.clientY); } lastTap=now; } };
+  st.onpointermove=e=>{ const p=pts.get(e.pointerId); if(!p) return; const dx=e.clientX-p.x, dy=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY;
+    if(pts.size===2&&pinch){ const [a,b]=[...pts.values()]; zoomAt(pinch.z*Math.hypot(a.x-b.x,a.y-b.y)/pinch.d,(a.x+b.x)/2,(a.y+b.y)/2); }
+    else if(pts.size===1){ S.x+=dx; S.y+=dy; apply(); } };
+  st.onpointerup=st.onpointercancel=e=>{ pts.delete(e.pointerId); if(pts.size<2) pinch=null; };
+  st.onwheel=e=>{ e.preventDefault(); zoomAt(S.z*Math.exp(-e.deltaY*0.0015),e.clientX,e.clientY); };
+  v.hidden=false; im.onload=apply; show('blade');
 }
 function openDetail(k){
   DETAIL=k; FORGEARM=0; const own=!!ARM.owned[k.id]; const d=document.getElementById('g_detail'); d.hidden=false; d.querySelector('.gdsheet').className='gdsheet t'+TORD[k.tier]+(own?'':' unk');

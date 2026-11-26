@@ -42,7 +42,8 @@ const MV = {
   sweep: { n:'足払い', k:'g', s:12, a:5, r:24, dmg:600, gd:1200, hs:30, blk:-12, kb:[420,650], kd:1, box:[4,0,112,26], arc:[-20,-5], crouch:1 },
   plunge:{ n:'落とし', k:'a', s:8, a:90, r:1, land:22, dmg:800, gd:1400, hs:28, kb:[350,800], kd:1, box:[-26,-30,52,84], arc:[-90,-90], plunge:1 },
   shot:  { n:'飛ぶ斬撃', k:'g', s:18, a:1, r:35, noBox:1, shot:1, arc:[150,-30] },
-  shotP: { n:'飛ぶ斬撃', k:'p', s:1, a:1, r:0, dmg:500, gd:900, hs:20, blk:-4, kb:[420,160] },
+  shotP: { n:'飛ぶ斬撃', k:'p', s:1, a:1, r:0, dmg:500, gd:900, hs:14, blk:-4, kb:[260,0], flinch:1 },
+  dashatk:{ n:'ダッシュ斬り', k:'g', s:7, a:6, r:22, dmg:700, gd:1000, hs:26, blk:-10, kb:[700,550], box:[4,30,92,70], arc:[160,-20], lunge:[1,10,700] },
   counter:{ n:'カウンター', k:'g', s:7, a:23, r:40, noBox:1, counter:1, arc:[95,95] },
   ctrHit:{ n:'カウンター（反撃）', k:'g', s:4, a:3, r:36, dmg:1000, gd:2000, hs:30, blk:-20, kb:[950,650], box:[-24,16,140,104], arc:[170,-40] },
   utilt: { n:'上斬り', k:'g', s:7, a:5, r:16, dmg:500, gd:800, hs:34, blk:-6, kb:[90,1500], box:[-14,72,84,92], arc:[-40,125] },
@@ -228,7 +229,7 @@ Sim.prototype.think = function(p, o){
       if (canIai) return this.startMove(p, 'iai');
       if (i.G && !oppStun) return this.dodge(p, 'fwd', p.face); // ダッシュ中の守は走る向きへ前方回避
       if (p.buf.J) { p.buf.J = 0; p.st = 'jsq'; p.f = 0; return; }
-      if (p.buf.A) return this.groundAttack(p);
+      if (p.buf.A) { if (p.cb) return this.startMove(p, 'dashatk'); return this.groundAttack(p); } // 走りながら攻撃スティックでダッシュ斬り
       if (i.D) { p.st = 'crouch'; return; }
       if (h === -p.face) { p.face = h; p.f = 0; return; }
       if (!h) { p.st = 'idle'; return; } // 手を離すと滑って止まる

@@ -74,4 +74,7 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 { const s = sim(400); run(s, 1, () => I({ A: 1, D: 1 })); let n = 1; const win = []; while (s.p[0].st === 'atk') { const m = A.MV[s.p[0].mv]; if (s.p[0].mvf >= m.s && s.p[0].mvf < m.s + m.a) win.push(s.p[0].mvf); s.step([I(), I()]); n++; }
   ok(win[0] === 7 && win[win.length - 1] === 29 && n === 69, 'カウンター受付7〜29F・失敗で全体69F (' + win[0] + '-' + win[win.length - 1] + ',' + n + ')'); }
 { const s = sim(60); run(s, 1, null, () => I({ A: 1, D: 1 })); run(s, 7); run(s, 1, () => I({ A: 1 })); run(s, 6); ok(s.p[1].mv === 'ctrHit' || drain(s).some(e => e.t === 'counter'), 'カウンターが取れる'); run(s, 30); ok(s.p[0].hp < A.HP_MAX && s.p[1].hp === A.HP_MAX, '反撃が当たって自分は無傷'); ok(A.MV.ctrHit.total === 42 && A.MV.ctrHit.s === 4, '反撃 発生4F・全体42F'); }
+// 22) 走りながら攻撃スティックでダッシュ斬り。飛ぶ斬撃は当たっても少し怯むだけ
+{ const s = sim(600); run(s, 1, () => I({ R: 1, F: 1 })); run(s, 3, () => I({ R: 1 })); run(s, 1, () => I({ R: 1, C: 'r' })); ok(s.p[0].mv === 'dashatk', 'ダッシュ斬り'); }
+{ const s = sim(250); run(s, 1, () => I({ A: 1, R: 1 })); const sts = new Set(); for (let k = 0; k < 80; k++) { s.step([I(), I()]); sts.add(s.p[1].st); } ok(sts.has('hit') && !sts.has('tumble') && !sts.has('down'), '飛ぶ斬撃は怯むだけ ' + [...sts]); }
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

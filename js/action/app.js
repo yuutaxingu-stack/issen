@@ -238,7 +238,7 @@ function pose(p, fr){
     if (p.mv === 'counter') { P.sw = 100; P.arm = 30; P.lean = -4; P.hip = 50; P.fA = [-22, 0]; P.fB = [16, 0]; }
     if (p.mv === 'rise') { P.fA = [-8, 6]; P.fB = [10, 16]; P.lean = -6; }
     if (p.mv === 'plunge') { P.fA = [-10, 18]; P.fB = [12, 22]; P.lean = 10; P.arm = -95; }
-    if (p.mv === 'side' || p.mv === 'sideA' || m.iai) { P.fA = [-34, 0]; P.fB = [30, 0]; P.hip = 44; P.lean = 28; }
+    if (p.mv === 'side' || p.mv === 'sideA' || p.mv === 'dashatk' || m.iai) { P.fA = [-34, 0]; P.fB = [30, 0]; P.hip = 44; P.lean = 28; }
     if (p.mv === 'gatk') { P.rot = 0; P.hip = 40; }
     if (m.grab) { P.arm = 0; P.sw = -40; P.lean = 22; }
   }

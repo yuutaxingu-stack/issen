@@ -89,7 +89,7 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   run(s, 60); down(s); ok(s.p[0].tree.stage === 2, '満開');
   run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 20); ok(s.pj.length === 3, '満開の花嵐は三枚'); run(s, 60);
   down(s); ok(s.p[0].tree.stage === 3, '落花');
-  run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 20); ok(s.pj.length === 5 && new Set(s.pj.map(q => q.vy)).size === 5, '落花の花嵐は五枚に散る'); run(s, 60);
+  run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 20); ok(s.pj.length === 7 && Math.max(...s.pj.map(q => q.vy)) === 960, '落花の花嵐は七枚・散る範囲3倍'); run(s, 60);
   { const x0 = s.p[0].x; run(s, 10, () => I({ L: 1 })); ok(x0 - s.p[0].x === 10 * Math.trunc(A.PH.walk * 3 / 2), '落花は歩きが1.5倍'); }
   run(s, 1, () => I({ U: 1, A: 1, V: 'u' })); ok(s.p[0].mv === 'tenR', '落花の天桜'); let fell = false; for (let k = 0; k < 120; k++) { run(s, 1); if (s.p[0].mv === 'tenFall') fell = true; } ok(fell, '天桜のあと降下攻撃');
   run(s, 40); down(s); ok(!s.p[0].tree, '四回目で撤去'); down(s); ok(s.p[0].tree && s.p[0].tree.stage === 1, '撤去のあとはまた植えられる'); }

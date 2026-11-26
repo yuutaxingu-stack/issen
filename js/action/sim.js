@@ -445,7 +445,7 @@ Sim.prototype.spawnPetals = function(p){
   const b = p.boost, x = p.x + p.face * SHOT.ox * FP, y = p.y + SHOT.oy * FP;
   this.pjN = (this.pjN || 0) + 1;
   const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: p.face * sp, vy, life: 48, w, h: w, mv, gid, petal: 1 });
-  if (b === 3) { for (const v of [-320, -160, 0, 160, 320]) add(0, v, 1150, 50, 'petalS', this.pjN * 8 + (v / 160 + 2)); }
+  if (b === 3) { const V = [-960, -640, -320, 0, 320, 640, 960]; V.forEach((v, k) => add(0, v, 1150, 50, 'petalS', this.pjN * 8 + k)); } // 落花: 散る角度は最初の3倍、七枚
   else if (b === 2) { for (const dy of [-38, 0, 38]) add(dy, 0, 1300, 62, 'petal', this.pjN * 8); }
   else add(0, 0, b === 1 ? 1350 : 800, PETAL.w, 'petal', this.pjN * 8);
   this.ev.push({ t: 'shot', p: p.i, petal: b });
@@ -476,7 +476,7 @@ Sim.prototype.triggerCounter = function(d, a){
 };
 Sim.prototype.moveShots = function(){
   const P = this.p;
-  for (const q of this.pj) { q.x += q.vx; q.y += q.vy || 0; q.life--; if (q.x < WALL_L || q.x > WALL_R || q.y < 0) q.life = 0; }
+  for (const q of this.pj) { q.x += q.vx; q.y += q.vy || 0; q.life--; if (q.petal && q.y < 12 * FP) { q.y = 12 * FP; q.vy = 0; } if (q.x < WALL_L || q.x > WALL_R || q.y < 0 || q.y > 900 * FP) q.life = 0; } // 花びらは地面に着くと地を這う
   // 斬撃どうしは相殺
   for (let i = 0; i < this.pj.length; i++) for (let j = i + 1; j < this.pj.length; j++) {
     const a = this.pj[i], b = this.pj[j];

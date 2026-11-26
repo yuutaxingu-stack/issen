@@ -233,10 +233,10 @@ function cpuInput(){
 const GAME = { mode: 'menu', phase: 'intro', t: 0, n: 1, log: [], best: 0 };
 try { GAME.best = (JSON.parse(localStorage.getItem('issen-action-cpu-v1') || '{}').best) | 0; } catch (e) {}
 let sim = new A.Sim({ training: true });
-const FX = { gone: [], parts: [], texts: [], shake: 0, finish: null, trails: [[], []], combo: [null, null], last: null, hist: [], calm: 0, flash: 0 };
+const FX = { ouka: [], grow: [null, null], pflash: 0, gone: [], parts: [], texts: [], shake: 0, finish: null, trails: [[], []], combo: [null, null], last: null, hist: [], calm: 0, flash: 0 };
 const cam = { x: 800, y: 0, z: 1 };
 
-function clearFx(){ FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; }
+function clearFx(){ FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; }
 function resetRound(){ sim.resetRound(); clearFx(); }
 /* 持たせる刀（新・一閃の特殊技）。common＝今の共通の技、ouka＝桜華 */
 const KITS = ['common', 'common'];
@@ -313,6 +313,9 @@ function afterFinish(){
 }
 function onEvent(e){
   const wx = e.x / FP, wy = e.y / FP;
+  if (e.t === 'hit' && sim.p[e.by].kit === 'ouka') { // 桜華の当たり: 花びらと紅の切り口
+    petals(wx, wy, OUKA_MV[e.mv] ? 26 : 12, 6); burst(wx, wy, 10, '#8e0f22', 6, true);
+    FX.ouka.push({ k: 'cut', x: wx, y: wy, t: 0, life: 16, a: rnd() * 3 }); if (OUKA_MV[e.mv]) FX.pflash = 4; }
   if (e.t === 'hit') {
     burst(wx, wy, e.dmg >= 700 ? 18 : 10, INK, 5);
     burst(wx, wy, 6, COL[e.by].light, 3);
@@ -334,23 +337,54 @@ function onEvent(e){
   else if (e.t === 'clash') { burst(wx, wy, 12, '#ffffff', 5, true); }
   else if (e.t === 'finish') { FX.finish = { t: 0, how: e.how, name: e.name, p: e.p, tier: sim.result.tier, x: e.x / FP, y: e.y / FP }; FX.shake = 14; }
   else if (e.t === 'bloom') { const p = sim.p[e.p];
-    petals(e.x / FP, e.y / FP + 60, e.stage === 2 ? 40 : 18, 4);
-    FX.texts.push({ s: A.TREE.name[e.stage], x: p.x / FP, y: p.y / FP + 110, t: 0, life: 60, sakura: true }); }
+    petals(e.x / FP, e.y / FP + 60, e.stage === 1 ? 30 : 80, e.stage === 1 ? 4 : 7);
+    if (e.stage >= 2) petals(e.x / FP, e.y / FP + 140, 50, 9);
+    FX.ouka.push({ k: 'ring', x: e.x / FP, y: e.y / FP + 4, t: 0, life: 36, r: e.stage === 1 ? 140 : 260, flat: true });
+    FX.ouka.push({ k: 'band', x: p.x / FP, y: p.y / FP + 120, t: 0, life: 70, s: A.TREE.name[e.stage] });
+    FX.grow[e.p] = 0; FX.shake = 6 + e.stage * 3; FX.pflash = 6 + e.stage * 2; }
+  else if (e.t === 'start' && OUKA_MV[e.mv]) oukaStart(e);
   else if (e.t === 'treeGone') { petals(e.x / FP, e.y / FP + 70, 30, 3); FX.gone.push({ x: e.x / FP, y: e.y / FP, t: 0, p: e.p }); }
   else if (e.t === 'treeBreak') { petals(e.x / FP, e.y / FP + 70, 36, 6); burst(e.x / FP, e.y / FP + 40, 16, '#4a3528', 5); FX.shake = 8; FX.texts.push({ s: '折', x: e.x / FP, y: e.y / FP + 120, t: 0, life: 60, seal: true, c: e.by }); }
   else if (e.t === 'treeHit') { burst(e.x / FP, e.y / FP, 6, '#4a3528', 3); petals(e.x / FP, e.y / FP, 4, 3); }
   else if (e.t === 'sd') { FX.texts.push({ s: 'サドンデス　一太刀で決まる', x: 0, y: 0, t: 0, life: 120, screen: true }); }
 }
+/* 桜華の技の始まりの演出 */
+const OUKA_MV = { hana: 1, ten: 1, tenK: 1, tenM: 1, tenR: 1, tenFall: 1, plant: 1, petal: 1, petalS: 1 };
+function oukaStart(e){
+  const p = sim.p[e.p], x = p.x / FP, y = p.y / FP, b = p.boost || 0, f = p.face;
+  if (e.mv === 'hana') { FX.ouka.push({ k: 'fan', x, y: y + 62, f, t: 0, life: 30, b }); FX.shake = 4 + b * 2; FX.pflash = 3 + b * 2; }
+  else if (e.mv === 'plant') { FX.ouka.push({ k: 'roots', x: x + f * 20, y, t: 0, life: 40 }); FX.shake = 5; }
+  else if (e.mv === 'tenFall') { FX.ouka.push({ k: 'storm', p: e.p, t: 0, life: 999 }); FX.pflash = 6; }
+  else { const big = e.mv !== 'ten'; FX.ouka.push({ k: 'pillar', x, y, t: 0, life: big ? 46 : 32, w: big ? 120 : 70, crim: e.mv === 'tenR' || e.mv === 'tenM' });
+    petals(x, y + 10, big ? 40 : 16, big ? 7 : 4); FX.shake = big ? 9 : 5; FX.pflash = big ? 7 : 3;
+    if (e.mv === 'tenM' || e.mv === 'tenR') FX.ouka.push({ k: 'ring', x, y: y + 80, t: 0, life: 26, r: 150 }); }
+}
 function petals(x, y, n, sp){
   for (let k = 0; k < n; k++) { const a = rnd() * Math.PI * 2, v = sp * (0.3 + rnd()); FX.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 1.5, life: 50 + rnd() * 40, t: 0, col: SAKURA[k % 3], r: 3 + rnd() * 2.5, petal: true, rot: rnd() * 6 }); }
 }
-const SAKURA = ['#f6c6d4', '#f9dbe4', '#ec9fb8'];
+const SAKURA = ['#f6c6d4', '#f9dbe4', '#ec9fb8'], CRIM = ['#8e0f22', '#2a0508', '#c2193a'];
 function burst(x, y, n, col, sp, spark){
   for (let k = 0; k < n; k++) { const a = rnd() * Math.PI * 2, v = sp * (0.4 + rnd()); FX.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 1, life: 18 + rnd() * 18, t: 0, col, r: spark ? 1.6 : 1.5 + rnd() * 3.5, spark }); }
 }
 function tickParts(){
   for (const q of FX.parts) { q.t++; q.x += q.vx; q.y += q.vy; if (q.petal) { q.vy = Math.max(-1.2, q.vy - 0.08); q.vx = q.vx * 0.96 + Math.sin((q.t + q.rot * 20) * 0.08) * 0.08; q.rot += 0.08; } else { q.vy -= 0.25; q.vx *= 0.94; } }
   for (const g of FX.gone) g.t++; FX.gone = FX.gone.filter(g => g.t < 40);
+  for (let i = 0; i < 2; i++) if (FX.grow[i] != null && FX.grow[i] < 30) FX.grow[i]++;
+  if (FX.pflash > 0) FX.pflash--;
+  for (const o of FX.ouka) o.t++;
+  // 花嵐の花びらは尾を引く。紅と黒が混じる
+  for (const q of sim.pj) if (q.petal) for (let k = 0; k < 2; k++) FX.parts.push({ x: q.x / FP + (rnd() - 0.5) * q.w * 0.6, y: q.y / FP + (rnd() - 0.5) * q.h * 0.6, vx: -Math.sign(q.vx) * (1 + rnd() * 2), vy: (rnd() - 0.3) * 1.5, life: 26 + rnd() * 20, t: 0, col: k ? SAKURA[FR % 3] : CRIM[(FR + k) % 3], r: 2.5 + rnd() * 2, petal: true, rot: rnd() * 6 });
+  // 天桜: 体のまわりを花びらが渦を巻いて昇る / 降下は花の嵐
+  for (const p of sim.p) if (p.st === 'atk' && OUKA_MV[p.mv] && p.mv.startsWith('ten')) {
+    const n = p.mv === 'ten' ? 2 : 5, fall = p.mv === 'tenFall';
+    for (let k = 0; k < n; k++) { const a = FR * 0.5 + k * (6.28 / n), R = 30 + rnd() * 30;
+      FX.parts.push({ x: p.x / FP + Math.cos(a) * R, y: p.y / FP + 40 + rnd() * 80, vx: -Math.sin(a) * 3, vy: fall ? 4 + rnd() * 3 : -2 - rnd() * 2, life: 24 + rnd() * 16, t: 0, col: k % 3 === 2 ? CRIM[k % 3] : SAKURA[k % 3], r: 3 + rnd() * 2.5, petal: true, rot: rnd() * 6 }); } }
+  // 降下が終わった（着地した）瞬間に花の衝撃
+  for (const o of FX.ouka) if (o.k === 'storm' && o.life === 999) { const p = sim.p[o.p];
+    if (!(p.st === 'atk' && p.mv === 'tenFall')) { o.life = 0; const x = p.x / FP, y = p.y / FP;
+      FX.ouka.push({ k: 'ring', x, y: y + 4, t: 0, life: 30, r: 240, flat: true }); FX.ouka.push({ k: 'ring', x, y: y + 40, t: 0, life: 22, r: 160 });
+      petals(x, y + 20, 70, 9); burst(x, y + 10, 18, '#2a0508', 7); FX.shake = 14; FX.pflash = 8; } }
+  FX.ouka = FX.ouka.filter(o => o.t < o.life);
   // 落花の木は花びらを散らし続ける
   for (const p of sim.p) if (p.tree && p.tree.stage === 3 && FR % 3 === 0) { const t = p.tree; FX.parts.push({ x: t.x / FP + (rnd() - 0.5) * 130, y: t.y / FP + 120 + rnd() * 50, vx: (rnd() - 0.3) * 1.2, vy: -0.4, life: 120, t: 0, col: SAKURA[FR % 3], r: 3 + rnd() * 2, petal: true, rot: rnd() * 6 }); }
   FX.parts = FX.parts.filter(q => q.t < q.life);
@@ -486,6 +520,50 @@ function drawTree(t, owner, grow){
   }
   cx.restore();
   if (t.hp < A.TREE.hp) { const w = 60 * cam.z, yy = wy(t.y / FP + (st === 1 ? 92 : 185)); cx.fillStyle = 'rgba(20,21,18,.35)'; cx.fillRect(x - w / 2, yy, w, 4); cx.fillStyle = '#ec9fb8'; cx.fillRect(x - w / 2, yy, w * t.hp / A.TREE.hp, 4); }
+}
+/* 桜華の大きな演出: 扇・柱・輪・根・切り口・段階の文字 */
+function drawOukaFx(){
+  for (const o of FX.ouka) {
+    const u = o.t / o.life, ease = 1 - Math.pow(1 - u, 3), fade = 1 - u;
+    cx.save();
+    if (o.k === 'fan') { // 花嵐: 前へ開く花の扇
+      const R = (120 + o.b * 60) * ease * cam.z, x = wx(o.x), y = wy(o.y), dir = o.f * MIR > 0 ? 0 : Math.PI, sp = o.b === 3 ? 1.2 : 0.5 + o.b * 0.12;
+      cx.globalCompositeOperation = 'lighter';
+      const g = cx.createRadialGradient(x, y, 0, x, y, R); g.addColorStop(0, `rgba(255,200,220,${0.5 * fade})`); g.addColorStop(0.6, `rgba(194,25,58,${0.35 * fade})`); g.addColorStop(1, 'rgba(194,25,58,0)');
+      cx.fillStyle = g; cx.beginPath(); cx.moveTo(x, y); cx.arc(x, y, R, dir - sp, dir + sp); cx.closePath(); cx.fill();
+      cx.strokeStyle = `rgba(255,235,242,${0.8 * fade})`; cx.lineWidth = 2; cx.beginPath(); cx.arc(x, y, R * 0.95, dir - sp, dir + sp); cx.stroke();
+    } else if (o.k === 'pillar') { // 天桜: 花の柱
+      const x = wx(o.x), y0 = wy(o.y), h = 420 * ease * cam.z, w = o.w * cam.z * (0.6 + 0.4 * fade);
+      cx.globalCompositeOperation = 'lighter';
+      const g = cx.createLinearGradient(x - w, 0, x + w, 0); const c = o.crim ? '194,25,58' : '255,170,200';
+      g.addColorStop(0, `rgba(${c},0)`); g.addColorStop(0.5, `rgba(${c},${0.45 * fade})`); g.addColorStop(1, `rgba(${c},0)`);
+      cx.fillStyle = g; cx.fillRect(x - w, y0 - h, w * 2, h);
+      cx.fillStyle = `rgba(255,245,248,${0.6 * fade})`; cx.fillRect(x - 3 * cam.z, y0 - h, 6 * cam.z, h);
+    } else if (o.k === 'ring') { // 輪
+      const x = wx(o.x), y = wy(o.y), R = o.r * ease * cam.z;
+      cx.strokeStyle = `rgba(255,190,210,${0.9 * fade})`; cx.lineWidth = 5 * fade * cam.z + 1;
+      cx.beginPath(); if (o.flat) cx.ellipse(x, y, R, R * 0.22, 0, 0, Math.PI * 2); else cx.arc(x, y, R, 0, Math.PI * 2); cx.stroke();
+      cx.strokeStyle = `rgba(142,15,34,${0.8 * fade})`; cx.lineWidth = 2;
+      cx.beginPath(); if (o.flat) cx.ellipse(x, y, R * 0.8, R * 0.18, 0, 0, Math.PI * 2); else cx.arc(x, y, R * 0.82, 0, Math.PI * 2); cx.stroke();
+    } else if (o.k === 'roots') { // 植樹: 刀を突き立てた所から光の根
+      const x = wx(o.x), y = wy(o.y); let sd = 31; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+      cx.globalCompositeOperation = 'lighter'; cx.strokeStyle = `rgba(255,120,160,${0.85 * fade})`; cx.lineCap = 'round';
+      for (let k = 0; k < 9; k++) { const a = (k / 8 - 0.5) * 2.6, L = (90 + r() * 120) * ease * cam.z; cx.lineWidth = (3 - k % 3) * cam.z + 1;
+        cx.beginPath(); cx.moveTo(x, y + 2); cx.quadraticCurveTo(x + Math.sin(a) * L * 0.5, y + 8 * cam.z, x + Math.sin(a) * L, y + (4 + r() * 10) * cam.z); cx.stroke(); }
+      const g = cx.createRadialGradient(x, y, 0, x, y, 70 * cam.z); g.addColorStop(0, `rgba(255,210,225,${0.7 * fade})`); g.addColorStop(1, 'rgba(194,25,58,0)'); cx.fillStyle = g; cx.fillRect(x - 70 * cam.z, y - 70 * cam.z, 140 * cam.z, 140 * cam.z);
+    } else if (o.k === 'cut') { // 当たりの紅い切り口
+      const x = wx(o.x), y = wy(o.y), L = 70 * cam.z * (0.4 + ease);
+      cx.translate(x, y); cx.rotate(o.a); cx.fillStyle = `rgba(160,14,36,${fade})`;
+      cx.beginPath(); cx.moveTo(-L, 0); cx.lineTo(0, -4 * cam.z * fade - 1); cx.lineTo(L, 0); cx.lineTo(0, 4 * cam.z * fade + 1); cx.closePath(); cx.fill();
+      cx.fillStyle = `rgba(255,230,236,${fade})`; cx.fillRect(-L * 0.7, -0.8, L * 1.4, 1.6);
+    } else if (o.k === 'band') { // 段階の文字: 赤黒の墨の帯に白い字
+      const x = wx(o.x), y = wy(o.y) - o.t * 0.25, a = Math.min(1, o.t / 6) * (o.t > o.life - 14 ? (o.life - o.t) / 14 : 1), bw = 150 * cam.z * Math.min(1, o.t / 8) + 20, s = Math.round(40 * cam.z + 10);
+      cx.globalAlpha = a; cx.fillStyle = 'rgba(40,4,10,.82)'; cx.beginPath(); cx.moveTo(x - bw, y - s * 0.45); cx.lineTo(x + bw, y - s * 0.62); cx.lineTo(x + bw * 0.92, y + s * 0.5); cx.lineTo(x - bw * 1.04, y + s * 0.4); cx.closePath(); cx.fill();
+      cx.fillStyle = '#b3142a'; cx.fillRect(x - bw, y + s * 0.42, bw * 2, 2);
+      cx.font = `${s}px ${DISPLAY}`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.shadowColor = 'rgba(255,120,160,.9)'; cx.shadowBlur = 16; cx.fillStyle = '#ffe6ee'; cx.fillText(o.s, x, y); cx.textBaseline = 'alphabetic';
+    }
+    cx.restore();
+  }
 }
 function drawTrails(){
   for (let i = 0; i < 2; i++) {
@@ -739,12 +817,13 @@ function drawView(v){
   }
   for (const p of sim.p) { const gy = p.plat >= 0 ? A.PLATS[p.plat].y / FP : (p.y / FP >= 190 && Math.abs(p.x / FP - 480) < 150) || (p.y / FP >= 190 && Math.abs(p.x / FP - 1120) < 150) ? 190 : 0;
     cx.fillStyle = 'rgba(20,21,18,.25)'; cx.beginPath(); cx.ellipse(wx(p.x / FP), wy(gy), 30 * cam.z, 5 * cam.z, 0, 0, Math.PI * 2); cx.fill(); }
-  for (const p of sim.p) if (p.tree) drawTree(p.tree, p.i);
+  for (const p of sim.p) if (p.tree) { const g = FX.grow[p.i]; drawTree(p.tree, p.i, g == null || g >= 30 ? 1 : 0.55 + 0.45 * (1 - Math.pow(1 - g / 30, 3)) + Math.sin(g / 30 * Math.PI) * 0.08); }
   for (const g of FX.gone) { cx.globalAlpha = 1 - g.t / 40; drawTree({ x: g.x * FP, y: g.y * FP, stage: 3, hp: 1 }, g.p, 1 + g.t / 40); cx.globalAlpha = 1; }
   for (const p of [sim.p[1], sim.p[0]]) drawFighter(p, FR + p.i * 37);
   for (const p of sim.p) if (p.tree && p.tree.stage === 2) { // 満開: 体に花びらを纏う
-    for (let k = 0; k < 9; k++) { const a = FR * 0.06 + k * 0.698, x = wx(p.x / FP + Math.cos(a) * 34), y = wy(p.y / FP + 60 + Math.sin(a * 2) * 40);
-      cx.save(); cx.translate(x, y); cx.rotate(a * 3); cx.fillStyle = SAKURA[k % 3]; cx.globalAlpha = 0.85; cx.beginPath(); cx.ellipse(0, 0, 5 * cam.z, 3 * cam.z, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); } cx.globalAlpha = 1; }
+    { const g = cx.createRadialGradient(wx(p.x / FP), wy(p.y / FP + 62), 0, wx(p.x / FP), wy(p.y / FP + 62), 90 * cam.z); g.addColorStop(0, 'rgba(194,25,58,.22)'); g.addColorStop(1, 'rgba(194,25,58,0)'); cx.fillStyle = g; cx.fillRect(wx(p.x / FP) - 90 * cam.z, wy(p.y / FP + 152), 180 * cam.z, 180 * cam.z); }
+    for (let k = 0; k < 16; k++) { const a = FR * 0.07 + k * 0.3927, rr = 30 + (k % 3) * 9, x = wx(p.x / FP + Math.cos(a) * rr), y = wy(p.y / FP + 62 + Math.sin(a * 2 + k) * 46);
+      cx.save(); cx.translate(x, y); cx.rotate(a * 3); cx.fillStyle = k % 4 === 3 ? CRIM[k % 3] : SAKURA[k % 3]; cx.globalAlpha = 0.85; cx.beginPath(); cx.ellipse(0, 0, 5 * cam.z, 3 * cam.z, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); } cx.globalAlpha = 1; }
   // シールド: 耐久が減るほど小さく、残り2割で朱く
   for (const p of sim.p) if (p.st === 'guard' || p.st === 'bstun' || p.st === 'unguard') {
     const k = p.gd / A.GD_MAX, r = (28 + 50 * k) * cam.z, x = wx(p.x / FP), y = wy(p.y / FP + 62);
@@ -779,6 +858,7 @@ function drawView(v){
     if (p.st === 'atk') { const m = MV[p.mv];
       if (!m.noBox && p.mvf >= m.s && p.mvf < m.s + m.a) { const b = A.box(p, A.curBox(p)); cx.fillStyle = 'rgba(200,55,45,.45)'; cx.fillRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z * MIR, (b[3] - b[1]) / FP * cam.z); } }
   }
+  drawOukaFx();
   for (const q of FX.parts) { cx.globalAlpha = 1 - q.t / q.life; cx.fillStyle = q.col; const r = q.r * cam.z;
     if (q.petal) { cx.save(); cx.translate(wx(q.x), wy(q.y)); cx.rotate(q.rot); cx.beginPath(); cx.ellipse(0, 0, r * 1.3, r * 0.7, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); }
     else cx.fillRect(wx(q.x) - r, wy(q.y) - r, r * 2, r * 2); }
@@ -796,6 +876,7 @@ function drawView(v){
     cx.globalAlpha = 1 - c.t / 70; cx.fillStyle = COL[i].main; cx.textAlign = 'center'; cx.font = `${Math.round(30 * cam.z + 8)}px ${DISPLAY}`;
     cx.fillText(kn(c.n) + '連', wx(p.x / FP), wy(p.y / FP + 175)); cx.globalAlpha = 1; }
   if (FX.flash) { cx.fillStyle = `rgba(255,255,255,${FX.flash * 0.05})`; cx.fillRect(0, 0, W, H); }
+  if (FX.pflash) { const g = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.7); g.addColorStop(0, `rgba(255,190,210,${FX.pflash * 0.012})`); g.addColorStop(1, `rgba(60,4,12,${FX.pflash * 0.07})`); cx.fillStyle = g; cx.fillRect(0, 0, W, H); }
   cx.restore();
   drawHud();
   drawFrames();

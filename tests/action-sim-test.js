@@ -41,7 +41,7 @@ function drain(s){ const e = s.ev; s.ev = []; return e; }
 // 12) 急降下しながら前に倒して斬ると空前（斜め下でも空下にならない）
 { const s = sim(600); run(s, 1, () => I({ J: 1 })); run(s, 30); run(s, 1, () => I({ D: 1 })); ok(s.p[0].ff, '急降下'); run(s, 1, () => I({ D: 1, R: 1, C: 'r' })); ok(s.p[0].mv === 'fair', '急降下中に攻撃スティックで空前 (' + s.p[0].mv + ')'); }
 // 13) スティックで強く下に倒していれば空下
-{ const s = sim(600); run(s, 1, () => I({ J: 1 })); run(s, 30); run(s, 1, () => I({ D: 1, R: 1, A: 1, V: 'd' })); ok(s.p[0].mv === 'plunge', '空中で下＋斬は特殊技3（落とし）'); }
+{ const s = sim(600); run(s, 1, () => I({ J: 1 })); run(s, 30); run(s, 1, () => I({ D: 1, R: 1, A: 1, V: 'd' })); ok(s.p[0].mv === 'counter', '空中で下＋斬は特殊技3（カウンター）'); }
 // 14) 空後は空前より発生が早い、空上は空前と同じくらい
 ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.uair.s - A.MV.fair.s) <= 1, '空中技の性格');
 // 15) 攻撃スティック: 空中で後ろに弾くと空後（向きは変わらない）、地上で上に弾くと上斬り
@@ -50,7 +50,7 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 { const s = sim(600); run(s, 1, () => I({ C: 'l' })); ok(s.p[0].mv === 'ftilt' && s.p[0].face === -1, '攻撃スティックで横斬り（弾いた向きへ）'); }
 // 16) 斬ボタン: なし＝三段、横・上・下＝特殊技1〜3
 { const t = (inp, mv) => { const s = sim(600); run(s, 1, () => I(inp)); ok(s.p[0].mv === mv, '斬 ' + JSON.stringify(inp) + ' → ' + mv + ' (' + s.p[0].mv + ')'); };
-  t({ A: 1 }, 'jab1'); t({ A: 1, R: 1 }, 'side'); t({ A: 1, U: 1 }, 'rise'); t({ A: 1, D: 1 }, 'sweep'); }
+  t({ A: 1 }, 'jab1'); t({ A: 1, R: 1 }, 'shot'); t({ A: 1, U: 1 }, 'rise'); t({ A: 1, D: 1 }, 'counter'); }
 // 17) 回避の無敵と全体F（ユーザーの表）
 { const meas = (setup) => { const s = sim(600); setup(s); const inv = []; let n = 0; while ((s.p[0].st === 'roll' || s.p[0].st === 'adodge') && n < 200) { n++; if (A.invuln(s.p[0])) inv.push(s.p[0].f); s.step([I(), I()]); } return { first: inv[0], last: inv[inv.length - 1], total: n + 1 }; }; // 押したFを1F目と数える
   const g = (inp) => (s) => { run(s, 1, () => I({ G: 1 })); s.step([I(Object.assign({ G: 1 }, inp)), I()]); };
@@ -66,4 +66,12 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 { const s = sim(600); run(s, 1, () => I({ A: 1, U: 1 })); let st = new Set(); for (let k = 0; k < 200 && !(s.p[0].st === 'idle' && s.p[0].ground); k++) { s.step([I({ J: k % 2 }), I()]); st.add(s.p[0].st); } ok(st.has('fall') && st.has('land'), '昇り斬り→無防備落下→着地 ' + [...st]); }
 // 19) ダッシュ中に守で前方回避、前方回避の後は振り返る
 { const s = sim(600); run(s, 1, () => I({ R: 1, F: 1 })); run(s, 3, () => I({ R: 1 })); run(s, 1, () => I({ R: 1, G: 1 })); ok(s.p[0].st === 'roll' && s.p[0].rk === 'fwd', 'ダッシュ中の守は前方回避'); run(s, 40); ok(s.p[0].face === -1, '前方回避の後は反対を向く'); }
+// 20) 飛ぶ斬撃: 18Fで出て、54F目に動ける。離れた相手に当たる
+{ const s = sim(900); run(s, 1, () => I({ A: 1, R: 1 })); let born = 0, n = 1; while (s.p[0].st === 'atk') { if (!born && s.pj.length) born = s.frame; s.step([I(), I()]); n++; } ok(born === 18 && n === 53, '飛ぶ斬撃 発生18F・54F目に動ける (' + born + ',' + (n + 1) + ')');
+}
+{ const s = sim(350); run(s, 1, () => I({ A: 1, R: 1 })); let hit = false; for (let k = 0; k < 120; k++) { s.step([I(), I()]); if (drain(s).some(e => e.t === 'hit')) hit = true; } ok(hit, '飛ぶ斬撃が離れた相手に当たる'); }
+// 21) カウンター: 受付7〜29F、失敗すると69F、受けると反撃（発生4F・全体42F）
+{ const s = sim(400); run(s, 1, () => I({ A: 1, D: 1 })); let n = 1; const win = []; while (s.p[0].st === 'atk') { const m = A.MV[s.p[0].mv]; if (s.p[0].mvf >= m.s && s.p[0].mvf < m.s + m.a) win.push(s.p[0].mvf); s.step([I(), I()]); n++; }
+  ok(win[0] === 7 && win[win.length - 1] === 29 && n === 69, 'カウンター受付7〜29F・失敗で全体69F (' + win[0] + '-' + win[win.length - 1] + ',' + n + ')'); }
+{ const s = sim(60); run(s, 1, null, () => I({ A: 1, D: 1 })); run(s, 7); run(s, 1, () => I({ A: 1 })); run(s, 6); ok(s.p[1].mv === 'ctrHit' || drain(s).some(e => e.t === 'counter'), 'カウンターが取れる'); run(s, 30); ok(s.p[0].hp < A.HP_MAX && s.p[1].hp === A.HP_MAX, '反撃が当たって自分は無傷'); ok(A.MV.ctrHit.total === 42 && A.MV.ctrHit.s === 4, '反撃 発生4F・全体42F'); }
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

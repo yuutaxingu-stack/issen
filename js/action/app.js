@@ -187,6 +187,8 @@ function onEvent(e){
     FX.last = { kind: 'ガードが割れた', mv: e.mv, adv: null };
   } else if (e.t === 'wall') { burst(wx, wy + 40, 10, '#6b6a55', 4); FX.shake = 6; }
   else if (e.t === 'down' || e.t === 'tech') { burst(wx, 6, 8, '#8d8a75', 3); if (e.t === 'tech') FX.texts.push({ s: '受け身', x: wx, y: 140, t: 0, life: 40, small: true }); }
+  else if (e.t === 'counter') { burst(wx, wy, 16, '#fff6dc', 6, true); FX.shake = 8; FX.flash = 5; FX.texts.push({ s: '返し', x: wx, y: wy + 80, t: 0, life: 50, seal: true, p: e.p }); FX.last = { kind: 'カウンター成立', mv: 'ctrHit', adv: null }; }
+  else if (e.t === 'clash') { burst(wx, wy, 12, '#ffffff', 5, true); }
   else if (e.t === 'finish') { FX.finish = { t: 0, how: e.how, name: e.name, p: e.p, tier: sim.result.tier, x: e.x / FP, y: e.y / FP }; FX.shake = 14; }
   else if (e.t === 'sd') { FX.texts.push({ s: 'サドンデス　一太刀で決まる', x: 0, y: 0, t: 0, life: 120, screen: true }); }
 }
@@ -223,7 +225,6 @@ function pose(p, fr){
   if (st === 'roll' && p.rk === 'spot') { P.hip = 46; P.lean = -14; P.sw = 70; P.arm = 20; P.alpha = A.invuln(p) ? 0.4 : 1; }
   else if (st === 'roll' || (st === 'getup' && p.gk === 'roll')) { P.rot = -(p.f * 14) * (p.rollDir * p.face); P.hip = 34; P.fA = [-8, 14]; P.fB = [10, 14]; P.sw = 10; P.alpha = (A.invuln(p)) ? 0.6 : 1; }
   if (st === 'tech' || (st === 'getup' && p.gk !== 'roll')) { P.hip = 40; P.lean = 20; P.alpha = A.invuln(p) ? 0.6 : 1; }
-  if (st === 'charge') { P.sw = 160 + Math.sin(fr * 1.3) * 3; P.arm = 120; P.lean = -10; P.hip = 48; P.fA = [-24, 0]; P.fB = [20, 0]; }
   if (st === 'atk') {
     const m = MV[p.mv], f = p.mvf;
     const a0 = m.arc[0], a1 = m.arc[1];
@@ -234,6 +235,7 @@ function pose(p, fr){
     P.arm = P.sw - 55;
     if (m.k === 'a') { P.fA = [-12, 20]; P.fB = [16, 14]; }
     if (p.mv === 'dtilt') { P.hip = 34; P.fA = [-22, 0]; P.fB = [30, 0]; }
+    if (p.mv === 'counter') { P.sw = 100; P.arm = 30; P.lean = -4; P.hip = 50; P.fA = [-22, 0]; P.fB = [16, 0]; }
     if (p.mv === 'rise') { P.fA = [-8, 6]; P.fB = [10, 16]; P.lean = -6; }
     if (p.mv === 'plunge') { P.fA = [-10, 18]; P.fB = [12, 22]; P.lean = 10; P.arm = -95; }
     if (p.mv === 'side' || p.mv === 'sideA' || m.iai) { P.fA = [-34, 0]; P.fB = [30, 0]; P.hip = 44; P.lean = 28; }
@@ -413,7 +415,6 @@ function drawFrames(){
   const lines = [];
   if (p.st === 'atk') { const m = MV[p.mv]; lines.push([`${m.n}　${p.mvf}F目`, INK]); lines.push([`発生 ${m.s}F　持続 ${m.a}F　硬直 ${m.r}F　全体 ${m.total}F${m.land ? '　着地 ' + m.land + 'F' : ''}`, '#3b3d33']); }
   else if (p.st === 'roll' || p.st === 'adodge') { const d = A.DG[p.st === 'roll' ? p.rk : p.ak]; lines.push([`${d.n}　${p.f}F目`, INK]); lines.push([`無敵 ${d.i0}〜${d.i1}F　全体 ${d.total}F${d.land ? '　着地 ' + d.land + 'F' : ''}`, '#3b3d33']); }
-  else if (p.st === 'charge') lines.push([`溜め斬り　溜め ${p.chargeF}F（${A.SMASH_MIN}〜${A.SMASH_MAX}）`, INK]);
   else lines.push([`状態: ${STN[p.st] || p.st}`, '#3b3d33']);
   const L = FX.last;
   if (L) {
@@ -531,6 +532,16 @@ function draw(){
     cx.strokeStyle = `rgba(255,255,255,${0.5 * fade})`; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(x, y, r - 1, Math.PI * 1.1, Math.PI * 1.5); cx.stroke();
   }
   drawTrails();
+  for (const q of sim.pj) {
+    const x = wx(q.x / FP), y = wy(q.y / FP), d = Math.sign(q.vx), r = 30 * cam.z;
+    cx.save(); cx.globalCompositeOperation = 'lighter'; cx.translate(x, y); cx.scale(d, 1);
+    for (let k = 0; k < 3; k++) { cx.fillStyle = `rgba(245,240,228,${0.6 - k * 0.18})`; cx.beginPath();
+      cx.arc(-k * 14 * cam.z, 0, r, -1.2, 1.2); cx.arc(-k * 14 * cam.z - r * 0.45, 0, r * 0.82, 1.1, -1.1, true); cx.closePath(); cx.fill(); }
+    cx.restore();
+  }
+  // カウンターの構え（受付中は刃が光る）
+  for (const p of sim.p) if (p.st === 'atk' && p.mv === 'counter') { const m = MV.counter; if (p.mvf >= m.s && p.mvf < m.s + m.a) {
+    cx.strokeStyle = `rgba(255,246,220,${0.5 + Math.sin(FR * 0.6) * 0.3})`; cx.lineWidth = 3; cx.beginPath(); cx.arc(wx(p.x / FP), wy(p.y / FP + 70), 44 * cam.z, 0, Math.PI * 2); cx.stroke(); } }
   if (OPT.boxes) for (const p of sim.p) {
     const hb = A.hurt(p);
     cx.strokeStyle = A.invuln(p) ? 'rgba(255,255,255,.9)' : 'rgba(44,79,150,.85)'; cx.lineWidth = 1.5;

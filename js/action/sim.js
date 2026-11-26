@@ -41,9 +41,12 @@ const MV = {
   rise:  { n:'昇り斬り', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], box:[-24,40,76,120], arc:[-60,95], rise:1, after:'fall' },
   sweep: { n:'足払い', k:'g', s:12, a:5, r:24, dmg:600, gd:1200, hs:30, blk:-12, kb:[420,650], kd:1, box:[4,0,112,26], arc:[-20,-5], crouch:1 },
   plunge:{ n:'落とし', k:'a', s:8, a:90, r:1, land:22, dmg:800, gd:1400, hs:28, kb:[350,800], kd:1, box:[-26,-30,52,84], arc:[-90,-90], plunge:1 },
+  shot:  { n:'飛ぶ斬撃', k:'g', s:18, a:1, r:35, noBox:1, shot:1, arc:[150,-30] },
+  shotP: { n:'飛ぶ斬撃', k:'p', s:1, a:1, r:0, dmg:500, gd:900, hs:20, blk:-4, kb:[420,160] },
+  counter:{ n:'カウンター', k:'g', s:7, a:23, r:40, noBox:1, counter:1, arc:[95,95] },
+  ctrHit:{ n:'カウンター（反撃）', k:'g', s:4, a:3, r:36, dmg:1000, gd:2000, hs:30, blk:-20, kb:[950,650], box:[-24,16,140,104], arc:[170,-40] },
   utilt: { n:'上斬り', k:'g', s:7, a:5, r:16, dmg:500, gd:800, hs:34, blk:-6, kb:[90,1500], box:[-14,72,84,92], arc:[-40,125] },
   dtilt: { n:'下斬り', k:'g', s:6, a:3, r:14, dmg:400, gd:700, hit:3, blk:-4, kb:[260,0], box:[6,0,92,34], arc:[-25,-5], crouch:1 },
-  smash: { n:'溜め斬り', k:'g', s:10, a:4, r:26, dmg:[1000,1600], gd:[2500,4000], hs:32, blk:-12, kb:[1150,720], box:[8,28,112,82], arc:[165,-40] },
   grab:  { n:'組み打ち', k:'g', s:7, a:2, r:30, dmg:400, gd:3500, hs:30, kb:[750,760], kd:1, box:[8,20,58,92], grab:1, arc:[-10,-10] },
   iai:   { n:'居合', k:'g', s:10, a:4, r:40, dmg:1000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,30,132,82], iai:1, arc:[-165,10], lunge:[2,10,3400] },
   gatk:  { n:'起き上がり斬り', k:'g', s:18, a:4, r:8, dmg:500, gd:800, hs:24, blk:-4, kb:[650,300], box:[-72,0,144,60], arc:[-170,170], inv:[1,12] },
@@ -63,7 +66,8 @@ for (const id in MV) {
 }
 const SMASH_MIN = 12, SMASH_MAX = 40;
 /* 斬ボタン＋向きで出る特殊技。刀ごとに入れ替える（今は共通の一組だけ） */
-const KIT = { common: { n: '共通', s1: 'side', s1a: 'sideA', s2: 'rise', s2a: 'rise', s3: 'sweep', s3a: 'plunge' } };
+const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: 'rise', s3: 'counter', s3a: 'counter' } };
+const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
 /* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
 const DG = {
   spot: { n: 'その場回避', i0: 3, i1: 17, total: 25 },
@@ -103,7 +107,7 @@ function Sim(opts){
 Sim.prototype.resetRound = function(){
   this.p = [newPlayer(0), newPlayer(1)];
   this.frame = 0; this.hitstop = 0; this.sd = false; this.sdStart = 0;
-  this.over = false; this.result = null; this.ev = [];
+  this.over = false; this.result = null; this.ev = []; this.pj = [];
   this.roundNo++;
 };
 
@@ -314,18 +318,7 @@ Sim.prototype.update = function(p, o){
     if (m.hover && p.mvf <= m.lunge[1]) p.vy = 0;
     if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
     else if (p.ground) p.vx = toward(p.vx, 0, PH.gFric);
-    if (p.mv === 'jab1' && p.inp.A && p.holdA >= m.total && p.mvf >= m.total) { // 押し続けると溜めへ
-      p.st = 'charge'; p.chargeF = 0; p.mv = null;
-    }
-  } else if (p.st === 'charge') {
-    p.vx = toward(p.vx, 0, PH.gFric);
-    p.chargeF++;
-    if (!p.inp.A || p.chargeF >= SMASH_MAX) {
-      const c = Math.max(SMASH_MIN, p.chargeF);
-      p.power = Math.floor((c - SMASH_MIN) * 100 / (SMASH_MAX - SMASH_MIN));
-      this.startMove(p, 'smash');
-      p.mvf = 1;
-    }
+    if (m.shot && p.mvf === m.s) this.spawnShot(p);
   }
   // 当たった・守った後の固まり
   if (p.st === 'hit' || p.st === 'bstun' || p.st === 'tumble') {
@@ -408,16 +401,48 @@ function box(p, b){
 function hbox(p){ const b = hurt(p); return [p.x + b[0] * FP, p.y + b[1] * FP, p.x + (b[0] + b[2]) * FP, p.y + (b[1] + b[3]) * FP]; }
 const overlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
+Sim.prototype.spawnShot = function(p){
+  this.pj.push({ o: p.i, x: p.x + p.face * SHOT.ox * FP, y: p.y + SHOT.oy * FP, vx: p.face * SHOT.speed, life: SHOT.life });
+  this.ev.push({ t: 'shot', p: p.i });
+};
+const inCounter = d => d.st === 'atk' && MV[d.mv].counter && d.mvf >= MV[d.mv].s && d.mvf < MV[d.mv].s + MV[d.mv].a;
+Sim.prototype.triggerCounter = function(d, a){
+  if (a.x !== d.x) d.face = sgn(a.x - d.x);
+  this.startMove(d, 'ctrHit');
+  this.hitstop = 12;
+  this.ev.push({ t: 'counter', p: d.i, by: a.i, x: d.x, y: d.y + 60 * FP });
+};
+Sim.prototype.moveShots = function(){
+  const P = this.p;
+  for (const q of this.pj) { q.x += q.vx; q.life--; if (q.x < WALL_L || q.x > WALL_R) q.life = 0; }
+  // 斬撃どうしは相殺
+  for (let i = 0; i < this.pj.length; i++) for (let j = i + 1; j < this.pj.length; j++) {
+    const a = this.pj[i], b = this.pj[j];
+    if (a.o !== b.o && a.life > 0 && b.life > 0 && Math.abs(a.x - b.x) < SHOT.w * FP && Math.abs(a.y - b.y) < SHOT.h * FP) { a.life = b.life = 0; this.ev.push({ t: 'clash', x: a.x, y: a.y }); }
+  }
+  for (const q of this.pj) {
+    if (q.life <= 0) continue;
+    const d = P[1 - q.o], a = P[q.o];
+    if (invuln(d)) continue;
+    const bx = [q.x - SHOT.w * FP / 2, q.y - SHOT.h * FP / 2, q.x + SHOT.w * FP / 2, q.y + SHOT.h * FP / 2];
+    if (!overlap(bx, hbox(d))) continue;
+    q.life = 0;
+    if (inCounter(d)) { this.triggerCounter(d, a); continue; }
+    this.applyHit(a, d, MV.shotP, { a: a.i, dst: d.st, dmv: d.mv, dmvf: d.mvf, dground: d.ground }, q);
+  }
+  this.pj = this.pj.filter(q => q.life > 0);
+};
 Sim.prototype.hits = function(){
   const P = this.p;
   const todo = [];
   for (const a of P) {
     if (a.st !== 'atk' || a.hitDone) continue;
     const m = MV[a.mv];
-    if (a.mvf < m.s || a.mvf >= m.s + m.a) continue;
+    if (m.noBox || a.mvf < m.s || a.mvf >= m.s + m.a) continue;
     const d = P[1 - a.i];
     if (invuln(d)) continue;
     if (!overlap(box(a, m.box), hbox(d))) continue;
+    if (inCounter(d) && !m.grab && !m.iai) { a.hitDone = true; this.triggerCounter(d, a); continue; }
     todo.push([a, d, m]);
   }
   // 相打ちも両方当てる（同じFに決めるので順番に依らない）
@@ -425,15 +450,15 @@ Sim.prototype.hits = function(){
   todo.forEach(([a, d, m], k) => { a.hitDone = true; this.applyHit(a, d, m, snap[k]); });
 };
 
-Sim.prototype.applyHit = function(a, d, m, s){
+Sim.prototype.applyHit = function(a, d, m, s, pj){
   const ev = this.ev;
-  const dir = sgn(d.x - a.x) || a.face;
-  const mvRem = m.total - a.mvf;
+  const dir = pj ? sgn(pj.vx) : (sgn(d.x - a.x) || a.face);
+  const mvRem = pj ? null : m.total - a.mvf;
   const pw = a.power || 0;
   const dmgBase = Array.isArray(m.dmg) ? m.dmg[0] + Math.floor((m.dmg[1] - m.dmg[0]) * pw / 100) : m.dmg;
   const gdBase = Array.isArray(m.gd) ? m.gd[0] + Math.floor((m.gd[1] - m.gd[0]) * pw / 100) : m.gd;
   const guarding = (s.dst === 'guard' || s.dst === 'bstun' || s.dst === 'unguard') && s.dground;
-  const hx = Math.trunc((a.x + d.x) / 2), hy = d.y + 60 * FP;
+  const hx = pj ? pj.x : Math.trunc((a.x + d.x) / 2), hy = d.y + 60 * FP;
 
   if (m.grab && !guarding) { a.hitDone = false; return; }       // 組み打ちはガード中の相手だけ
   if (guarding && !m.iai) {
@@ -450,7 +475,7 @@ Sim.prototype.applyHit = function(a, d, m, s){
     else {
       d.st = 'bstun'; d.hs = m.bs; d.vx = dir * 520;
       this.hitstop = m.dmg >= 700 || Array.isArray(m.dmg) ? 7 : 4;
-      ev.push({ t: 'block', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, adv: m.bs - mvRem, gd: gdBase });
+      ev.push({ t: 'block', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, adv: mvRem == null ? null : m.bs - mvRem, gd: gdBase, shot: !!pj });
       return;
     }
   }
@@ -493,7 +518,7 @@ Sim.prototype.applyHit = function(a, d, m, s){
       d.st = 'tumble'; d.ground = false; d.plat = -1; d.vy = 500; d.vx = dir * 200; d.kd = true;
     } else { d.st = 'hit'; d.vx = dir * kx; }
     d.hs = m.hs; d.s1Used = false; if (d.st === 'tumble') d.jumps = 1;
-    const adv = (d.st === 'hit') ? m.hs - mvRem : null;
+    const adv = (d.st === 'hit' && mvRem != null) ? m.hs - mvRem : null;
     ev.push({ t: 'hit', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, dmg, combo: a.combo, adv, counter: a.combo === 1 && a.comboFirst.counter });
   }
   this.hitstop = dmg >= 700 ? 8 : 4;
@@ -559,6 +584,7 @@ Sim.prototype.step = function(inputs){
     if (ov > 0) { const s = dx >= 0 ? 1 : -1, hlf = Math.ceil(ov / 2); a.x -= s * hlf; b.x += s * hlf;
       a.x = Math.min(WALL_R, Math.max(WALL_L, a.x)); b.x = Math.min(WALL_R, Math.max(WALL_L, b.x)); }
   }
+  this.moveShots();
   this.hits();
   // 技の終わり
   for (const p of P) {
@@ -566,7 +592,6 @@ Sim.prototype.step = function(inputs){
     const m = MV[p.mv];
     if (m.chain && p.chainReq && p.mvf >= m.s + m.a - 1) { this.startMove(p, m.chain); continue; }
     if (p.mvf >= m.total) {
-      if (p.mv === 'jab1' && p.inp.A && p.holdA >= m.total) { p.st = 'charge'; p.chargeF = 0; p.mv = null; continue; }
       p.st = p.ground ? 'idle' : m.after === 'fall' ? 'fall' : 'air'; p.mv = null; p.power = 0;
     }
   }
@@ -582,12 +607,12 @@ Sim.prototype.step = function(inputs){
 Sim.prototype.hash = function(){
   let h = 2166136261 >>> 0;
   const mix = v => { h ^= (v | 0); h = Math.imul(h, 16777619) >>> 0; };
-  mix(this.frame); mix(this.hitstop);
+  mix(this.frame); mix(this.hitstop); for (const q of this.pj) { mix(q.x); mix(q.y); mix(q.life); }
   for (const p of this.p) { mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
   return h;
 };
 
-const API = { Sim, MV, FIN, KIT, DG, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
+const API = { Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 else root.IssenAction = API;
 })(typeof window !== 'undefined' ? window : globalThis);

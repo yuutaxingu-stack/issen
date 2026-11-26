@@ -22,7 +22,7 @@ function resize(){ DPR = Math.min(2, window.devicePixelRatio || 1); W = innerWid
 addEventListener('resize', resize);
 
 /* ---------- 設定 ---------- */
-const OPT = { dummy: 'stand', frames: true, refill: true };
+const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false };
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('issen-action-opt') || '{}')); } catch (e) {}
 function saveOpt(){ try { localStorage.setItem('issen-action-opt', JSON.stringify(OPT)); } catch (e) {} }
 const DUMMY = [['stand', '立つだけ'], ['guard', '守り続ける'], ['jump', '跳び回る'], ['mash', '暴れる']];
@@ -256,7 +256,7 @@ function drawFighter(p, fr){
   const shx = hx + Math.sin(rad(P.lean)) * 44, shy = hy + Math.cos(rad(P.lean)) * 44;
   c.strokeStyle = INK; c.lineCap = 'round'; c.lineJoin = 'round';
   // 脚
-  c.lineWidth = 5.5; c.beginPath(); leg(c, hx, hy, P.fA[0], P.fA[1], -1); leg(c, hx, hy, P.fB[0], P.fB[1], -1); c.stroke();
+  c.lineWidth = 5.5; c.beginPath(); leg(c, hx, hy, P.fA[0], P.fA[1], 1); leg(c, hx, hy, P.fB[0], P.fB[1], 1); c.stroke();
   // 胴
   c.lineWidth = 7; c.beginPath(); c.moveTo(hx, hy); c.lineTo(shx, shy); c.stroke();
   // 帯
@@ -296,22 +296,24 @@ function drawFighter(p, fr){
 function recordTrail(p){
   const tr = FX.trails[p.i];
   const swinging = p.st === 'atk' && p.mvf >= MV[p.mv].s - 1 && p.mvf < MV[p.mv].s + MV[p.mv].a + 2;
-  if (swinging && p._tip) tr.push({ t: p._tip.slice(), h: p._hand.slice(), life: 10, iai: !!MV[p.mv].iai });
+  if (swinging && p._tip) { const ox = p.x / FP, oy = p.y / FP; tr.push({ t: [p._tip[0] - ox, p._tip[1] - oy], h: [p._hand[0] - ox, p._hand[1] - oy], life: 10, iai: !!MV[p.mv].iai }); }
+  if (!swinging && p.st !== 'atk') tr.length = 0;
   for (const q of tr) q.life--;
   FX.trails[p.i] = tr.filter(q => q.life > 0).slice(-10);
 }
 function drawTrails(){
   for (let i = 0; i < 2; i++) {
     const tr = FX.trails[i]; if (tr.length < 2) continue;
+    const ox = sim.p[i].x / FP, oy = sim.p[i].y / FP;
     cx.save();
     cx.globalCompositeOperation = 'lighter';
     for (let k = 1; k < tr.length; k++) {
       const a = tr[k - 1], b = tr[k], al = Math.min(1, b.life / 10);
       cx.fillStyle = b.iai ? `rgba(255,255,255,${0.85 * al})` : `rgba(240,236,226,${0.55 * al})`;
       cx.beginPath();
-      const mid = (q, f) => [q.h[0] + (q.t[0] - q.h[0]) * f, q.h[1] + (q.t[1] - q.h[1]) * f];
+      const mid = (q, f) => [ox + q.h[0] + (q.t[0] - q.h[0]) * f, oy + q.h[1] + (q.t[1] - q.h[1]) * f];
       const a1 = mid(a, 0.35), b1 = mid(b, 0.35);
-      cx.moveTo(wx(a1[0]), wy(a1[1])); cx.lineTo(wx(a.t[0]), wy(a.t[1])); cx.lineTo(wx(b.t[0]), wy(b.t[1])); cx.lineTo(wx(b1[0]), wy(b1[1]));
+      cx.moveTo(wx(a1[0]), wy(a1[1])); cx.lineTo(wx(ox + a.t[0]), wy(oy + a.t[1])); cx.lineTo(wx(ox + b.t[0]), wy(oy + b.t[1])); cx.lineTo(wx(b1[0]), wy(b1[1]));
       cx.closePath(); cx.fill();
     }
     cx.restore();
@@ -525,6 +527,13 @@ function draw(){
     cx.strokeStyle = `rgba(255,255,255,${0.5 * fade})`; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(x, y, r - 1, Math.PI * 1.1, Math.PI * 1.5); cx.stroke();
   }
   drawTrails();
+  if (OPT.boxes) for (const p of sim.p) {
+    const hb = A.hurt(p);
+    cx.strokeStyle = A.invuln(p) ? 'rgba(255,255,255,.9)' : 'rgba(44,79,150,.85)'; cx.lineWidth = 1.5;
+    cx.strokeRect(wx(p.x / FP + hb[0]), wy(p.y / FP + hb[1] + hb[3]), hb[2] * cam.z, hb[3] * cam.z);
+    if (p.st === 'atk') { const m = MV[p.mv];
+      if (p.mvf >= m.s && p.mvf < m.s + m.a) { const b = A.box(p, m.box); cx.fillStyle = 'rgba(200,55,45,.45)'; cx.fillRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z, (b[3] - b[1]) / FP * cam.z); } }
+  }
   for (const q of FX.parts) { cx.globalAlpha = 1 - q.t / q.life; cx.fillStyle = q.col; const r = q.r * cam.z; cx.fillRect(wx(q.x) - r, wy(q.y) - r, r * 2, r * 2); }
   cx.globalAlpha = 1;
   for (const t of FX.texts) {
@@ -552,6 +561,7 @@ function setupBar(){
   DUMMY.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; sel.appendChild(o); });
   sel.value = OPT.dummy; sel.addEventListener('change', () => { OPT.dummy = sel.value; saveOpt(); sel.blur(); });
   const fr = document.getElementById('a_frames'); fr.checked = OPT.frames; fr.addEventListener('change', () => { OPT.frames = fr.checked; saveOpt(); });
+  const bx = document.getElementById('a_boxes'); bx.checked = OPT.boxes; bx.addEventListener('change', () => { OPT.boxes = bx.checked; saveOpt(); });
   const rf = document.getElementById('a_refill'); rf.checked = OPT.refill; rf.addEventListener('change', () => { OPT.refill = rf.checked; saveOpt(); });
   document.getElementById('a_reset').addEventListener('click', e => { resetRound(); e.target.blur(); });
   document.getElementById('a_help').addEventListener('click', () => { document.getElementById('help').hidden = false; });

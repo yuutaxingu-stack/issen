@@ -146,6 +146,7 @@ function inputSym(i){
   return ar + (i.C ? '攻' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.C] : '') + (i.A ? '斬' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
 }
 function stepOnce(){
+  if (DBG.pause) return;
   if (FX.finish) {
     FX.finish.t++;
     if (FX.finish.t > 200) resetRound();
@@ -225,22 +226,9 @@ function pose(p, fr){
   if (st === 'roll' && p.rk === 'spot') { P.hip = 46; P.lean = -14; P.sw = 70; P.arm = 20; P.alpha = A.invuln(p) ? 0.4 : 1; }
   else if (st === 'roll' || (st === 'getup' && p.gk === 'roll')) { P.rot = -(p.f * 14) * (p.rollDir * p.face); P.hip = 34; P.fA = [-8, 14]; P.fB = [10, 14]; P.sw = 10; P.alpha = (A.invuln(p)) ? 0.6 : 1; }
   if (st === 'tech' || (st === 'getup' && p.gk !== 'roll')) { P.hip = 40; P.lean = 20; P.alpha = A.invuln(p) ? 0.6 : 1; }
-  if (st === 'atk') {
-    const m = MV[p.mv], f = p.mvf;
-    const a0 = m.arc[0], a1 = m.arc[1];
-    if (m.iai) P.sheath = f < m.s;
-    if (f < m.s) { const t = f / m.s; P.sw = lerp(25, a0, Math.min(1, t * 1.6)); P.lean = lerp(6, -4, t); }
-    else if (f < m.s + m.a) { const t = (f - m.s + 1) / m.a; P.sw = lerp(a0, a1, t); P.lean = 18; }
-    else { const t = (f - m.s - m.a) / Math.max(1, m.r); P.sw = lerp(a1, 25, t * t); P.lean = lerp(18, 6, t); }
-    P.arm = P.sw - 55;
-    if (m.k === 'a') { P.fA = [-12, 20]; P.fB = [16, 14]; }
-    if (p.mv === 'dtilt') { P.hip = 34; P.fA = [-22, 0]; P.fB = [30, 0]; }
-    if (p.mv === 'counter') { P.sw = 100; P.arm = 30; P.lean = -4; P.hip = 50; P.fA = [-22, 0]; P.fB = [16, 0]; }
-    if (p.mv === 'rise') { P.fA = [-8, 6]; P.fB = [10, 16]; P.lean = -6; }
-    if (p.mv === 'plunge') { P.fA = [-10, 18]; P.fB = [12, 22]; P.lean = 10; P.arm = -95; }
-    if (p.mv === 'side' || p.mv === 'sideA' || p.mv === 'dashatk' || m.iai) { P.fA = [-34, 0]; P.fB = [30, 0]; P.hip = 44; P.lean = 28; }
-    if (p.mv === 'gatk') { P.rot = 0; P.hip = 40; }
-    if (m.grab) { P.arm = 0; P.sw = -40; P.lean = 22; }
+  if (st === 'atk') { // 技の最中は判定と同じ形（pose.js）
+    const Q = window.IssenPose.attackPose(p.mv, MV[p.mv], p.mvf);
+    Object.assign(P, Q); P.rot = 0; P.head = 0;
   }
   return P;
 }
@@ -283,6 +271,8 @@ function drawFighter(p, fr){
   c.strokeStyle = INK; c.lineWidth = 5; c.beginPath(); c.moveTo(shx, shy); c.lineTo(hnx, hny); c.stroke();
   const sa = rad(P.sw);
   const tipx = hnx + Math.cos(sa) * 82, tipy = hny + Math.sin(sa) * 82;
+  const ext = p.st === 'atk' ? (MV[p.mv].ext || 0) : 0; // 刀より先まで届く技は軌跡も伸ばす
+  const etx = tipx + Math.cos(sa) * ext, ety = tipy + Math.sin(sa) * ext;
   if (!P.sheath) {
     c.strokeStyle = '#2b2520'; c.lineWidth = 5; c.beginPath(); c.moveTo(hnx - Math.cos(sa) * 12, hny - Math.sin(sa) * 12); c.lineTo(hnx, hny); c.stroke();
     c.strokeStyle = '#c9a54a'; c.lineWidth = 3; c.beginPath(); c.moveTo(hnx + Math.cos(sa + 1.57) * 5, hny + Math.sin(sa + 1.57) * 5); c.lineTo(hnx - Math.cos(sa + 1.57) * 5, hny - Math.sin(sa + 1.57) * 5); c.stroke();
@@ -296,11 +286,17 @@ function drawFighter(p, fr){
     if (P.rot) { const r = rad(P.rot), yy = y - P.hip; const nx = x * Math.cos(r) - yy * Math.sin(r), ny = x * Math.sin(r) + yy * Math.cos(r) + P.hip; x = nx; y = ny; }
     return [p.x / FP + x * p.face, p.y / FP + y];
   };
-  p._tip = toW(tipx, tipy); p._hand = toW(hnx, hny); p._sheath = P.sheath;
+  p._tip = toW(etx, ety); p._hand = toW(hnx, hny);
+  // 突き（刀の向きが変わらない技）は、届くところまで白い筋を出す
+  if (p.st === 'atk') { const m = MV[p.mv]; if (m.arc[0] === m.arc[1] && !m.noBox && p.mvf >= m.s && p.mvf < m.s + m.a) {
+    const h = p._hand, t = p._tip, nx = -(t[1] - h[1]), ny = t[0] - h[0], L = Math.hypot(nx, ny) || 1, w = 7;
+    const b0 = [h[0] + (t[0] - h[0]) * 0.3, h[1] + (t[1] - h[1]) * 0.3];
+    cx.save(); cx.globalCompositeOperation = 'lighter'; cx.fillStyle = 'rgba(250,246,236,.85)'; cx.beginPath();
+    cx.moveTo(wx(b0[0] + nx / L * w), wy(b0[1] + ny / L * w)); cx.lineTo(wx(t[0]), wy(t[1])); cx.lineTo(wx(b0[0] - nx / L * w), wy(b0[1] - ny / L * w)); cx.closePath(); cx.fill(); cx.restore(); } } p._sheath = P.sheath;
 }
 function recordTrail(p){
   const tr = FX.trails[p.i];
-  const swinging = p.st === 'atk' && p.mvf >= MV[p.mv].s - 1 && p.mvf < MV[p.mv].s + MV[p.mv].a + 2;
+  const swinging = p.st === 'atk' && !MV[p.mv].noBox && p.mvf >= MV[p.mv].s - 1 && p.mvf < MV[p.mv].s + MV[p.mv].a;
   if (swinging && p._tip) { const ox = p.x / FP, oy = p.y / FP; tr.push({ t: [p._tip[0] - ox, p._tip[1] - oy], h: [p._hand[0] - ox, p._hand[1] - oy], life: 10, iai: !!MV[p.mv].iai }); }
   if (!swinging && p.st !== 'atk') tr.length = 0;
   for (const q of tr) q.life--;
@@ -317,7 +313,7 @@ function drawTrails(){
       cx.fillStyle = b.iai ? `rgba(255,255,255,${0.85 * al})` : `rgba(240,236,226,${0.55 * al})`;
       cx.beginPath();
       const mid = (q, f) => [ox + q.h[0] + (q.t[0] - q.h[0]) * f, oy + q.h[1] + (q.t[1] - q.h[1]) * f];
-      const a1 = mid(a, 0.35), b1 = mid(b, 0.35);
+      const a1 = mid(a, 0.3), b1 = mid(b, 0.3);
       cx.moveTo(wx(a1[0]), wy(a1[1])); cx.lineTo(wx(ox + a.t[0]), wy(oy + a.t[1])); cx.lineTo(wx(ox + b.t[0]), wy(oy + b.t[1])); cx.lineTo(wx(b1[0]), wy(b1[1]));
       cx.closePath(); cx.fill();
     }
@@ -547,7 +543,7 @@ function draw(){
     cx.strokeStyle = A.invuln(p) ? 'rgba(255,255,255,.9)' : 'rgba(44,79,150,.85)'; cx.lineWidth = 1.5;
     cx.strokeRect(wx(p.x / FP + hb[0]), wy(p.y / FP + hb[1] + hb[3]), hb[2] * cam.z, hb[3] * cam.z);
     if (p.st === 'atk') { const m = MV[p.mv];
-      if (p.mvf >= m.s && p.mvf < m.s + m.a) { const b = A.box(p, m.box); cx.fillStyle = 'rgba(200,55,45,.45)'; cx.fillRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z, (b[3] - b[1]) / FP * cam.z); } }
+      if (!m.noBox && p.mvf >= m.s && p.mvf < m.s + m.a) { const b = A.box(p, A.curBox(p)); cx.fillStyle = 'rgba(200,55,45,.45)'; cx.fillRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z, (b[3] - b[1]) / FP * cam.z); } }
   }
   for (const q of FX.parts) { cx.globalAlpha = 1 - q.t / q.life; cx.fillStyle = q.col; const r = q.r * cam.z; cx.fillRect(wx(q.x) - r, wy(q.y) - r, r * 2, r * 2); }
   cx.globalAlpha = 1;
@@ -584,6 +580,7 @@ function setupBar(){
 }
 
 resize(); setupBar();
-window.__action = { get sim(){ return sim; }, FX, OPT, resetRound };
+const DBG = { pause: false };
+window.__action = { get sim(){ return sim; }, FX, OPT, resetRound, DBG, recordTrail, draw, cam, get W(){ return W; }, get GROUND(){ return GROUND; } };
 requestAnimationFrame(t => { lastT = t; requestAnimationFrame(tick); });
 })();

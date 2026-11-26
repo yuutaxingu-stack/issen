@@ -72,8 +72,8 @@ const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
 /* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
 const DG = {
   spot: { n: 'その場回避', i0: 3, i1: 17, total: 25 },
-  fwd:  { n: '前方回避', i0: 4, i1: 15, total: 29, mv: [4, 22], v: 650 },
-  back: { n: '後方回避', i0: 5, i1: 16, total: 34, mv: [5, 26], v: 560 },
+  fwd:  { n: '前方回避', i0: 4, i1: 15, total: 29, mv: [4, 22], v: 1050 },
+  back: { n: '後方回避', i0: 5, i1: 16, total: 34, mv: [5, 26], v: 900 },
   airN: { n: '空中回避', i0: 3, i1: 28, total: 44, land: 10 },
   airD: { n: '空中回避（方向）', i0: 3, i1: 22, total: 60, land: 15, mv: [3, 10], v: 1000 },
 };

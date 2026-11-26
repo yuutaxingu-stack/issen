@@ -1373,29 +1373,46 @@ function zetsuStage(k){
   const W=c.width, H=c.height, x=c.getContext('2d');
   const P=[]; for(let i=0;i<70;i++) P.push({x:Math.random()*W,y:Math.random()*H,v:20+Math.random()*50,s:4+Math.random()*7,r:Math.random()*6,w:Math.random()*6,d:Math.random()<.35});
   const t0=performance.now(); let last=t0;
-  ZST={raf:0};
+  ZST={raf:0,burst:0};
+  c.onclick=()=>zetsuStage(k); // 触るともう一度抜く
   const frame=now=>{
-    if(!ZST) return; const t=(now-t0)/1000, dt=Math.min(.05,(now-last)/1000); last=now;
+    if(!ZST) return; const t=(now-t0)/1000*(window.__zslow||1), dt=Math.min(.05,(now-last)/1000); last=now;
     const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,'#5a0d18'); g.addColorStop(.55,'#250609'); g.addColorStop(1,'#070203');
     x.fillStyle=g; x.fillRect(0,0,W,H);
     // 朱の月
     x.save(); x.globalAlpha=.55; x.fillStyle='#b3122a'; x.shadowColor='#ff2a44'; x.shadowBlur=40; x.beginPath(); x.arc(W*.78,H*.3,64,0,7); x.fill(); x.restore();
     // 大きな「絶」
     x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore();
-    // 抜刀: 最初の1.2秒で鞘から刃が滑り出る
-    const e=Math.min(1,t/1.2), ease=1-Math.pow(1-e,3), kw=W*.9, kh=kw*106/900, ky=H*.62+Math.sin(t*1.3)*4;
-    const kx=W*.05;
-    if(KREADY){
-      x.save(); x.translate(kx,ky); x.rotate(-.12);
-      if(ZSAYA.complete&&ZSAYA.naturalWidth){ x.globalAlpha=.95; x.drawImage(ZSAYA,0,kh*.7,kw,kh); }
-      x.globalAlpha=1; x.shadowColor='rgba(255,40,70,.8)'; x.shadowBlur=24; x.drawImage(k.canvas,-kw*.55*(1-ease),-kh*.35,kw,kh);
-      // 刃を流れる光
-      const sx=((t*.45)%1.4-.2)*kw; const lg=x.createLinearGradient(sx-60,0,sx+60,0); lg.addColorStop(0,'rgba(255,255,255,0)'); lg.addColorStop(.5,'rgba(255,235,240,.75)'); lg.addColorStop(1,'rgba(255,255,255,0)');
-      x.globalCompositeOperation='lighter'; x.shadowBlur=0; x.fillStyle=lg; x.fillRect(sx-60,-kh*.35+kh*.25,120,kh*.3);
+    // 抜刀: 鞘に納まった桜華が現れ → 鯉口を切り → 刃が鞘から滑り出て → 鞘が消え、抜き身が中央に据わる
+    const kw=W*0.56, sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.6, cxF=(W-kw)/2;
+    const A=0.8, B=1.3, Cd=2.3, D=2.9; // 現れる / 鯉口 / 抜き終わり / 据わる
+    const eo=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),3), eio=v=>{v=Math.max(0,Math.min(1,v)); return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
+    let pull=0; if(t>A) pull=8*sc*eo((t-A)/(B-A)); if(t>B) pull=8*sc+(bladeI-8*sc)*eio((t-B)/(Cd-B));
+    const settle=eo((t-Cd-0.15)/(D-Cd)), bob=t>D?Math.sin((t-D)*1.3)*4:0;
+    const bx=kx0-pull+(cxF-(kx0-bladeI))*settle; // 刀（柄の左端）の位置
+    if(KREADY&&ZSAYA.complete&&ZSAYA.naturalWidth){
+      x.save(); x.translate(W/2,ky+bob); x.rotate(-0.1*(t<Cd?1:1-settle)-0.12*settle); x.translate(-W/2,-kh/2);
+      if(t<B){ // 鞘に納まった姿
+        x.globalAlpha=eo(t/A); x.shadowColor='rgba(255,40,70,.7)'; x.shadowBlur=18+10*Math.sin(t*8); x.drawImage(ZSAYA,kx0,0,kw,kh);
+        if(t>A){ x.globalAlpha=1; x.save(); x.beginPath(); x.rect(0,-50,kx0+mouthI*sc,kh+100); x.clip(); x.shadowBlur=0; x.drawImage(k.canvas,bx,0,kw,kh); x.restore(); }
+      } else {
+        // 鞘（鯉口から先だけ）。抜き終わると落ちて消える
+        const sa=1-eo((t-Cd)/0.5); if(sa>0){ x.save(); x.globalAlpha=sa; x.translate(0,(1-sa)*40); x.beginPath(); x.rect(kx0+mouthI*sc,-50,W,kh+100); x.clip(); x.drawImage(ZSAYA,kx0,0,kw,kh); x.restore(); }
+        // 刃: 鞘の中にある間は鯉口より先を隠す
+        x.save(); if(t<Cd){ x.beginPath(); x.rect(-W,-200,kx0+mouthI*sc+W,kh+400); x.clip(); }
+        x.shadowColor='rgba(255,40,70,.85)'; x.shadowBlur=24; x.drawImage(k.canvas,bx,0,kw,kh); x.restore();
+        // 鯉口の火花
+        if(t<Cd){ const mx=kx0+mouthI*sc, g2=x.createRadialGradient(mx,kh*.45,0,mx,kh*.45,60); g2.addColorStop(0,'rgba(255,240,245,.95)'); g2.addColorStop(1,'rgba(255,60,90,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=g2; x.fillRect(mx-60,kh*.45-60,120,120); x.globalCompositeOperation='source-over'; }
+        // 抜き終わりの閃光と、刃を流れる光
+        if(t>Cd&&t<Cd+0.5){ x.save(); x.globalCompositeOperation='lighter'; x.globalAlpha=1-(t-Cd)/0.5; x.fillStyle='rgba(255,210,220,.6)'; x.fillRect(-W,-H,W*3,H*3); x.restore(); }
+        if(t>D){ const sx=bx+kw*(0.3+((t-D)*.4%1)*0.72); const lg=x.createLinearGradient(sx-60,0,sx+60,0); lg.addColorStop(0,'rgba(255,255,255,0)'); lg.addColorStop(.5,'rgba(255,235,240,.75)'); lg.addColorStop(1,'rgba(255,255,255,0)');
+          x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(sx-60,kh*.25,120,kh*.3); x.globalCompositeOperation='source-over'; }
+      }
       x.restore();
+      if(!ZST.burst&&t>Cd){ ZST.burst=1; for(const p of P){ p.x=W*.3+Math.random()*W*.4; p.y=ky+(Math.random()-.5)*60; p.v=-120+Math.random()*80; p.kx=(Math.random()-.5)*600; } }
     }
     // 花びら
-    for(const p of P){ p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>H+10){p.y=-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
+    for(const p of P){ if(p.kx){ p.x+=p.kx*dt; p.kx*=0.96; if(Math.abs(p.kx)<5) p.kx=0; } if(p.v<20) p.v+=160*dt; p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>H+10){p.y=-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
       x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':'rgba('+(200+Math.random()*20|0)+',40,64,.85)'; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
     // 落款
     x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore();

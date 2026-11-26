@@ -533,7 +533,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
 /* 一本。決着名を決める */
 Sim.prototype.finish = function(w, l, how, m, s){
   const tw = this.opts.toWin || C.toWin;
-  const bothLast = this.wins[0] === tw - 1 && this.wins[1] === tw - 1;
+  const bothLast = tw > 1 && this.wins[0] === tw - 1 && this.wins[1] === tw - 1; // 一本勝負では「後なし」はない
   const air = !w.ground || !s.dground;
   const back = l.face * (w.x - l.x) < 0;
   const iai = how === 'iai';

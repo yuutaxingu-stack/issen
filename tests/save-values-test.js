@@ -12,9 +12,10 @@ const srv = [...block.matchAll(/\('([a-z0-9_]+)', '(.)'\)/g)].map(m => m[1] + ':
 ok(game === srv, '刀の一覧（' + katanaRows().length + '本）が一致' + (game === srv ? '' : '。node tools/katana-sql.js を実行してください'));
 const ids = katanaRows().map(r => r[0]); ok(new Set(ids).size === ids.length, '刀の id に重なりがない');
 const ev = s => Function('return ' + s)();
-const rate = ev(js.match(/const TIERRATE=(\[.*?\]);/)[1]), dup = ev(js.match(/const DUPBACK=(\{.*?\});/)[1]);
-const tiers = [...sql.matchAll(/\('(.)', (\d+), (\d+)\)/g)].map(m => [m[1], +m[2], +m[3]]);
-ok(rate.every(([t, w]) => tiers.some(x => x[0] === t && x[1] === w && x[2] === dup[t])), 'ガチャの確率と重なりの銭が一致');
+const rate = ev(js.match(/const TIERRATE=(\[.*?\]);/)[1]);
+const steel = ev(js.match(/const STEEL=(\{.*?\});/)[1]), forge = ev(js.match(/const FORGE=(\{.*?\});/)[1]);
+const tiers = [...sql.matchAll(/\('(.)', (\d+), (\d+), (\d+), (\d+)\)/g)].map(m => [m[1], +m[2], +m[3], +m[4], +m[5]]);
+ok(tiers.length === 4 && rate.every(([t, w]) => tiers.some(x => x[0] === t && x[1] === w && x[2] === 0 && x[3] === steel[t] && x[4] === forge[t])), 'ガチャの確率・玉鋼・鍛える値段が一致');
 const coin = ev(js.match(/const COIN=(\{.*?\});/)[1]);
 const fin = ev(js.slice(js.indexOf('const FIN=') + 10, js.indexOf('};', js.indexOf('const FIN=')) + 1));
 const fc = Object.fromEntries([...sql.matchAll(/\('([^']+)', (\d+)\)/g)].map(m => [m[1], +m[2]]));

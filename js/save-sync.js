@@ -72,12 +72,21 @@
       catch (e) { if (last) apply(last); throw new Error(N.jp(e)); }   // 断られたらサーバーの銭に戻す
       apply(d);
       return d;
+    },
+    async forge(id){   // 玉鋼で刀を鍛える（玉鋼の計算はサーバー）
+      await flush();
+      if (queue().length) throw new Error('通信できませんでした。電波のよい所でもう一度どうぞ');
+      let d;
+      try { d = await rpc('forge_katana', { p_id: id }); }
+      catch (e) { if (last) apply(last); throw new Error(missing(e) ? 'サーバーの準備がまだです（SQLの実行待ち）' : N.jp(e)); }
+      apply(d);
+      return d;
     }
   };
 
   /* ---------- ログイン・ログアウト ---------- */
   function worth(g){
-    return g.coins > 0 || g.best > 0 || Object.keys(g.rec || {}).length > 0 ||
+    return g.coins > 0 || g.steel > 0 || g.best > 0 || Object.keys(g.rec || {}).length > 0 ||
       Object.keys(g.owned || {}).some(k => k !== 'mumei' && g.owned[k] > 0);
   }
   async function start(u){

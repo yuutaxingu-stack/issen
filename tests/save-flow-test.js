@@ -107,11 +107,22 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   ok(cnt(v.owned) === cnt(before.owned) + 1 && v.pulls === 1, '刀が1本増えた（サーバー）');
   ok(s.coins === v.coins && v.coins <= 107 + 30 && v.coins >= 107, '銭が10減った（重なれば戻る） 画面 ' + s.coins + ' / サーバー ' + v.coins);
   await p1.evaluate(() => { WALLET.coins = 99999; refreshCoins(); });
-  await p1.waitForFunction(() => GA.phase === 'shown' || GA.phase === 'draw', null);
+  await p1.waitForFunction(() => GA.phase === 'item' || GA.phase === 'shown' || GA.phase === 'draw', null);
   await p1.evaluate(() => { GA.phase = 'idle'; doPull(50); });
   await p1.waitForFunction(() => GA.phase !== 'wait', null, { timeout: 10000 });
   ok(/銭が足りません/.test(await p1.textContent('#g_msg')), '画面の銭を書き換えても、サーバーが断る: ' + await p1.textContent('#g_msg'));
   ok((await st(p1)).coins === server(A).coins, '断られた後は正しい銭に戻る');
+
+  console.log('--- 玉鋼で鍛える（玉鋼の計算はサーバー）');
+  sql("update public.saves set steel = 1000, owned = owned - 'shiden' - 'geppaku' where id = :'id'", { id: USERS[A] });
+  let fr = await p1.evaluate(() => ACCT.forge('shiden').then(d => d.steel, e => 'ERR ' + e.message));
+  v = server(A);
+  ok(fr === 700 && v.steel === 700 && v.owned.shiden === 1, '極を鍛えると玉鋼 -300、刀が手に入る（' + fr + '）');
+  ok((await p1.evaluate(() => WALLET.steel)) === 700 && (await p1.evaluate(() => !!ARM.owned.shiden)), '画面の玉鋼と刀帳もサーバーに合う');
+  await p1.evaluate(() => { WALLET.steel = 99999; });
+  fr = await p1.evaluate(() => ACCT.forge('geppaku').then(d => d.steel, e => 'ERR ' + e.message));
+  ok(/玉鋼が足りません/.test(fr) && !server(A).owned.geppaku, '画面の玉鋼を書き換えても、サーバーが断る: ' + fr);
+  ok((await p1.evaluate(() => WALLET.steel)) === 700, '断られた後は正しい玉鋼に戻る');
   await p1.click('#g_back');
 
   console.log('--- 持たせる刀');

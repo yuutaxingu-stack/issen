@@ -101,3 +101,13 @@ body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--ui);use
 #rotate button{font-family:var(--ui);font-weight:700;font-size:14px;border-radius:8px;padding:9px 14px;border:1px solid rgba(255,255,255,.4);background:transparent;color:var(--paper);}
 #safe{position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);}
 @media (prefers-reduced-motion: reduce){.btn{transition:none;}}
+/* 玉鋼・飛ばす・鍛える */
+.gcoin{display:flex;flex-direction:column;align-items:flex-end;line-height:1.15;} .gcoin .gst b{color:#e07a3a;font-size:16px;}
+.gskip{position:absolute;right:8px;bottom:8px;background:rgba(14,15,12,.55);border:1px solid rgba(233,226,207,.3);color:#e9e2cf;border-radius:4px;padding:5px 12px;font-family:var(--ui);font-size:12px;letter-spacing:.12em;cursor:pointer;}
+.gres.sum .gm{font-size:clamp(22px,5vh,32px);}
+.gbatch .bc.nw{opacity:1;}
+.gcount small{display:block;font-family:var(--ui);font-size:11.5px;letter-spacing:.04em;opacity:.6;margin-top:2px;} .gcount small b{color:#e07a3a;font-weight:500;font-size:14px;}
+.gcard.unk{cursor:pointer;}
+.gdsheet.unk .gm{opacity:.75;} .gdsheet.unk .gl{opacity:.6;font-style:italic;}
+.gforge{display:flex;flex-direction:column;align-items:center;gap:6px;margin:8px 0 4px;}
+.gforge .gpull{border-color:#b5562a;background:#7a3417;} .gforge .gpull.arm{background:#c2581f;box-shadow:0 0 18px rgba(255,120,40,.45);}

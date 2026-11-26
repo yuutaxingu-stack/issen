@@ -35,6 +35,10 @@ create table if not exists public.finish_coins (
   coins int not null check (coins >= 0)
 );
 
+-- 玉鋼（2026-11-26）: 持っている刀が出たら銭の代わりに玉鋼になり、玉鋼でまだ持っていない刀を鍛えられる
+alter table public.gacha_tiers add column if not exists steel int not null default 0 check (steel >= 0);         -- 持っている刀が出たときの玉鋼
+alter table public.gacha_tiers add column if not exists forge_cost int not null default 0 check (forge_cost >= 0); -- その階級の刀を鍛える玉鋼
+
 -- ---------- 設定（schema.sql の app_config に列を足す） ----------
 alter table public.app_config add column if not exists pull_cost int not null default 10;        -- ガチャ1回の銭
 alter table public.app_config add column if not exists day_coin_cap int not null default 15000;  -- 1日に勝負で得られる銭の上限（ずる対策）
@@ -55,9 +59,13 @@ create table if not exists public.saves (
   coin_day date,                                         -- 今日の日付と、今日勝負で得た銭
   day_coins int not null default 0,
   pulls bigint not null default 0,                       -- ガチャを引いた回数
+  steel bigint not null default 0 check (steel >= 0),    -- 玉鋼
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.saves add column if not exists steel bigint not null default 0 check (steel >= 0);
+alter table public.saves add column if not exists forges int not null default 0;   -- 鍛えた回数
 
 alter table public.katana_catalog enable row level security;
 alter table public.gacha_tiers enable row level security;
@@ -65,10 +73,11 @@ alter table public.finish_coins enable row level security;
 alter table public.saves enable row level security;
 revoke all on public.katana_catalog, public.gacha_tiers, public.finish_coins, public.saves from anon, authenticated;
 
--- ---------- 中身（ゲームの js/game.js と同じ値。tests/save-test.js で一致を確かめている） ----------
-insert into public.gacha_tiers (tier, weight, dup_back) values
-  ('並', 60, 2), ('上', 28, 4), ('極', 10, 10), ('幻', 2, 30)
-on conflict (tier) do update set weight = excluded.weight, dup_back = excluded.dup_back;
+-- ---------- 中身（ゲームの js/game.js と同じ値。tests/save-values-test.js で一致を確かめている） ----------
+-- 割合(%)・重なって戻る銭(今は0。玉鋼に置きかえた)・重なったときの玉鋼・鍛える玉鋼
+insert into public.gacha_tiers (tier, weight, dup_back, steel, forge_cost) values
+  ('並', 60, 0, 5, 50), ('上', 28, 0, 10, 110), ('極', 10, 0, 25, 300), ('幻', 2, 0, 100, 1500)
+on conflict (tier) do update set weight = excluded.weight, dup_back = excluded.dup_back, steel = excluded.steel, forge_cost = excluded.forge_cost;
 
 insert into public.finish_coins (finish, coins) values
   ('疾風', 3), ('先の先', 3), ('隙穿ち', 3),
@@ -123,7 +132,7 @@ $$;
 -- ゲームに返す形
 create or replace function public.save_json(s public.saves) returns jsonb
 language sql stable set search_path = '' as $$
-  select jsonb_build_object('coins', s.coins, 'best', s.cpu_best, 'owned', s.owned, 'rec', s.rec, 'equip', s.equip,
+  select jsonb_build_object('coins', s.coins, 'steel', s.steel, 'best', s.cpu_best, 'owned', s.owned, 'rec', s.rec, 'equip', s.equip,
     'imports', s.imports, 'cost', (select c.pull_cost from public.app_config c where c.id = 1));
 $$;
 
@@ -172,6 +181,7 @@ begin
 
   s.coins := least(s.coins + public.save_num(p -> 'coins', 100000), 10000000);
   s.cpu_best := greatest(s.cpu_best, public.save_num(p -> 'best', 1000));
+  s.steel := least(s.steel + public.save_num(p -> 'steel', 100000), 10000000);
 
   if jsonb_typeof(p -> 'owned') = 'object' then
     for k, v in select * from jsonb_each(p -> 'owned') loop
@@ -201,7 +211,7 @@ begin
     s.equip := jsonb_build_array(eq ->> 0, eq ->> 1);
   end if;
 
-  update public.saves set coins = s.coins, cpu_best = s.cpu_best, owned = s.owned, rec = s.rec, equip = s.equip,
+  update public.saves set coins = s.coins, steel = s.steel, cpu_best = s.cpu_best, owned = s.owned, rec = s.rec, equip = s.equip,
     imports = s.imports + 1, updated_at = now()
   where id = s.id returning * into s;
   return public.save_json(s);
@@ -253,12 +263,12 @@ end;
 $$;
 
 -- ガチャを引く。くじはサーバーが引き、銭を減らして刀を渡す
--- 返す got: [{ id, new }]（new = 初めての刀）、back: 重なって戻った銭
+-- 返す got: [{ id, new, steel }]（new = 初めての刀、steel = 持っていた刀が変わった玉鋼）、back: 重なって戻った銭、steel_got: 玉鋼の合計
 create or replace function public.pull_gacha(p_n int) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   s public.saves;
-  cost int; total numeric; r numeric; t text; k text; had bigint; back int := 0;
+  cost int; total numeric; r numeric; t text; k text; had bigint; back int := 0; st int; steel_got bigint := 0;
   got jsonb := '[]';
   i int;
 begin
@@ -282,13 +292,37 @@ begin
     select c.id into k from public.katana_catalog c where c.tier = t and c.in_gacha order by random() limit 1;
     had := coalesce((s.owned ->> k)::bigint, 0);
     s.owned := jsonb_set(s.owned, array[k], to_jsonb(had + 1));
-    if had > 0 then back := back + (select g.dup_back from public.gacha_tiers g where g.tier = t); end if;
-    got := got || jsonb_build_array(jsonb_build_object('id', k, 'new', had = 0));
+    st := 0;
+    if had > 0 then
+      back := back + (select g.dup_back from public.gacha_tiers g where g.tier = t);
+      st := (select g.steel from public.gacha_tiers g where g.tier = t);
+      steel_got := steel_got + st;
+    end if;
+    got := got || jsonb_build_array(jsonb_build_object('id', k, 'new', had = 0, 'steel', st));
   end loop;
 
-  update public.saves set coins = s.coins - p_n::bigint * cost + back, owned = s.owned, pulls = s.pulls + p_n, updated_at = now()
+  update public.saves set coins = s.coins - p_n::bigint * cost + back, steel = least(s.steel + steel_got, 10000000),
+    owned = s.owned, pulls = s.pulls + p_n, updated_at = now()
   where id = s.id returning * into s;
-  return public.save_json(s) || jsonb_build_object('got', got, 'back', back);
+  return public.save_json(s) || jsonb_build_object('got', got, 'back', back, 'steel_got', steel_got);
+end;
+$$;
+
+-- 玉鋼で刀を鍛える。まだ持っていない、ガチャに入っている刀だけ。玉鋼の額はサーバーが決める
+create or replace function public.forge_katana(p_id text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare s public.saves; t text; cost int;
+begin
+  s := public.save_lock();
+  select c.tier into t from public.katana_catalog c where c.id = p_id and c.in_gacha;
+  if t is null then raise exception 'その刀は鍛えられません'; end if;
+  if public.save_has(s, p_id) then raise exception 'その刀はもう持っています'; end if;
+  select g.forge_cost into cost from public.gacha_tiers g where g.tier = t;
+  if cost is null or cost <= 0 then raise exception 'その刀は鍛えられません'; end if;
+  if s.steel < cost then raise exception '玉鋼が足りません'; end if;
+  update public.saves set steel = s.steel - cost, owned = jsonb_set(s.owned, array[p_id], to_jsonb(1)), forges = s.forges + 1, updated_at = now()
+  where id = s.id returning * into s;
+  return public.save_json(s) || jsonb_build_object('got', jsonb_build_array(jsonb_build_object('id', p_id, 'new', true)), 'spent', cost);
 end;
 $$;
 
@@ -308,9 +342,9 @@ $$;
 revoke execute on function
   public.save_num(jsonb, bigint), public.save_json(public.saves), public.save_lock(), public.save_has(public.saves, text),
   public.get_save(), public.import_local(jsonb), public.record_win(text, text), public.record_cpu_best(int),
-  public.pull_gacha(int), public.set_equip(text, text)
+  public.pull_gacha(int), public.set_equip(text, text), public.forge_katana(text)
   from public, anon, authenticated;
 grant execute on function
   public.get_save(), public.import_local(jsonb), public.record_win(text, text), public.record_cpu_best(int),
-  public.pull_gacha(int), public.set_equip(text, text)
+  public.pull_gacha(int), public.set_equip(text, text), public.forge_katana(text)
   to authenticated;

@@ -220,7 +220,9 @@ const KATANA=[
 const KMAP={}; KATANA.forEach(k=>KMAP[k.id]=k);
 const METAL={gold:null,silver:[198,204,214],copper:[206,122,82],black:[44,40,38]};
 const TIERRATE=[['並',60],['上',28],['極',10],['幻',2]];
-const DUPBACK={'並':2,'上':4,'極':10,'幻':30};
+// 持っている刀が出たら玉鋼に変わる。玉鋼で好きな刀を鍛えられる（値段 ≒ その階級が出るまでの平均の銭 × 3）
+const STEEL={'並':5,'上':10,'極':25,'幻':100};
+const FORGE={'並':50,'上':110,'極':300,'幻':1500};
 let PULLCOST=10;
 function hsl2rgb(h,s,l){ h=((h%360)+360)%360/360; const f=n=>{ const k=(n+h*12)%12, a=s*Math.min(l,1-l); return 255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))); }; return [f(0),f(8),f(4)]; }
 function tintCanvas(src,col){ const t=document.createElement('canvas'); t.width=src.width; t.height=src.height; const x=t.getContext('2d'); x.drawImage(src,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,t.width,t.height); return t; }
@@ -287,18 +289,18 @@ const TOWIN=()=>G.mode==='cpu'?1:(G.mode==='online'&&NET.toWin)?NET.toWin:CFG.to
 
 /* コインと記録（ログインしていなければこの端末に、ログイン中はアカウントに保存） */
 const COIN={'並':3,'上':9,'極':24,'幻':60,'絶':150,'分':0};
-const WALLET={coins:0,best:0};
-function loadGuestWallet(){ WALLET.coins=0; WALLET.best=0;
+const WALLET={coins:0,best:0,steel:0};
+function loadGuestWallet(){ WALLET.coins=0; WALLET.best=0; WALLET.steel=0;
   try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){} }
 loadGuestWallet();
 function saveWallet(){ if(ACCT) return; try{ localStorage.setItem('issen-wallet-v1',JSON.stringify(WALLET)); }catch(e){} }
 /* アカウント保存との出入り口（js/save-sync.js が使う） */
 function guestData(){ // この端末に保存されている記録（ログイン中でも端末の分を読む）
   let a=null,w=null; try{ a=JSON.parse(localStorage.getItem('issen-armory-v1')||'null'); w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); }catch(e){}
-  a=a||{}; w=w||{}; return {coins:w.coins||0,best:w.best||0,owned:a.owned||{},rec:a.rec||{},equip:a.equip||['mumei','mumei']}; }
+  a=a||{}; w=w||{}; return {coins:w.coins||0,best:w.best||0,steel:w.steel||0,owned:a.owned||{},rec:a.rec||{},equip:a.equip||['mumei','mumei']}; }
 function applySave(d,pend){ // アカウントの持ち物を画面に映す。pend: まだサーバーに届いていない銭
   ARM.owned=Object.assign({mumei:1},d.owned||{}); ARM.rec=d.rec||{}; ARM.equip=Array.isArray(d.equip)&&d.equip.length===2?d.equip.slice():['mumei','mumei'];
-  WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; if(d.cost>0) PULLCOST=d.cost;
+  WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; WALLET.steel=d.steel||0; if(d.cost>0) PULLCOST=d.cost;
   uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
 function useAccount(api){ ACCT=api; }
 function useGuest(){ ACCT=null; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
@@ -1080,16 +1082,19 @@ function updateUI(){
   document.getElementById('ps_resume').textContent=G.mode==='online'?'続ける（試合は止まりません）':'続ける';
   document.getElementById('ps_title').textContent=G.mode==='online'?'退出してタイトルへ':'タイトルへ戻る';
   menuEl.hidden=!menuOn;
-  document.getElementById('m_meta').textContent='所持 '+WALLET.coins+' 銭　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
+  document.getElementById('m_meta').textContent='所持 '+WALLET.coins+' 銭・玉鋼 '+(WALLET.steel||0)+'　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
 }
 document.getElementById('m_cpu').addEventListener('click',()=>{ ensureAudio(); startMatch('cpu'); });
 document.getElementById('m_vs').addEventListener('click',()=>{ ensureAudio(); startMatch('vs'); });
-document.getElementById('m_gacha').addEventListener('click',()=>openGacha());
+document.getElementById('m_gacha').addEventListener('click',()=>openGacha('pull'));
+document.getElementById('m_book').addEventListener('click',()=>openGacha('book'));
 document.getElementById('g_back').addEventListener('click',()=>closeGacha());
 
 /* ---------- 刀ガチャと刀帳 ---------- */
 const gcv=document.getElementById('gc'), gctx=gcv.getContext('2d');
-const GA={phase:'idle',t0:0,kat:null,dup:0,batch:[],raf:0,W:0,H:0,cued:{}};
+// phase: idle 待ち / wait サーバー待ち / forge 鍛える槌 / draw 一振りずつの抜刀 / quick 持っている刀を素早く / item 一振りの札 / shown まとめ
+const GA={phase:'idle',t0:0,kat:null,batch:[],idx:-1,steel:0,back:0,forge:false,silent:false,raf:0,W:0,H:0,cued:{}};
+const gBusy=()=>!(GA.phase==='idle'||GA.phase==='shown');
 const TORD={'並':0,'上':1,'極':2,'幻':3};
 const TIERGLOW={'並':'rgba(236,230,214,','上':'rgba(120,180,255,','極':'rgba(245,196,70,','幻':null};
 // 階級ごとの演出。数字はミリ秒
@@ -1104,46 +1109,82 @@ function tierRGBA(t,a,now){ return t==='幻'?rainbow(a,now):TIERGLOW[t]+a+')'; }
 // 幻は白→金→虹と化ける（昇格演出）
 function shownTier(k,e){ if(k.tier!=='幻') return e<TP[k.tier].d0*0.8&&k.tier!=='並'?'並':k.tier; return e<1000?'並':e<1700?'極':'幻'; }
 function gSize(){ const r=gcv.getBoundingClientRect(); GA.W=Math.max(200,r.width); GA.H=Math.max(120,r.height); gcv.width=Math.round(GA.W*DPR); gcv.height=Math.round(GA.H*DPR); }
-function openGacha(){ gachaEl.hidden=false; uiCache=''; setTab('pull'); GA.phase='idle'; document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
+function openGacha(tab){ gachaEl.hidden=false; uiCache=''; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
-function refreshCoins(){ document.getElementById('g_coins').textContent=WALLET.coins; const n=Math.floor(WALLET.coins/PULLCOST), busy=GA.phase==='draw'||GA.phase==='wait';
+function refreshCoins(){ document.getElementById('g_coins').textContent=WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=Math.floor(WALLET.coins/PULLCOST), busy=gBusy();
   document.getElementById('g_pull1').disabled=busy||n<1; const all=document.getElementById('g_all'); all.disabled=busy||n<2; all.innerHTML='全部引く　<small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>'; }
 function setTab(t){ document.querySelectorAll('.gtabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));
   document.getElementById('g_pull').hidden=t!=='pull'; document.getElementById('g_book').hidden=t!=='book'; if(t==='book') renderBook(); else gSize(); }
 function doPull(n){
-  if(GA.phase==='draw'||GA.phase==='wait') return;
+  if(gBusy()) return;
   const msg=document.getElementById('g_msg'); n=Math.min(n,Math.floor(WALLET.coins/PULLCOST));
   if(n<1){ msg.textContent='銭が足りません。勝負に勝って銭を集めてください。'; return; }
   msg.textContent=''; ensureAudio();
   if(ACCT){ // ログイン中: くじはサーバーが引く
     GA.phase='wait'; msg.textContent='引いています…'; refreshCoins();
     ACCT.pull(n).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
-      startDraw(r.got.map(g=>({k:KMAP[g.id]||KMAP.mumei,isNew:!!g.new})),r.back||0); },
+      startDraw(r.got.map(g=>{ const k=KMAP[g.id]||KMAP.mumei; return {k,isNew:!!g.new,steel:g.new?0:(g.steel!=null?g.steel:STEEL[k.tier])}; }),r.back||0); },
       e=>{ if(GA.phase==='wait') GA.phase='idle'; msg.textContent=e.message; refreshCoins(); });
     return;
   }
   const batch=[]; let back=0;
-  for(let i=0;i<n;i++){ WALLET.coins-=PULLCOST; const k=rollKatana(); const had=ARM.owned[k.id]||0; ARM.owned[k.id]=had+1; const d=had?DUPBACK[k.tier]:0; back+=d; batch.push({k,isNew:!had}); }
-  WALLET.coins+=back; saveWallet(); saveArm();
+  for(let i=0;i<n;i++){ WALLET.coins-=PULLCOST; const k=rollKatana(); const had=ARM.owned[k.id]||0; ARM.owned[k.id]=had+1; const st=had?STEEL[k.tier]:0; WALLET.steel=(WALLET.steel||0)+st; batch.push({k,isNew:!had,steel:st}); }
+  saveWallet(); saveArm();
   startDraw(batch,back);
 }
-function startDraw(batch,back){
-  let best=batch[0]; batch.forEach(b=>{ if(TORD[b.k.tier]>TORD[best.k.tier]||(TORD[b.k.tier]===TORD[best.k.tier]&&b.isNew&&!best.isNew)) best=b; });
-  GA.batch=batch; GA.kat=best.k; GA.isNew=best.isNew; GA.dup=back; GA.phase='draw'; GA.t0=performance.now(); GA.cued={};
-  document.getElementById('g_res').hidden=true; refreshCoins();
+/* 引いた順に一振りずつ見せる。初めての刀はそこで止めて階級の演出、持っている刀は素早く流して玉鋼に */
+function startDraw(batch,back,forge){
+  GA.batch=batch; GA.idx=-1; GA.back=back||0; GA.steel=batch.reduce((s,b)=>s+(b.steel||0),0); GA.forge=!!forge;
+  document.getElementById('g_res').hidden=true;
+  if(forge){ GA.idx=0; GA.kat=batch[0].k; GA.isNew=true; GA.phase='forge'; GA.t0=performance.now(); GA.cued={}; GA.silent=false; refreshCoins(); showSkip(); return; }
+  nextItem();
 }
-function showResult(){
-  const k=GA.kat, f=document.getElementById('g_res');
-  f.className='gres t'+TORD[k.tier];
-  document.getElementById('g_rt').textContent=k.tier; document.getElementById('g_rt').style.background=TIER[k.tier];
+const QUICK={'並':480,'上':640,'極':900,'幻':1150};
+function itemFull(b){ return b.isNew||GA.batch.length===1; }
+function beginItem(){ const b=GA.batch[GA.idx]; GA.kat=b.k; GA.isNew=b.isNew; GA.t0=performance.now(); GA.cued={}; GA.silent=false;
+  GA.phase=itemFull(b)?'draw':'quick'; GA.qdur=QUICK[b.k.tier]*(GA.batch.length>30?0.6:1); }
+function nextItem(){
+  document.getElementById('g_res').hidden=true;
+  GA.idx++;
+  if(GA.idx>=GA.batch.length){ if(GA.batch.length>1) showSummary(); else { GA.phase='idle'; refreshCoins(); } showSkip(); return; }
+  beginItem(); refreshCoins(); showSkip();
+}
+// 飛ばす: 次の初めての刀まで進む（なければまとめへ）
+function skipAhead(){
+  if(!(GA.phase==='draw'||GA.phase==='quick'||GA.phase==='item')||GA.batch.length<2) return;
+  document.getElementById('g_res').hidden=true;
+  let j=GA.idx+1; while(j<GA.batch.length&&!GA.batch[j].isNew) j++;
+  GA.idx=j; if(j>=GA.batch.length){ showSummary(); showSkip(); return; }
+  beginItem(); refreshCoins(); showSkip();
+}
+function showSkip(){ const b=document.getElementById('g_skip'); const left=GA.batch.length>1&&(GA.phase==='draw'||GA.phase==='quick'||GA.phase==='item')&&GA.idx<GA.batch.length-1;
+  b.hidden=!left; }
+function fillCard(k){ const f=document.getElementById('g_res'); f.className='gres t'+TORD[k.tier];
+  const rt=document.getElementById('g_rt'); rt.hidden=false; rt.textContent=k.tier; rt.style.background=TIER[k.tier];
   document.getElementById('g_rm').textContent=k.mei; document.getElementById('g_ry').textContent=k.yomi;
-  document.getElementById('g_rl').textContent=k.lore;
+  document.getElementById('g_rl').textContent=k.lore; return f; }
+function showItem(){
+  const b=GA.batch[GA.idx], n=GA.batch.length, f=fillCard(b.k);
+  document.getElementById('g_rdup').textContent=GA.forge?'玉鋼で鍛えた一振り。':b.isNew?'初めて手に入れた一振り。':'すでに持っている一振り。'+(b.steel?'　玉鋼 +'+b.steel:'');
+  document.getElementById('g_batch').hidden=true;
+  const last=GA.idx>=n-1;
+  document.getElementById('g_tap').textContent=n>1?(last?'触れてまとめへ':'触れて次へ')+'　'+(GA.idx+1)+' / '+n:'触れて閉じる';
+  f.hidden=false; GA.phase='item'; refreshCoins(); showSkip();
+}
+function showSummary(){
   const n=GA.batch.length, news=GA.batch.filter(b=>b.isNew).length;
-  document.getElementById('g_rdup').textContent=(n>1?n+'回引いて、新しい刀 '+news+'振り。':(GA.isNew?'初めて手に入れた一振り。':'すでに持っている一振り。'))+(GA.dup?'　重なった分の銭 +'+GA.dup:'');
+  let best=GA.batch[0]; GA.batch.forEach(b=>{ if(TORD[b.k.tier]>TORD[best.k.tier]||(TORD[b.k.tier]===TORD[best.k.tier]&&b.isNew&&!best.isNew)) best=b; });
+  // 舞台には一番よい刀を抜いたまま置いておく（音は鳴らさない）
+  GA.kat=best.k; GA.isNew=best.isNew; GA.silent=true; GA.t0=performance.now()-TP[best.k.tier].rev-1500;
+  const f=document.getElementById('g_res'); f.className='gres sum';
+  document.getElementById('g_rt').hidden=true;
+  document.getElementById('g_rm').textContent=n+'振り';
+  document.getElementById('g_ry').textContent='引いた順';
+  document.getElementById('g_rl').textContent='';
+  document.getElementById('g_rdup').textContent='新しい刀 '+news+'振り'+(GA.steel?'　玉鋼 +'+GA.steel:'')+(GA.back?'　銭 +'+GA.back:'');
   const bl=document.getElementById('g_batch');
-  if(n>1){ const sorted=GA.batch.slice().sort((a,b)=>TORD[b.k.tier]-TORD[a.k.tier]);
-    bl.innerHTML=sorted.map(b=>'<span class="bc t'+TORD[b.k.tier]+'"><i style="background:'+TIER[b.k.tier]+'">'+b.k.tier+'</i>'+b.k.mei+(b.isNew?'<em>新</em>':'')+'</span>').join(''); bl.hidden=false; }
-  else bl.hidden=true;
+  bl.innerHTML=GA.batch.map(b=>'<span class="bc t'+TORD[b.k.tier]+(b.isNew?' nw':'')+'"><i style="background:'+TIER[b.k.tier]+'">'+b.k.tier+'</i>'+b.k.mei+(b.isNew?'<em>新</em>':'')+'</span>').join(''); bl.hidden=false;
+  document.getElementById('g_tap').textContent='触れて閉じる';
   f.hidden=false; GA.phase='shown'; refreshCoins();
 }
 function drawKatanaAt(c,img,cx,cy,kw){ const kh=kw*KIMG_H/KIMG_W; c.drawImage(img,cx-kw/2,cy-kh/2,kw,kh); }
@@ -1163,8 +1204,45 @@ function gLoop(){
     txt(c,'鞘に手をかける',cx,H*0.86,Math.max(11,H*0.055),UIF,'rgba(233,226,207,0.4)','center');
     return;
   }
+  // 玉鋼で鍛える: 槌を三度打ち、火の粉が散ってから抜刀へ
+  if(GA.phase==='forge'){
+    const e=now-GA.t0, HIT=[250,720,1180], END=1750;
+    HIT.forEach((t,i)=>{ if(e>=t&&!GA.cued['h'+i]){ GA.cued['h'+i]=1; sfx('clash'); if(i===2) sfx('drum'); } });
+    const heat=clamp(e/1300)*(1-clamp((e-1450)/300));
+    txt(c,'鍛',cx,cy,H*0.85,DISPLAY,'rgba(233,226,207,'+(0.05+0.06*heat)+')','center');
+    const gr=c.createRadialGradient(cx,cy,0,cx,cy,kw*0.5); gr.addColorStop(0,'rgba(255,120,40,'+(0.35*heat)+')'); gr.addColorStop(1,'rgba(255,80,20,0)'); c.fillStyle=gr; c.fillRect(0,0,W,H);
+    if(KREADY){ c.save(); c.globalAlpha=0.25+0.6*heat; c.shadowColor='rgba(255,110,30,1)'; c.shadowBlur=18*heat; drawKatanaAt(c,FORGEBAR(),cx,cy,kw); c.restore(); }
+    c.save(); c.globalCompositeOperation='lighter';
+    HIT.forEach((t,i)=>{ const d=e-t; if(d<0||d>700) return; const r=mulberry32(31+i), hx=cx+kw*(0.05*i-0.05);
+      if(d<240){ c.fillStyle='rgba(255,236,200,'+(0.5*(1-d/240))+')'; c.fillRect(0,0,W,H); }
+      for(let j=0;j<46;j++){ const an=-Math.PI*(0.1+0.8*r()), sp=(0.25+r()*0.75)*H*1.6, tt=d/1000, life=1-d/700;
+        const x=hx+Math.cos(an)*sp*tt*(r()<0.5?-1:1), y=cy+Math.sin(an)*sp*tt+H*1.4*tt*tt;
+        c.fillStyle='rgba(255,'+(150+(r()*90|0))+',60,'+life+')'; c.fillRect(x,y,1.6+r()*1.6,1.6+r()*1.6); } });
+    c.restore();
+    txt(c,'玉鋼を鍛える',cx,H*0.86,Math.max(11,H*0.055),UIF,'rgba(233,226,207,'+(0.5*clamp(e/400))+')','center');
+    if(e>=END){ GA.phase='draw'; GA.t0=now; GA.cued={}; }
+    return;
+  }
+  // 持っている刀: 素早く抜いて見せ、玉鋼に変える
+  if(GA.phase==='quick'){
+    const b=GA.batch[GA.idx], k=b.k, ord=TORD[k.tier], e=now-GA.t0, D=GA.qdur, sl=D*0.35;
+    if(e>=sl*0.8&&!GA.cued.q){ GA.cued.q=1; sfx('clack'); if(ord>=2) sfx('chime'); }
+    const u=ease(clamp(e/sl)), mouth=mouth0+u*(kw*0.76+40), out=e>=sl;
+    if(ord>=1){ const a=clamp((e-sl*0.6)/200); const gr=c.createRadialGradient(cx,cy,0,cx,cy,kw*(0.35+0.08*ord)); gr.addColorStop(0,tierRGBA(k.tier,(0.12+0.08*ord)*a,now)); gr.addColorStop(1,tierRGBA(k.tier,0,now)); c.fillStyle=gr; c.fillRect(0,0,W,H); }
+    if(KREADY){ c.save(); if(!out){ c.beginPath(); c.rect(0,0,mouth,H); c.clip(); }
+      if(ord>=1&&out){ c.shadowColor=tierRGBA(k.tier,0.8,now); c.shadowBlur=8+ord*6; }
+      drawKatanaAt(c,k.canvas,cx,cy,kw); c.restore(); }
+    if(!out||e<sl+150) drawSaya(mouth,1-clamp((e-sl)/150));
+    if(ord>=2&&e>sl&&e<sl+220){ c.fillStyle=tierRGBA(k.tier,0.25*(1-(e-sl)/220),now); c.fillRect(0,0,W,H); }
+    const ta=clamp((e-sl)/160);
+    txt(c,k.mei,cx,H*0.16,Math.max(14,H*0.085),DISPLAY,k.tier==='幻'?rainbow(ta,now):tierRGBA(k.tier,ta,now),'center');
+    txt(c,'所持　玉鋼 +'+b.steel,cx,H*0.86,Math.max(11,H*0.055),UIF,'rgba(232,195,90,'+(0.85*ta)+')','center');
+    drawStrip(c,W,H);
+    if(e>=D) nextItem();
+    return;
+  }
   const k=GA.kat, tp=TP[k.tier], e=now-GA.t0, ord=TORD[k.tier];
-  const cue=(n,ms,fn)=>{ if(e>=ms&&!GA.cued[n]){ GA.cued[n]=1; fn(); } };
+  const cue=(n,ms,fn)=>{ if(!GA.silent&&e>=ms&&!GA.cued[n]){ GA.cued[n]=1; fn(); } };
   cue('koi',0,()=>sfx('koi'));
   cue('slash',tp.d0,()=>sfx('slash'));
   if(ord>=1) cue('chime',tp.d0+200,()=>sfx('chime'));
@@ -1220,13 +1298,26 @@ function gLoop(){
   }
   // 名乗り
   if(revealed&&ord>=2){ const a=clamp((re-300)/500); txt(c,k.mei,cx,H*0.14,H*(ord===3?0.13:0.1),DISPLAY,k.tier==='幻'?rainbow(a,now):tierRGBA(k.tier,a,now),'center'); }
-  if(revealed&&GA.phase==='draw') showResult();
+  drawStrip(c,W,H);
+  if(revealed&&GA.phase==='draw') showItem();
 }
+// 何振り目か（10連などのとき、上に小さく並べる。新しい刀は明るく）
+function drawStrip(c,W,H){
+  const n=GA.batch.length; if(n<2||GA.phase==='shown') return;
+  const fs=Math.max(10,H*0.045);
+  txt(c,(GA.idx+1)+' / '+n,W-10,fs*0.9,fs,UIF,'rgba(233,226,207,0.55)','right');
+  if(n>60) return;
+  const sz=Math.max(3,Math.min(9,(W*0.7)/n-3)), gap=Math.min(4,sz*0.5), tw=n*sz+(n-1)*gap, x0=(W-tw)/2, y=fs*0.9-sz/2+fs*1.1;
+  for(let i=0;i<n;i++){ const b=GA.batch[i], x=x0+i*(sz+gap);
+    if(i<GA.idx||(i===GA.idx&&GA.phase!=='draw')){ c.globalAlpha=b.isNew?1:0.4; c.fillStyle=TIER[b.k.tier]; c.fillRect(x,y,sz,sz); c.globalAlpha=1; }
+    else { c.strokeStyle='rgba(233,226,207,'+(i===GA.idx?0.8:0.2)+')'; c.lineWidth=1; c.strokeRect(x+0.5,y+0.5,sz-1,sz-1); } }
+}
+let FBAR=null; function FORGEBAR(){ return FBAR||(FBAR=tintCanvas(KMAP.mumei.canvas,'#ff8a3a')); }
 const TINTC={}; function tintCanvasCached(k,t){ const key=k.id+t; return TINTC[key]||(TINTC[key]=tintCanvas(k.canvas,t==='幻'?'#f3e6ff':(TIERGLOW[t]+'1)'))); }
 function renderBook(){
   const grid=document.getElementById('g_grid'); grid.innerHTML='';
   const got=KATANA.filter(k=>ARM.owned[k.id]).length;
-  document.getElementById('g_count').textContent='集めた刀　'+got+' / '+KATANA.length;
+  document.getElementById('g_count').innerHTML='集めた刀　'+got+' / '+KATANA.length+'<small>玉鋼 <b>'+(WALLET.steel||0)+'</b>　まだ持っていない刀に触れると、玉鋼で鍛えられます</small>';
   KATANA.forEach(k=>{ const own=!!ARM.owned[k.id];
     const b=document.createElement('button'); b.type='button'; b.className='gcard t'+TORD[k.tier]+(own?'':' unk');
     const cvs=document.createElement('canvas'); cvs.width=420; cvs.height=Math.round(420*KIMG_H/KIMG_W)+8;
@@ -1234,16 +1325,18 @@ function renderBook(){
     const eq=[0,1].filter(i=>ARM.equip[i]===k.id).map(i=>'<i style="background:'+COL[i].main+'">'+COL[i].name+'</i>').join('');
     b.innerHTML='<span class="ct" style="background:'+TIER[k.tier]+'">'+k.tier+'</span><span class="cm">'+(own?k.mei:'？？？')+'</span><span class="ce">'+eq+'</span>';
     b.insertBefore(cvs,b.firstChild);
-    b.addEventListener('click',()=>{ if(own) openDetail(k); });
+    b.addEventListener('click',()=>openDetail(k));
     grid.appendChild(b); });
 }
 let DETAIL=null;
 function openDetail(k){
-  DETAIL=k; const d=document.getElementById('g_detail'); d.hidden=false; d.querySelector('.gdsheet').className='gdsheet t'+TORD[k.tier];
-  const cvs=document.getElementById('gd_img'); const x=cvs.getContext('2d'); x.clearRect(0,0,cvs.width,cvs.height); x.drawImage(k.canvas,0,0,cvs.width,cvs.width*KIMG_H/KIMG_W);
+  DETAIL=k; FORGEARM=0; const own=!!ARM.owned[k.id]; const d=document.getElementById('g_detail'); d.hidden=false; d.querySelector('.gdsheet').className='gdsheet t'+TORD[k.tier]+(own?'':' unk');
+  const cvs=document.getElementById('gd_img'); const x=cvs.getContext('2d'); x.clearRect(0,0,cvs.width,cvs.height); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,0,cvs.width,cvs.width*KIMG_H/KIMG_W);
   document.getElementById('gd_t').textContent=k.tier; document.getElementById('gd_t').style.background=TIER[k.tier];
-  document.getElementById('gd_m').textContent=k.mei; document.getElementById('gd_y').textContent=k.yomi+'　・　'+(ARM.owned[k.id]||0)+'振り所持';
-  document.getElementById('gd_l').textContent=k.lore;
+  document.getElementById('gd_m').textContent=k.mei; document.getElementById('gd_y').textContent=k.yomi+'　・　'+(own?(ARM.owned[k.id]||0)+'振り所持':'まだ持っていない');
+  document.getElementById('gd_l').textContent=own?k.lore:'まだ見ぬ一振り。姿は鍛えあがるまでわからない。';
+  document.getElementById('gd_own').hidden=!own; document.getElementById('gd_fg').hidden=own;
+  if(!own){ forgeLabel(); return; }
   const rec=ARM.rec[k.id]||{}; const names=Object.keys(rec).sort((a,b)=>rec[b]-rec[a]);
   document.getElementById('gd_rec').innerHTML=names.length?names.map(n=>'<li><span class="rt" style="color:'+TIER[FIN[n].tier]+'">'+FIN[n].tier+'</span>'+n+'<b>'+rec[n]+'</b></li>').join(''):'<li class="none">まだこの刀で勝っていません</li>';
   [0,1].forEach(i=>{ const btn=document.getElementById('gd_e'+i); const on=ARM.equip[i]===k.id; btn.textContent=on?COL[i].name+'が持っています':COL[i].name+'に持たせる'; btn.disabled=on; });
@@ -1251,10 +1344,31 @@ function openDetail(k){
 document.getElementById('gd_e0').addEventListener('click',()=>{ ARM.equip[0]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
 document.getElementById('gd_e1').addEventListener('click',()=>{ ARM.equip[1]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
 document.getElementById('gd_close').addEventListener('click',()=>{ document.getElementById('g_detail').hidden=true; });
+/* 玉鋼で鍛える（まだ持っていない刀だけ）。間違えて押さないよう、二度触れて鍛える */
+let FORGEARM=0;
+function forgeLabel(msg){ const k=DETAIL, cost=FORGE[k.tier], have=WALLET.steel||0, btn=document.getElementById('gd_forge');
+  btn.disabled=have<cost||FORGEARM===2;
+  btn.innerHTML=FORGEARM===2?'鍛えています…':FORGEARM===1?'もう一度触れて鍛える':'鍛える　<small>玉鋼 '+cost+'</small>';
+  btn.classList.toggle('arm',FORGEARM===1);
+  document.getElementById('gd_fn').textContent=msg||(have<cost?'玉鋼が足りません（所持 '+have+'・あと '+(cost-have)+'）。持っている刀がガチャで出ると玉鋼になります。':'所持 '+have+' → 鍛えると '+(have-cost)); }
+function doForge(){
+  const k=DETAIL; if(!k||ARM.owned[k.id]||gBusy()) return;
+  const cost=FORGE[k.tier]; if((WALLET.steel||0)<cost){ forgeLabel(); return; }
+  if(FORGEARM===0){ FORGEARM=1; forgeLabel(); setTimeout(()=>{ if(FORGEARM===1&&DETAIL===k){ FORGEARM=0; forgeLabel(); } },3000); return; }
+  if(FORGEARM!==1) return;
+  ensureAudio();
+  const go=()=>{ document.getElementById('g_detail').hidden=true; FORGEARM=0; setTab('pull'); startDraw([{k,isNew:true,steel:0}],0,true); };
+  if(ACCT){ FORGEARM=2; forgeLabel();
+    ACCT.forge(k.id).then(()=>{ if(DETAIL===k) go(); else FORGEARM=0; }, e=>{ FORGEARM=0; if(DETAIL===k) forgeLabel(e.message); });
+    return; }
+  WALLET.steel-=cost; ARM.owned[k.id]=1; saveWallet(); saveArm(); go();
+}
+document.getElementById('gd_forge').addEventListener('click',doForge);
+document.getElementById('g_skip').addEventListener('click',skipAhead);
 document.querySelectorAll('.gtabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 document.getElementById('g_pull1').addEventListener('click',()=>doPull(1));
 document.getElementById('g_all').addEventListener('click',()=>doPull(Infinity));
-document.getElementById('g_res').addEventListener('click',()=>{ document.getElementById('g_res').hidden=true; GA.phase='idle'; refreshCoins(); });
+document.getElementById('g_res').addEventListener('click',()=>{ if(GA.phase==='item'){ nextItem(); return; } document.getElementById('g_res').hidden=true; GA.phase='idle'; refreshCoins(); });
 window.addEventListener('resize',()=>{ if(!gachaEl.hidden) gSize(); });
 
 /* ---------- 調整パネル ---------- */

@@ -38,3 +38,27 @@ do $$ declare i int; begin
   begin perform public.record_win('疾風', 'mumei'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 速すぎる勝ちは断る: %', sqlerrm; end;
 end $$;
 reset role;
+
+-- 玉鋼: 持っている刀が出たら玉鋼になり、銭は戻らない
+select 'steel after 3000 pulls', steel, coins from public.saves where id = '22222222-2222-2222-2222-222222222222';
+do $$ declare s public.saves; begin
+  select * into s from public.saves where id = '22222222-2222-2222-2222-222222222222';
+  if s.steel <= 0 then raise exception 'NG 玉鋼が増えていない'; end if;
+  if s.coins <> 1000000 - 3000 * 10 then raise exception 'NG 重なりで銭が戻った: %', s.coins; end if;
+  raise notice 'OK 3000回で玉鋼 %（1回あたり %）、銭は戻らない', s.steel, round(s.steel / 3000.0, 2);
+end $$;
+-- 鍛える
+update public.saves set steel = 1600, owned = '{"mumei":1}' where id = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+select 'forge', public.forge_katana('geppaku') ->> 'steel', public.get_save() -> 'owned' ->> 'geppaku';
+do $$ begin perform public.forge_katana('geppaku'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 持っている刀は鍛えない: %', sqlerrm; end $$;
+do $$ begin perform public.forge_katana('nichirin'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 玉鋼が足りない: %', sqlerrm; end $$;
+do $$ begin perform public.forge_katana('fake'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 知らない刀は鍛えない: %', sqlerrm; end $$;
+do $$ begin perform public.forge_katana('mumei'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 無銘は鍛えない: %', sqlerrm; end $$;
+select 'forge2', public.forge_katana('yamabuki') ->> 'steel';
+do $$ begin update public.saves set steel = 999999; raise exception 'NG 直接書けた'; exception when insufficient_privilege then raise notice 'OK 玉鋼を直接は書けない'; end $$;
+-- 引っ越しで玉鋼も足す
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select 'import steel', public.import_local('{"steel":77}') ->> 'steel';
+reset role;

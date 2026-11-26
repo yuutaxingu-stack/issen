@@ -158,7 +158,7 @@ function takeC(p, inp){
   if (inp.C) { p.buf.A = C.buf; p.cb = { d: inp.C, n: C.buf }; }
 }
 /* 落花の間は速く動ける（1.5倍） */
-const spd = (p, v) => p.tree && p.tree.stage === 3 ? Math.trunc(v * 3 / 2) : v;
+const spd = (p, v) => p.tree && p.tree.stage >= 2 ? Math.trunc(v * 13 / 10) : v; // 満開・落花は動きが1.3倍
 const horiz = p => (p.inp.R ? 1 : 0) - (p.inp.L ? 1 : 0);
 /* 技の向き。スティックは強く倒した方（V）、キーボードなどは斜めなら横を優先（急降下しながらでも空前・空後が出る） */
 function hsign(p){ return p.cb ? (p.cb.d === 'r' ? 1 : p.cb.d === 'l' ? -1 : 0) : horiz(p); }
@@ -450,7 +450,7 @@ Sim.prototype.spawnPetals = function(p){
   const b = p.boost, x = p.x + p.face * SHOT.ox * FP, y = p.y + SHOT.oy * FP;
   this.pjN = (this.pjN || 0) + 1;
   // 置き技（2026-11-26）: 弾の速さは前の slow 倍。大きさと威力の増え方は前と同じ速さ（前の速さで飛んだとした距離で決める）
-    const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: Math.trunc(p.face * sp * PETAL.slow), vy: Math.trunc(vy * PETAL.slow), eq: sp, life: PETAL.life, w, h: w, w0: w, x0: x, dm: 100, mv, gid, petal: 1, hana: 1 });
+    const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: Math.trunc(p.face * sp * PETAL.slow), vy: Math.trunc(vy * PETAL.slow), eq: sp, life: PETAL.life, w, h: w, w0: w, x0: x, dm: 100, mv, gid, petal: 1, hana: 1, b2: b === 2 ? 1 : 0 });
   if (b === 3) { const V = [-960, -640, -320, 0, 320, 640, 960]; V.forEach((v, k) => add(0, v, 1150, 86, 'petalS', this.pjN * 8 + k)); } // 落花: 散る角度は最初の3倍、七枚
   else if (b === 2) { for (const dy of [-60, 0, 60]) add(dy, 0, 1300, 108, 'petal', this.pjN * 8); }
   else add(0, 0, b === 1 ? 1350 : 800, PETAL.w, 'petal', this.pjN * 8);
@@ -463,15 +463,24 @@ Sim.prototype.fallBurst = function(p){
   for (const d of [1, -1]) for (const sp of [650, 950, 1250]) this.pj.push({ o: p.i, x: p.x, y: p.y + 34 * FP, vx: d * sp, vy: 0, life: 32, w: 90, h: 70, mv: 'petalG', gid: this.pjN * 8 + (k++), petal: 1, ground: 1 });
   this.ev.push({ t: 'fallBurst', p: p.i, x: p.x, y: p.y });
 };
-/* 植樹: 木が無ければ足元に植えて開花。あれば 満開→落花→撤去 と進める */
+/* 植樹: 木が無ければ足元に植えて開花。あれば抜く（撤去）。
+   木は相手に攻撃を当てるほど育つ（2026-11-26）: 7回当てるごとに 開花→満開→落花。満開の間は、強化した天桜・花嵐を2回当てると一気に落花 */
+const GROW = { per: 7, big: 2 };
 Sim.prototype.plant = function(p){
   const t = p.tree;
-  if (!t) {
-    let gy = 0; if (p.ground) gy = p.y; else for (const pl of PLATS) if (p.x >= pl.x0 && p.x <= pl.x1 && p.y >= pl.y && pl.y > gy) gy = pl.y;
-    p.tree = { x: p.x, y: gy, hp: TREE.hp, stage: 1, u1: false, u2: false };
-  } else if (t.stage < 3) { t.stage++; t.u1 = t.u2 = false; }
-  else { p.tree = null; this.ev.push({ t: 'treeGone', p: p.i, x: t.x, y: t.y }); return; }
-  this.ev.push({ t: 'bloom', p: p.i, stage: p.tree.stage, x: p.tree.x, y: p.tree.y });
+  if (t) { p.tree = null; this.ev.push({ t: 'treeGone', p: p.i, x: t.x, y: t.y }); return; }
+  let gy = 0; if (p.ground) gy = p.y; else for (const pl of PLATS) if (p.x >= pl.x0 && p.x <= pl.x1 && p.y >= pl.y && pl.y > gy) gy = pl.y;
+  p.tree = { x: p.x, y: gy, hp: TREE.hp, stage: 1, u1: false, u2: false, n: 0, big: 0 };
+  this.ev.push({ t: 'bloom', p: p.i, stage: 1, x: p.tree.x, y: p.tree.y });
+};
+Sim.prototype.grow = function(a, m, pj){
+  const t = a.tree; if (!t || t.stage >= 3) return;
+  if (t.stage === 2 && (m.id === 'tenM' || (pj && pj.b2)) && ++t.big >= GROW.big) return this.stageUp(a);
+  if (++t.n >= GROW.per) this.stageUp(a);
+};
+Sim.prototype.stageUp = function(p){
+  const t = p.tree; t.stage++; t.n = 0; t.big = 0; t.u1 = t.u2 = false;
+  this.ev.push({ t: 'bloom', p: p.i, stage: t.stage, x: t.x, y: t.y });
 };
 function treeBox(t){ const b = TREE.box[t.stage]; return [t.x + b[0] * FP, t.y + b[1] * FP, t.x + (b[0] + b[2]) * FP, t.y + (b[1] + b[3]) * FP]; }
 /* 相手の木を斬る（技ごとに一回） */
@@ -537,7 +546,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   const pw = a.power || 0;
   let dmgBase = Array.isArray(m.dmg) ? m.dmg[0] + Math.floor((m.dmg[1] - m.dmg[0]) * pw / 100) : m.dmg;
   if (pj && pj.dm) dmgBase = Math.floor(dmgBase * pj.dm / 100); // 花嵐: 遠くまで飛ぶほど重い
-  if (a.tree && a.tree.stage === 2) dmgBase = Math.floor(dmgBase * 14 / 10); // 満開: 花びらを纏って威力1.4倍
+  if (a.tree && a.tree.stage === 3) dmgBase = Math.floor(dmgBase * 14 / 10); // 落花: 与えるダメージ1.4倍
   const gdBase = Array.isArray(m.gd) ? m.gd[0] + Math.floor((m.gd[1] - m.gd[0]) * pw / 100) : m.gd;
   const guarding = (s.dst === 'guard' || s.dst === 'bstun' || s.dst === 'unguard') && s.dground;
   const hx = pj ? pj.x : Math.trunc((a.x + d.x) / 2), hy = d.y + 60 * FP;
@@ -583,6 +592,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   d.hp = Math.max(0, d.hp - dmg); d.touched = true;
   if (m.grab) { d.gd = Math.max(1, d.gd - gdBase); }
   a.comboDmg += dmg;
+  this.grow(a, m, pj);
   const kbs = 100 + Math.floor((HP_MAX - d.hp) / 200);
   if (s.dst === 'stun') {
     d.vx = dir * Math.floor(m.kb[0] * kbs / 200);
@@ -692,11 +702,11 @@ Sim.prototype.hash = function(){
   let h = 2166136261 >>> 0;
   const mix = v => { h ^= (v | 0); h = Math.imul(h, 16777619) >>> 0; };
   mix(this.frame); mix(this.hitstop); for (const q of this.pj) { mix(q.x); mix(q.y); mix(q.life); }
-  for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
+  for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); mix(p.tree.n); mix(p.tree.big); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
   return h;
 };
 
-const API = { curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
+const API = { GROW, curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 else root.IssenAction = API;
 })(typeof window !== 'undefined' ? window : globalThis);

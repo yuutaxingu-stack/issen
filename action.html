@@ -116,7 +116,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
     <tr><td>技（U / V）</td><td>刀の技。向きなし・横＝特殊技1　上＝特殊技2　下＝特殊技3（共通の刀は 飛ぶ斬撃・昇り斬り・カウンター）。昇り斬りの後は着地まで何もできない</td></tr>
     <tr><td>跳（K / X / Space）</td><td>軽く＝小跳び　長め＝大跳び　空中でもう一回　端の竹で壁蹴り</td></tr>
     <tr><td>守（L / C）</td><td>押している間シールドを張る（耐久が減るほど小さくなる）　守りながら下＝その場回避　守りながら前・後＝前方・後方回避　守りながら斬＝組み打ち　空中で守＝空中回避（向きを入れると方向回避）　叩きつけられる直前＝受け身</td></tr>
-    <tr><td>刀「桜華」</td><td>下＋技＝植樹。押すたび 開花→満開→落花→撤去。開花: 花嵐が速く・天桜が高く。満開: 花嵐が三枚、天桜のまわりに花びら、全部の技の威力1.4倍。落花: 花嵐が五枚に散る、天桜のあと降下攻撃、動きが1.5倍。強化は段階ごとに一度（上の◆が残り）。木は相手に斬られると折れる</td></tr>
+    <tr><td>刀「桜華」</td><td>下＋技＝植樹（木があるときは撤去）。木は相手に攻撃を7回当てるごとに 開花→満開→落花 と育つ（上の●）。満開の間は、強化した花嵐・天桜を2回当てると一気に落花（◆）。開花: 花嵐が速く・天桜が高く。満開: 花嵐が三枚、天桜のまわりに花びら、動きが1.3倍。落花: 花嵐が七枚に散る、天桜のあと降下攻撃、与えるダメージ1.4倍・動きが1.3倍。花嵐・天桜の強化は段階ごとに一度（花嵐◆・天桜◆が残り）。木は相手に斬られると折れる</td></tr>
     <tr><td>居</td><td>相手が気絶すると守が居に変わる。当たれば一本</td></tr>
   </table>
   <p>ボタンの置き場所と大きさは「ボタン配置」で変えられます。キーボードで二人対戦: 朱は WASD・J斬 U技 K跳 L守、藍は 矢印・テンキー1斬 4技 2跳 3守。</p>
@@ -128,14 +128,14 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <div class="acts"><button type="button" id="nv_back" hidden>一閃へ戻る</button></div>
 </div></div>
 <div id="rot">横向きにしてください</div>
-<script src="js/action/pose.js?v=1795705566"></script>
-<script src="js/action/boxes.js?v=1795705566"></script>
-<script src="js/action/sim.js?v=1795705566"></script>
-<script src="js/action/netplay.js?v=1795705566"></script>
-<script src="js/action/app.js?v=1795705566"></script>
+<script src="js/action/pose.js?v=1795706099"></script>
+<script src="js/action/boxes.js?v=1795706099"></script>
+<script src="js/action/sim.js?v=1795706099"></script>
+<script src="js/action/netplay.js?v=1795706099"></script>
+<script src="js/action/app.js?v=1795706099"></script>
 <script src="js/online-config.js"></script>
-<script src="js/net.js?v=1795705566"></script>
-<script src="js/action/online.js?v=1795705566"></script>
+<script src="js/net.js?v=1795706099"></script>
+<script src="js/action/online.js?v=1795706099"></script>
 <script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>
 </body>
 </html>

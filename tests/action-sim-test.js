@@ -88,7 +88,7 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); let maxX = 0; for (let k = 0; k < 900; k++) { run(s, 1); for (const q of s.pj) maxX = Math.max(maxX, q.x / A.FP); }
   ok(maxX > 1500 && s.pj.length === 0, '花嵐は壁に当たるまで飛ぶ (' + Math.round(maxX) + ')');
 }
-// 桜華: 下Bで 植樹(開花)→満開→落花→撤去、強化は段階ごとに一度
+// 桜華: 下Bで植樹(開花)・もう一度で撤去、段階は当てて育てる、強化は段階ごとに一度
 { const ou = d => { const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
   const down = s => { run(s, 1, () => I({ D: 1, A: 1, V: 'd' })); run(s, 40); };
   const s = ou(900); // 花嵐が遅いので、相手は遠くに置く（当たって止まると次の入力の向きが変わる）
@@ -96,17 +96,17 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   const tx = s.p[0].tree.x; run(s, 20, () => I({ R: 1 })); ok(s.p[0].tree.x === tx, '木は動かない');
   run(s, 1, () => I({ R: 1, A: 1, V: "h" })); run(s, 25); ok(s.pj.length === 1 && Math.abs(s.pj[0].vx) === 540, '開花の花嵐は普通より速い');
   run(s, 50); s.pj = []; run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 25); ok(s.pj.length === 1 && Math.abs(s.pj[0].vx) === 320, '強化は一度だけ、二度目は普通');
-  run(s, 60); s.pj = []; down(s); ok(s.p[0].tree.stage === 2, '満開');
+  run(s, 60); s.pj = []; s.stageUp(s.p[0]); ok(s.p[0].tree.stage === 2, '満開');
   s.pj = []; run(s, 1, () => I({ R: 1, A: 1, V: "h" })); run(s, 25); ok(s.pj.length === 3, '満開の花嵐は三枚'); run(s, 60);
-  s.pj = []; down(s); ok(s.p[0].tree.stage === 3, '落花');
+  s.pj = []; s.stageUp(s.p[0]); ok(s.p[0].tree.stage === 3, '落花');
   s.pj = []; run(s, 1, () => I({ R: 1, A: 1, V: "h" })); run(s, 25); ok(s.pj.length === 7 && Math.max(...s.pj.map(q => q.vy)) === 384, '落花の花嵐は七枚・散る範囲3倍'); run(s, 60); s.pj = [];
-  { const x0 = s.p[0].x; run(s, 10, () => I({ L: 1 })); ok(x0 - s.p[0].x === 10 * Math.trunc(A.PH.walk * 3 / 2), '落花は歩きが1.5倍'); }
+  { const x0 = s.p[0].x; run(s, 10, () => I({ L: 1 })); ok(x0 - s.p[0].x === 10 * Math.trunc(A.PH.walk * 13 / 10), '落花は歩きが1.3倍'); }
   run(s, 1, () => I({ U: 1, A: 1, V: 'u' })); ok(s.p[0].mv === 'tenR', '落花の天桜'); let fell = false; for (let k = 0; k < 120; k++) { run(s, 1); if (s.p[0].mv === 'tenFall') fell = true; } ok(fell, '天桜のあと降下攻撃');
-  run(s, 40); down(s); ok(!s.p[0].tree, '四回目で撤去'); down(s); ok(s.p[0].tree && s.p[0].tree.stage === 1, '撤去のあとはまた植えられる'); }
-// 桜華: 満開は威力1.4倍、木は相手に斬られて折れる（耐久4000）
+  run(s, 40); down(s); ok(!s.p[0].tree, '木があるときの植樹で撤去'); down(s); ok(s.p[0].tree && s.p[0].tree.stage === 1, '撤去のあとはまた植えられる'); }
+// 桜華: 落花は威力1.4倍、木は相手に斬られて折れる（耐久4000）
 { const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 660 * A.FP;
-  s.p[0].tree = { x: 200 * A.FP, y: 0, hp: 4000, stage: 2, u1: true, u2: true };
-  run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.p[1].hp === 10000 - Math.floor(300 * 14 / 10), '満開で弱斬り 300→420 (' + (10000 - s.p[1].hp) + ')');
+  s.p[0].tree = { x: 200 * A.FP, y: 0, hp: 4000, stage: 3, u1: true, u2: true, n: 0, big: 0 };
+  run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.p[1].hp === 10000 - Math.floor(300 * 14 / 10), '落花で弱斬り 300→420 (' + (10000 - s.p[1].hp) + ')');
   const t = new A.Sim({ training: true, kits: ['ouka', 'common'] }); t.p[0].x = 300 * A.FP; t.p[1].x = 660 * A.FP; t.p[1].face = -1;
   t.p[0].tree = { x: 610 * A.FP, y: 0, hp: 4000, stage: 1, u1: false, u2: false };
   let n = 0; for (let k = 0; k < 400 && t.p[0].tree; k++) { t.step([I(), I({ A: (k % 20) === 0 })]); }
@@ -120,4 +120,16 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 // 桜華で勝つと 並・上 の決着名は「散華」になる
 { const s = new A.Sim({ kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 660 * A.FP; s.p[1].hp = 100; s.p[0].touched = true;
   run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.result && s.result.name === '散華', '桜華の決着は散華 (' + (s.result && s.result.name) + ')'); }
+// 木は当てて育つ: 7回で一段、満開は強化した天桜・花嵐を2回で一気に落花。満開は動き1.3倍・威力そのまま、落花は威力1.4倍
+{ const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 700 * A.FP;
+  s.plant(s.p[0]); const t = s.p[0].tree, d = s.p[1], a = s.p[0], snap = () => ({ a: 0, dst: 'idle', dground: true });
+  for (let k = 0; k < 6; k++) s.applyHit(a, d, A.MV.jab1, snap()); ok(t.stage === 1 && t.n === 6, '6回ではまだ開花');
+  s.applyHit(a, d, A.MV.jab1, snap()); ok(t.stage === 2 && t.n === 0, '7回目で満開');
+  d.hp = A.HP_MAX; a.combo = 0; s.applyHit(a, d, A.MV.jab1, snap()); ok(A.HP_MAX - d.hp === A.MV.jab1.dmg, '満開は威力そのまま (' + (A.HP_MAX - d.hp) + ')');
+  s.applyHit(a, d, A.MV.tenM, snap()); ok(t.stage === 2 && t.big === 1, '強化した天桜1回目');
+  s.applyHit(a, d, A.MV.petal, snap(), { vx: 100, b2: 1, dm: 100 }); ok(t.stage === 3, '強化した花嵐2回目で一気に落花');
+  d.hp = A.HP_MAX; a.combo = 0; s.applyHit(a, d, A.MV.jab1, snap()); ok(A.HP_MAX - d.hp === Math.floor(A.MV.jab1.dmg * 14 / 10), '落花は威力1.4倍 (' + (A.HP_MAX - d.hp) + ')');
+  const g = new A.Sim({ training: true, kits: ['ouka', 'common'] }); g.plant(g.p[0]); g.p[0].tree.stage = 2; const x0 = g.p[0].x; for (let k = 0; k < 10; k++) g.step([I({ R: 1 }), I()]);
+  ok(g.p[0].x - x0 === 10 * Math.trunc(A.PH.walk * 13 / 10), '満開は歩きが1.3倍'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

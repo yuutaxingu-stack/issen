@@ -759,7 +759,7 @@ function drawSakuraWorld(fr){
 const STORM = []; for (let k = 0; k < 420; k++) STORM.push({ x: Math.random(), y: Math.random(), s: 0.6 + Math.random() * 1.2, r: Math.random() * 6, v: Math.random() });
 function drawStorm(fr){
   const k = WORLD.k, b = WORLD.b, f = WORLD.f; if (k < 0.01 && WORLD.m < 0.01) return;
-  const m = WORLD.m, n = Math.floor(30 * k + 150 * m + 240 * f), wind = 0.0006 + f * 0.006 + Math.max(0, Math.sin(fr * 0.02)) * f * 0.006, fall = 0.0012 + f * 0.003;
+  const m = WORLD.m, n = Math.floor(30 * k + 260 * m + 130 * f), wind = 0.0006 + f * 0.006 + Math.max(0, Math.sin(fr * 0.02)) * f * 0.006, fall = 0.0012 + f * 0.003;
   const mv = CUR === VIEWS[0]; // 二画面のときも動かすのは一回だけ
   for (let i = 0; i < n; i++) { const q = STORM[i];
     if (mv) q.x += (wind + 0.0004 * Math.sin(fr * 0.03 + i)) * q.s * (MIR < 0 ? 1 : 1); if (mv) { q.y += fall * q.s + Math.sin(fr * 0.05 + i) * 0.0006; q.r += 0.05 * q.s; }
@@ -867,7 +867,7 @@ function drawHud(){
     bar(x, top + 20, bw, 12, p.hp / A.HP_MAX, red ? '#f2e6d8' : INK, right);
     bar(x, top + 36, bw * 0.8 + 0, 5, p.gd / A.GD_MAX, p.gd <= 2000 ? COL[0].main : '#3d5a6c', right);
     cx.font = `500 11px ${UIF}`; cx.fillStyle = red ? '#f2e6d8' : '#3b3d33';
-    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : ''), right ? W - m : m, top + 56);
+    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : ''), right ? W - m : m, top + 56);
   }
   const left = sim.sd ? Math.max(0, Math.ceil((A.C.sdF - (sim.frame - sim.sdStart)) / 60)) : Math.max(0, Math.ceil((A.C.roundF - sim.frame) / 60));
   cx.textAlign = 'center'; cx.font = `30px ${DISPLAY}`; cx.fillStyle = red ? '#ffe2d4' : INK;

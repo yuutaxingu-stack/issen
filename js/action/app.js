@@ -215,12 +215,13 @@ function pose(p, fr){
   if (st === 'crouch' || st === 'jsq' || st === 'land') { P.hip = 38; P.fA = [-20, 0]; P.fB = [22, 0]; P.lean = 18; P.sw = 10; }
   if (st === 'guard' || st === 'bstun') { P.lean = -6; P.sw = 92; P.arm = 10; P.hip = 52; P.fA = [-22, 0]; P.fB = [14, 0]; }
   if (st === 'unguard') { P.sw = 60; P.arm = 0; }
-  if (st === 'air' || st === 'adodge') { P.fA = [-12, 22]; P.fB = [16, 16]; P.sw = 35; P.lean = 4; if (st === 'adodge') P.alpha = 0.45; }
+  if (st === 'air' || st === 'adodge' || st === 'fall') { P.fA = [-12, 22]; P.fB = [16, 16]; P.sw = 35; P.lean = 4; if (st === 'adodge') P.alpha = A.invuln(p) ? 0.4 : 0.85; if (st === 'fall') { P.sw = -60; P.arm = -60; P.lean = -8; P.alpha = 0.8; } }
   if (st === 'hit') { P.lean = -22; P.sw = 50; P.arm = 30; }
   if (st === 'tumble') { P.rot = -fr * 18 * (p.face); P.fA = [-14, 18]; P.fB = [18, 8]; P.sw = 140; P.arm = 60; }
   if (st === 'stun') { const sway = Math.sin(fr * 0.15) * 6; P.lean = 26 + sway; P.head = 25; P.sw = -95; P.arm = -80; P.hip = 50; P.fA = [-12, 0]; P.fB = [12, 0]; }
   if (st === 'down' || st === 'ko') { P.rot = 90 * 1; P.hip = 14; P.sw = -170; P.fA = [-30, 0]; P.fB = [-26, 2]; P.lean = 0; }
-  if (st === 'roll' || (st === 'getup' && p.gk === 'roll')) { P.rot = -(p.f * 14) * (p.rollDir * p.face); P.hip = 34; P.fA = [-8, 14]; P.fB = [10, 14]; P.sw = 10; P.alpha = (A.invuln(p)) ? 0.6 : 1; }
+  if (st === 'roll' && p.rk === 'spot') { P.hip = 46; P.lean = -14; P.sw = 70; P.arm = 20; P.alpha = A.invuln(p) ? 0.4 : 1; }
+  else if (st === 'roll' || (st === 'getup' && p.gk === 'roll')) { P.rot = -(p.f * 14) * (p.rollDir * p.face); P.hip = 34; P.fA = [-8, 14]; P.fB = [10, 14]; P.sw = 10; P.alpha = (A.invuln(p)) ? 0.6 : 1; }
   if (st === 'tech' || (st === 'getup' && p.gk !== 'roll')) { P.hip = 40; P.lean = 20; P.alpha = A.invuln(p) ? 0.6 : 1; }
   if (st === 'charge') { P.sw = 160 + Math.sin(fr * 1.3) * 3; P.arm = 120; P.lean = -10; P.hip = 48; P.fA = [-24, 0]; P.fB = [20, 0]; }
   if (st === 'atk') {
@@ -233,7 +234,9 @@ function pose(p, fr){
     P.arm = P.sw - 55;
     if (m.k === 'a') { P.fA = [-12, 20]; P.fB = [16, 14]; }
     if (p.mv === 'dtilt') { P.hip = 34; P.fA = [-22, 0]; P.fB = [30, 0]; }
-    if (p.mv === 'side' || m.iai) { P.fA = [-34, 0]; P.fB = [30, 0]; P.hip = 44; P.lean = 28; }
+    if (p.mv === 'rise') { P.fA = [-8, 6]; P.fB = [10, 16]; P.lean = -6; }
+    if (p.mv === 'plunge') { P.fA = [-10, 18]; P.fB = [12, 22]; P.lean = 10; P.arm = -95; }
+    if (p.mv === 'side' || p.mv === 'sideA' || m.iai) { P.fA = [-34, 0]; P.fB = [30, 0]; P.hip = 44; P.lean = 28; }
     if (p.mv === 'gatk') { P.rot = 0; P.hip = 40; }
     if (m.grab) { P.arm = 0; P.sw = -40; P.lean = 22; }
   }
@@ -409,6 +412,7 @@ function drawFrames(){
   const p = sim.p[0], x = Math.max(16, W * 0.03), y0 = 92;
   const lines = [];
   if (p.st === 'atk') { const m = MV[p.mv]; lines.push([`${m.n}　${p.mvf}F目`, INK]); lines.push([`発生 ${m.s}F　持続 ${m.a}F　硬直 ${m.r}F　全体 ${m.total}F${m.land ? '　着地 ' + m.land + 'F' : ''}`, '#3b3d33']); }
+  else if (p.st === 'roll' || p.st === 'adodge') { const d = A.DG[p.st === 'roll' ? p.rk : p.ak]; lines.push([`${d.n}　${p.f}F目`, INK]); lines.push([`無敵 ${d.i0}〜${d.i1}F　全体 ${d.total}F${d.land ? '　着地 ' + d.land + 'F' : ''}`, '#3b3d33']); }
   else if (p.st === 'charge') lines.push([`溜め斬り　溜め ${p.chargeF}F（${A.SMASH_MIN}〜${A.SMASH_MAX}）`, INK]);
   else lines.push([`状態: ${STN[p.st] || p.st}`, '#3b3d33']);
   const L = FX.last;
@@ -427,7 +431,7 @@ function drawFrames(){
   cx.textAlign = 'right'; cx.font = `500 12px ${UIF}`;
   FX.hist.slice(0, 12).forEach((h, k) => { cx.fillStyle = `rgba(20,21,18,${0.85 - k * 0.06})`; cx.fillText(`${h.s}　${h.n > 99 ? '99+' : h.n}`, hx, hy + k * 15); });
 }
-const STN = { idle: '待ち', walk: '歩き', dash: 'ダッシュ', crouch: 'しゃがみ', jsq: '踏み切り', air: '空中', land: '着地', guard: 'ガード', unguard: 'ガードを解く', bstun: 'ガード硬直', roll: '転がり', hit: 'のけぞり', tumble: '吹き飛び', down: 'ダウン', getup: '起き上がり', stun: '気絶', adodge: '空中回避', tech: '受け身', ko: '一本' };
+const STN = { fall: '無防備落下', idle: '待ち', walk: '歩き', dash: 'ダッシュ', crouch: 'しゃがみ', jsq: '踏み切り', air: '空中', land: '着地', guard: 'ガード', unguard: 'ガードを解く', bstun: 'ガード硬直', roll: '転がり', hit: 'のけぞり', tumble: '吹き飛び', down: 'ダウン', getup: '起き上がり', stun: '気絶', adodge: '空中回避', tech: '受け身', ko: '一本' };
 function drawPad(){
   const stunO = sim.p[1].st === 'stun';
   if (pad.stick) {

@@ -32,10 +32,15 @@ const C = {
    dmg, gd は 1/100 単位。hit=ヒット時の有利F（決めると hs を計算）、blk=ガード時の有利F
    box=[前へのずれ, 足元からの高さ, 幅, 高さ](px)  kb=[横, 縦] 吹き飛ばし(1/100px/F) */
 const MV = {
-  jab1:  { n:'弱斬り（一段目）', k:'g', s:5, a:3, r:10, dmg:300, gd:600, hit:6, blk:-2, kb:[220,0], box:[6,52,80,44], arc:[-70,20], chain:'jab2' },
-  jab2:  { n:'弱斬り（二段目）', k:'g', s:5, a:3, r:12, dmg:300, gd:600, hit:5, blk:-3, kb:[220,0], box:[6,52,80,44], arc:[40,-45], chain:'jab3' },
-  jab3:  { n:'弱斬り（三段目・払い）', k:'g', s:7, a:4, r:20, dmg:500, gd:1000, hs:30, blk:-10, kb:[750,850], kd:1, box:[6,36,96,62], arc:[-100,55] },
+  jab1:  { n:'弱斬り（一段目）', k:'g', s:5, a:3, r:10, dmg:300, gd:600, hit:6, blk:-2, kb:[220,0], box:[6,58,60,34], arc:[-70,20], chain:'jab2' },
+  jab2:  { n:'弱斬り（二段目）', k:'g', s:5, a:3, r:12, dmg:300, gd:600, hit:5, blk:-3, kb:[220,0], box:[6,58,60,34], arc:[40,-45], chain:'jab3' },
+  jab3:  { n:'弱斬り（三段目・払い）', k:'g', s:7, a:4, r:20, dmg:500, gd:1000, hs:30, blk:-10, kb:[750,850], kd:1, box:[6,42,74,50], arc:[-100,55] },
   side:  { n:'踏み込み斬り', k:'g', s:14, a:4, r:22, dmg:700, gd:1800, hs:28, blk:-8, kb:[950,560], box:[8,38,100,64], arc:[150,-35], lunge:[2,14,900] },
+  ftilt: { n:'横斬り', k:'g', s:8, a:3, r:18, dmg:600, gd:900, hs:22, blk:-6, kb:[620,240], box:[8,40,86,52], arc:[60,-30] },
+  sideA: { n:'踏み込み斬り（空中）', k:'a', s:12, a:4, r:18, land:14, dmg:600, gd:1500, hs:24, kb:[850,500], box:[8,30,100,70], arc:[150,-35], lunge:[2,12,850], hover:1 },
+  rise:  { n:'昇り斬り', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], box:[-24,40,76,120], arc:[-60,95], rise:1, after:'fall' },
+  sweep: { n:'足払い', k:'g', s:12, a:5, r:24, dmg:600, gd:1200, hs:30, blk:-12, kb:[420,650], kd:1, box:[4,0,112,26], arc:[-20,-5], crouch:1 },
+  plunge:{ n:'落とし', k:'a', s:8, a:90, r:1, land:22, dmg:800, gd:1400, hs:28, kb:[350,800], kd:1, box:[-26,-30,52,84], arc:[-90,-90], plunge:1 },
   utilt: { n:'上斬り', k:'g', s:7, a:5, r:16, dmg:500, gd:800, hs:34, blk:-6, kb:[90,1500], box:[-14,72,84,92], arc:[-40,125] },
   dtilt: { n:'下斬り', k:'g', s:6, a:3, r:14, dmg:400, gd:700, hit:3, blk:-4, kb:[260,0], box:[6,0,92,34], arc:[-25,-5], crouch:1 },
   smash: { n:'溜め斬り', k:'g', s:10, a:4, r:26, dmg:[1000,1600], gd:[2500,4000], hs:32, blk:-12, kb:[1150,720], box:[8,28,112,82], arc:[165,-40] },
@@ -44,9 +49,9 @@ const MV = {
   gatk:  { n:'起き上がり斬り', k:'g', s:18, a:4, r:8, dmg:500, gd:800, hs:24, blk:-4, kb:[650,300], box:[-72,0,144,60], arc:[-170,170], inv:[1,12] },
   nair:  { n:'空中斬', k:'a', s:5, a:6, r:14, land:8, dmg:400, gd:600, hs:18, kb:[320,320], box:[-44,26,104,84], arc:[-150,150] },
   fair:  { n:'前空斬', k:'a', s:8, a:4, r:18, land:12, dmg:600, gd:900, hs:22, kb:[720,360], box:[8,28,98,72], arc:[120,-60] },
-  bair:  { n:'後空斬', k:'a', s:5, a:3, r:16, land:11, dmg:900, gd:1100, hs:24, kb:[860,430], box:[-104,36,92,62], arc:[200,280] },
+  bair:  { n:'後空斬', k:'a', s:5, a:3, r:16, land:11, dmg:900, gd:1100, hs:24, kb:[860,430], box:[-118,22,114,88], arc:[200,280] },
   uair:  { n:'上空斬', k:'a', s:8, a:5, r:14, land:10, dmg:500, gd:700, hs:24, kb:[100,1150], box:[-44,92,88,74], arc:[-10,190] },
-  dair:  { n:'下空斬（突き）', k:'a', s:16, a:2, r:20, land:18, dmg:800, gd:1200, hs:34, kb:[60,0], flinch:1, box:[-7,-40,14,62], arc:[-90,-90] },
+  dair:  { n:'下空斬（突き）', k:'a', s:16, a:2, r:20, land:18, dmg:800, gd:1200, hs:34, kb:[60,0], flinch:1, box:[-13,-54,26,86], arc:[-90,-90] },
   airiai:{ n:'空中居合', k:'a', s:10, a:4, r:30, land:20, dmg:1000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,10,132,100], iai:1, arc:[-165,10], lunge:[2,10,3000] },
 };
 for (const id in MV) {
@@ -57,6 +62,16 @@ for (const id in MV) {
   else m.bs = Math.max(1, m.a - 1 + m.r - 8);
 }
 const SMASH_MIN = 12, SMASH_MAX = 40;
+/* 斬ボタン＋向きで出る特殊技。刀ごとに入れ替える（今は共通の一組だけ） */
+const KIT = { common: { n: '共通', s1: 'side', s1a: 'sideA', s2: 'rise', s2a: 'rise', s3: 'sweep', s3a: 'plunge' } };
+/* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
+const DG = {
+  spot: { n: 'その場回避', i0: 3, i1: 17, total: 25 },
+  fwd:  { n: '前方回避', i0: 4, i1: 15, total: 29, mv: [4, 22], v: 650 },
+  back: { n: '後方回避', i0: 5, i1: 16, total: 34, mv: [5, 26], v: 560 },
+  airN: { n: '空中回避', i0: 3, i1: 28, total: 44, land: 10 },
+  airD: { n: '空中回避（方向）', i0: 3, i1: 22, total: 60, land: 15, mv: [3, 14], v: 1500 },
+};
 
 /* 決着名 */
 const FIN = {
@@ -76,7 +91,7 @@ function newPlayer(i){
     hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
-    stunCount: 0, gdLow: false, touched: false, wallF: 0 };
+    stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
 }
 
 function Sim(opts){
@@ -133,8 +148,8 @@ function hurt(p){
 }
 function invuln(p){
   if (p.st === 'down' || p.st === 'ko') return true;
-  if (p.st === 'roll') return p.f >= 4 && p.f <= 15;
-  if (p.st === 'adodge') return p.f >= 3 && p.f <= 14;
+  if (p.st === 'roll') { const d = DG[p.rk]; return p.f >= d.i0 && p.f <= d.i1; }
+  if (p.st === 'adodge') { const d = DG[p.ak]; return p.f >= d.i0 && p.f <= d.i1; }
   if (p.st === 'tech') return p.f <= 14;
   if (p.st === 'getup') return p.f <= (p.gk === 'roll' ? 16 : 20);
   if (p.st === 'atk' && MV[p.mv].inv) { const v = MV[p.mv].inv; return p.mvf >= v[0] && p.mvf <= v[1]; }
@@ -147,6 +162,41 @@ Sim.prototype.startMove = function(p, id){
   this.ev.push({ t: 'start', p: p.i, mv: id });
 };
 
+/* 地上: 攻撃スティックは通常技、斬ボタンは 向きなし＝三段 / 横・上・下＝特殊技 */
+Sim.prototype.groundAttack = function(p){
+  const kit = KIT[p.kit] || KIT.common;
+  if (p.cb) {
+    const d = adir(p);
+    if (d === 'h') { p.face = hsign(p); return this.startMove(p, 'ftilt'); }
+    if (d === 'u') return this.startMove(p, 'utilt');
+    if (d === 'd') return this.startMove(p, 'dtilt');
+    return this.startMove(p, 'jab1');
+  }
+  const d = adir(p);
+  if (d === 'h') { p.face = horiz(p) || p.face; return this.startMove(p, kit.s1); }
+  if (d === 'u') return this.startMove(p, kit.s2);
+  if (d === 'd') return this.startMove(p, kit.s3);
+  return this.startMove(p, 'jab1');
+};
+Sim.prototype.airAttack = function(p){
+  const kit = KIT[p.kit] || KIT.common;
+  if (p.cb) {
+    const dv = adir(p, true);
+    if (dv === 'u') return this.startMove(p, 'uair');
+    if (dv === 'd') return this.startMove(p, 'dair');
+    if (dv === 'h') return this.startMove(p, hsign(p) * p.face > 0 ? 'fair' : 'bair');
+    return this.startMove(p, 'nair');
+  }
+  const dv = adir(p, true);
+  if (dv === 'h') { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; p.face = horiz(p) || p.face; return this.startMove(p, kit.s1a); }
+  if (dv === 'u') return this.startMove(p, kit.s2a);
+  if (dv === 'd') return this.startMove(p, kit.s3a);
+  return this.startMove(p, 'nair');
+};
+Sim.prototype.dodge = function(p, k, dir){
+  p.st = 'roll'; p.f = 0; p.rk = k; p.rollDir = dir || p.face; p.buf.G = 0;
+  this.ev.push({ t: 'dodge', p: p.i, k });
+};
 Sim.prototype.think = function(p, o){
   const h = horiz(p), i = p.inp;
   const oppStun = o.st === 'stun';
@@ -156,7 +206,8 @@ Sim.prototype.think = function(p, o){
       if (canIai) return this.startMove(p, 'iai');
       if (i.G && !oppStun) {
         if (p.buf.A) return this.startMove(p, 'grab');
-        if (p.hEdge) { p.st = 'roll'; p.f = 0; p.rollDir = p.hEdge; return; }
+        if (p.hEdge) return this.dodge(p, p.hEdge === p.face ? 'fwd' : 'back', p.hEdge);
+        if (i.D && p.buf.G) return this.dodge(p, 'spot');
         p.st = 'guard'; p.f = 0; return;
       }
       if (p.buf.J) {
@@ -164,13 +215,7 @@ Sim.prototype.think = function(p, o){
         if (i.D && p.plat >= 0) { p.ground = false; p.plat = -1; p.dropF = 12; p.st = 'air'; return; }
         p.st = 'jsq'; p.f = 0; return;
       }
-      if (p.buf.A) {
-        const d = adir(p);
-        if (d === 'd') return this.startMove(p, 'dtilt');
-        if (d === 'u') return this.startMove(p, 'utilt');
-        if (d === 'h') { p.face = hsign(p); return this.startMove(p, 'side'); }
-        return this.startMove(p, 'jab1');
-      }
+      if (p.buf.A) return this.groundAttack(p);
       if (i.F && h && !i.D) { p.st = 'dash'; p.face = h; p.f = 0; this.ev.push({ t: 'dash', p: p.i }); return; }
       if (h && !i.D) p.face = h;
       p.st = i.D ? 'crouch' : h ? 'walk' : 'idle';
@@ -179,7 +224,7 @@ Sim.prototype.think = function(p, o){
       if (canIai) return this.startMove(p, 'iai');
       if (i.G && !oppStun) { p.st = 'guard'; p.f = 0; return; }
       if (p.buf.J) { p.buf.J = 0; p.st = 'jsq'; p.f = 0; return; }
-      if (p.buf.A) { const hs = hsign(p); if (hs) p.face = hs; return this.startMove(p, 'side'); }
+      if (p.buf.A) return this.groundAttack(p);
       if (i.D) { p.st = 'crouch'; return; }
       if (h === -p.face) { p.face = h; p.f = 0; return; }
       if (!h) { p.st = 'idle'; return; } // 手を離すと滑って止まる
@@ -187,24 +232,24 @@ Sim.prototype.think = function(p, o){
     case 'guard':
       if (!i.G) { p.st = 'unguard'; p.f = 0; return; }
       if (p.buf.A) return this.startMove(p, 'grab');
-      if (p.hEdge) { p.st = 'roll'; p.f = 0; p.rollDir = p.hEdge; return; }
+      if (p.hEdge) return this.dodge(p, p.hEdge === p.face ? 'fwd' : 'back', p.hEdge);
+      if (i.D && !p.pi.D) return this.dodge(p, 'spot');
       if (p.buf.J) { p.buf.J = 0; p.st = 'jsq'; p.f = 0; return; }
       return;
     case 'air': {
       if (canIai) return this.startMove(p, 'airiai');
-      if (p.buf.G && !p.adUsed && !oppStun) { p.buf.G = 0; p.adUsed = true; p.st = 'adodge'; p.f = 0; return; }
+      if (p.buf.G && !p.adUsed && !oppStun) {
+        p.buf.G = 0; p.adUsed = true; p.st = 'adodge'; p.f = 0;
+        const v = (i.U ? 1 : 0) - (i.D ? 1 : 0);
+        if (h || v) { p.ak = 'airD'; const n = (h && v) ? 707 : 1000; p.adx = h * n; p.ady = v * n; } else { p.ak = 'airN'; p.adx = 0; p.ady = 0; }
+        this.ev.push({ t: 'dodge', p: p.i, k: p.ak }); return;
+      }
       if (p.buf.J) {
         const atL = p.x <= WALL_L + 600, atR = p.x >= WALL_R - 600;
         if ((atL && h > 0) || (atR && h < 0)) { p.buf.J = 0; p.vy = PH.wallVY; p.vx = h * PH.wallVX; p.face = h; p.ff = false; this.ev.push({ t: 'walljump', p: p.i }); return; }
         if (p.jumps > 0) { p.buf.J = 0; p.jumps--; p.vy = PH.jump2; p.vx = h * PH.airMax; p.ff = false; this.ev.push({ t: 'jump2', p: p.i }); return; }
       }
-      if (p.buf.A) {
-        const dv = adir(p, true);
-        if (dv === 'u') return this.startMove(p, 'uair');
-        if (dv === 'd') return this.startMove(p, 'dair');
-        if (dv === 'h') return this.startMove(p, hsign(p) * p.face > 0 ? 'fair' : 'bair');
-        return this.startMove(p, 'nair');
-      }
+      if (p.buf.A) return this.airAttack(p);
       if (i.D && !p.pi.D && p.vy <= 200) p.ff = true;
       return;
     }
@@ -237,15 +282,19 @@ Sim.prototype.update = function(p, o){
       p.f++;
       if (p.f >= C.jsq) { p.st = 'air'; p.ground = false; p.plat = -1; p.vy = p.inp.J ? PH.jumpF : PH.jumpS; p.vx = h * Math.floor(PH.airMax * 4 / 5); p.ff = false; this.ev.push({ t: 'jump', p: p.i }); }
       break;
-    case 'roll':
-      p.f++;
-      p.vx = (p.f >= 4 && p.f <= 20) ? p.rollDir * PH.roll : toward(p.vx, 0, PH.gFric * 2);
-      if (p.f >= 28) { p.st = 'idle'; }
-      break;
-    case 'adodge':
-      p.f++; p.vx = toward(p.vx, 0, 30);
-      if (p.f >= 26) p.st = 'air';
-      break;
+    case 'roll': {
+      p.f++; const d = DG[p.rk];
+      p.vx = (d.mv && p.f >= d.mv[0] && p.f <= d.mv[1]) ? p.rollDir * d.v : toward(p.vx, 0, PH.gFric * 2);
+      if (p.f >= d.total) { p.st = 'idle'; }
+      break; }
+    case 'adodge': {
+      p.f++; const d = DG[p.ak];
+      if (d.mv && p.f >= d.mv[0] && p.f <= d.mv[1]) { p.vx = Math.trunc(p.adx * d.v / 1000); p.vy = Math.trunc(p.ady * d.v / 1000) + PH.grav; }
+      else if (d.mv && p.f > d.mv[1]) { p.vx = toward(p.vx, 0, 40); }
+      else p.vx = toward(p.vx, 0, 30);
+      if (p.f >= d.total) p.st = 'air';
+      break; }
+    case 'fall': p.vx = toward(p.vx, h * Math.floor(PH.airMax * 6 / 10), Math.floor(PH.airAcc / 2)); break;
     case 'getup':
       p.f++;
       if (p.gk === 'roll') p.vx = (p.f >= 4 && p.f <= 22) ? p.rollDir * 520 : 0;
@@ -260,6 +309,9 @@ Sim.prototype.update = function(p, o){
   if (p.st === 'atk') {
     const m = MV[p.mv];
     p.mvf++;
+    if (m.rise && p.mvf === 3) { p.ground = false; p.plat = -1; p.vy = 1750; p.vx = p.face * 250; p.ff = false; }
+    if (m.plunge) { if (p.mvf < m.s) { p.vy = 0; p.vx = toward(p.vx, 0, 60); } else { p.vy = -2200; p.vx = 0; } }
+    if (m.hover && p.mvf <= m.lunge[1]) p.vy = 0;
     if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
     else if (p.ground) p.vx = toward(p.vx, 0, PH.gFric);
     if (p.mv === 'jab1' && p.inp.A && p.holdA >= m.total && p.mvf >= m.total) { // 押し続けると溜めへ
@@ -295,7 +347,7 @@ Sim.prototype.update = function(p, o){
 Sim.prototype.physics = function(p){
   if (!p.ground) {
     p.vy -= PH.grav;
-    const lim = p.ff ? PH.ffall : PH.fallMax;
+    const lim = (p.st === 'atk' && MV[p.mv].plunge) ? 2400 : p.ff ? PH.ffall : PH.fallMax;
     if (p.ff) p.vy = Math.min(p.vy, -PH.ffall + 400);
     if (p.vy < -lim) p.vy = -lim;
   }
@@ -330,7 +382,7 @@ Sim.prototype.physics = function(p){
 
 Sim.prototype.land = function(p, y, plat){
   const vy = p.vy;
-  p.y = y; p.vy = 0; p.ground = true; p.plat = plat; p.jumps = 1; p.adUsed = false; p.ff = false;
+  p.y = y; p.vy = 0; p.ground = true; p.plat = plat; p.jumps = 1; p.adUsed = false; p.ff = false; p.s1Used = false;
   if (p.st === 'atk') {
     const m = MV[p.mv];
     if (m.k === 'a') { p.st = 'land'; p.f = m.land; this.ev.push({ t: 'land', p: p.i, lag: m.land }); }
@@ -338,12 +390,13 @@ Sim.prototype.land = function(p, y, plat){
     if (p.hs > 8 || p.kd || vy < -900) {
       if (p.lastG <= C.techWin) {
         const h = horiz(p);
-        if (h) { p.st = 'roll'; p.f = 3; p.rollDir = h; } else { p.st = 'tech'; p.f = 20; }
+        if (h) { p.st = 'roll'; p.f = 3; p.rollDir = h; p.rk = h === p.face ? 'fwd' : 'back'; } else { p.st = 'tech'; p.f = 20; }
         this.ev.push({ t: 'tech', p: p.i, x: p.x, y: p.y });
       } else { p.st = 'down'; p.f = C.downF; p.downT = 0; p.vx = Math.trunc(p.vx / 3); this.ev.push({ t: 'down', p: p.i, x: p.x, y: p.y }); }
       p.kd = false; p.hs = 0;
     } else { p.st = 'land'; p.f = 4; p.hs = 0; }
-  } else if (p.st === 'adodge') { p.st = 'land'; p.f = 10; }
+  } else if (p.st === 'adodge') { p.st = 'land'; p.f = DG[p.ak].land; }
+  else if (p.st === 'fall') { p.st = 'land'; p.f = 20; }
   else if (p.st === 'air') { p.st = 'land'; p.f = C.landF; }
   else if (p.st === 'stun' || p.st === 'hit') { /* そのまま続く */ }
 };
@@ -439,7 +492,7 @@ Sim.prototype.applyHit = function(a, d, m, s){
     } else if (m.kb[1] < 0) { // 地上の相手に叩きつけ
       d.st = 'tumble'; d.ground = false; d.plat = -1; d.vy = 500; d.vx = dir * 200; d.kd = true;
     } else { d.st = 'hit'; d.vx = dir * kx; }
-    d.hs = m.hs; if (d.st === 'tumble') d.jumps = 1;
+    d.hs = m.hs; d.s1Used = false; if (d.st === 'tumble') d.jumps = 1;
     const adv = (d.st === 'hit') ? m.hs - mvRem : null;
     ev.push({ t: 'hit', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, dmg, combo: a.combo, adv, counter: a.combo === 1 && a.comboFirst.counter });
   }
@@ -514,7 +567,7 @@ Sim.prototype.step = function(inputs){
     if (m.chain && p.chainReq && p.mvf >= m.s + m.a - 1) { this.startMove(p, m.chain); continue; }
     if (p.mvf >= m.total) {
       if (p.mv === 'jab1' && p.inp.A && p.holdA >= m.total) { p.st = 'charge'; p.chargeF = 0; p.mv = null; continue; }
-      p.st = p.ground ? 'idle' : 'air'; p.mv = null; p.power = 0;
+      p.st = p.ground ? 'idle' : m.after === 'fall' ? 'fall' : 'air'; p.mv = null; p.power = 0;
     }
   }
   if (this.over) return;
@@ -534,7 +587,7 @@ Sim.prototype.hash = function(){
   return h;
 };
 
-const API = { Sim, MV, FIN, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
+const API = { Sim, MV, FIN, KIT, DG, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 else root.IssenAction = API;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -342,7 +342,7 @@ function onEvent(e){
     petals(e.x / FP, e.y / FP + 60, e.stage === 1 ? 30 : 80, e.stage === 1 ? 4 : 7);
     if (e.stage >= 2) petals(e.x / FP, e.y / FP + 140, 50, 9);
     FX.ouka.push({ k: 'ring', x: e.x / FP, y: e.y / FP + 4, t: 0, life: 36, r: e.stage === 1 ? 140 : 260, flat: true });
-    FX.cut = { t: 0, stage: e.stage, p: e.p }; SND.play('bloom'); for (const q of STORM) { q.x = Math.random(); q.y = Math.random(); }
+    SND.play('bloom'); // 段階が上がるときのカットインはなし（2026-11-26 ユーザー指定）、止まらない for (const q of STORM) { q.x = Math.random(); q.y = Math.random(); }
     FX.grow[e.p] = 0; FX.shake = 6 + e.stage * 3; FX.pflash = 6 + e.stage * 2; }
   else if (e.t === 'start' && OUKA_MV[e.mv]) oukaStart(e);
   else if (e.t === 'fallBurst') { const x = e.x / FP, y = e.y / FP; for (const d of [1, -1]) for (let k = 0; k < 40; k++) FX.parts.push({ x, y: y + 10 + rnd() * 40, vx: d * (2 + rnd() * 9), vy: 1 + rnd() * 4, life: 50 + rnd() * 30, t: 0, col: k % 3 ? SAKURA[k % 3] : CRIM[k % 3], r: 3 + rnd() * 3, petal: true, rot: rnd() * 6 });

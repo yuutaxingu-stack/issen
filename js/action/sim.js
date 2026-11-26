@@ -217,7 +217,7 @@ Sim.prototype.groundAttack = function(p){
   const d = adir(p);
   if (d === 'h' || (d === 'n' && p.spB)) { p.face = horiz(p) || p.face; return this.startMove(p, kit.s1); }
   if (d === 'u') return this.startMove(p, kit.s2);
-  if (d === 'd') return this.startMove(p, kit.s3);
+  if (d === 'd') { if (kit.s3 === 'plant' && p.tree) { p.buf.A = 0; return; } return this.startMove(p, kit.s3); } // 木があるうちは植えられない（相手に折られるまで）
   return this.startMove(p, 'jab1');
 };
 Sim.prototype.airAttack = function(p){
@@ -232,7 +232,7 @@ Sim.prototype.airAttack = function(p){
   const dv = adir(p, true);
   if (dv === 'h' || (dv === 'n' && p.spB)) { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; p.face = horiz(p) || p.face; return this.startMove(p, kit.s1a); }
   if (dv === 'u') return this.startMove(p, kit.s2a);
-  if (dv === 'd') return this.startMove(p, kit.s3a);
+  if (dv === 'd') { if (kit.s3a === 'plant' && p.tree) { p.buf.A = 0; return; } return this.startMove(p, kit.s3a); }
   return this.startMove(p, 'nair');
 };
 Sim.prototype.dodge = function(p, k, dir){
@@ -463,12 +463,12 @@ Sim.prototype.fallBurst = function(p){
   for (const d of [1, -1]) for (const sp of [650, 950, 1250]) this.pj.push({ o: p.i, x: p.x, y: p.y + 34 * FP, vx: d * sp, vy: 0, life: 32, w: 90, h: 70, mv: 'petalG', gid: this.pjN * 8 + (k++), petal: 1, ground: 1 });
   this.ev.push({ t: 'fallBurst', p: p.i, x: p.x, y: p.y });
 };
-/* 植樹: 木が無ければ足元に植えて開花。あれば抜く（撤去）。
+/* 植樹: 足元に植えて開花。自分では抜けず、相手に折られるまで次の木は植えられない。
    木は相手に攻撃を当てるほど育つ（2026-11-26）: 7回当てるごとに 開花→満開→落花。満開の間は、強化した天桜・花嵐を2回当てると一気に落花 */
 const GROW = { per: 7, big: 2 };
 Sim.prototype.plant = function(p){
   const t = p.tree;
-  if (t) { p.tree = null; this.ev.push({ t: 'treeGone', p: p.i, x: t.x, y: t.y }); return; }
+  if (t) return;
   let gy = 0; if (p.ground) gy = p.y; else for (const pl of PLATS) if (p.x >= pl.x0 && p.x <= pl.x1 && p.y >= pl.y && pl.y > gy) gy = pl.y;
   p.tree = { x: p.x, y: gy, hp: TREE.hp, stage: 1, u1: false, u2: false, n: 0, big: 0 };
   this.ev.push({ t: 'bloom', p: p.i, stage: 1, x: p.tree.x, y: p.tree.y });

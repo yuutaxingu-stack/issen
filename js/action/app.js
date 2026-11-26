@@ -218,7 +218,7 @@ function pose(p, fr){
   if (st === 'guard' || st === 'bstun') { P.lean = -6; P.sw = 92; P.arm = 10; P.hip = 52; P.fA = [-22, 0]; P.fB = [14, 0]; }
   if (st === 'unguard') { P.sw = 60; P.arm = 0; }
   if (st === 'air' || st === 'adodge' || st === 'fall') { P.fA = [-12, 22]; P.fB = [16, 16]; P.sw = 35; P.lean = 4; if (st === 'adodge') P.alpha = A.invuln(p) ? 0.4 : 0.85; if (st === 'fall') { P.sw = -60; P.arm = -60; P.lean = -8; P.alpha = 0.8; } }
-  if (st === 'hit') { P.lean = -22; P.sw = 50; P.arm = 30; }
+  if (st === 'hit') { P.lean = -10 - Math.min(10, p.hs * 0.6); P.sw = 45; P.arm = 20; P.hip = 54; }
   if (st === 'tumble') { P.rot = -fr * 18 * (p.face); P.fA = [-14, 18]; P.fB = [18, 8]; P.sw = 140; P.arm = 60; }
   if (st === 'stun') { const sway = Math.sin(fr * 0.15) * 6; P.lean = 26 + sway; P.head = 25; P.sw = -95; P.arm = -80; P.hip = 50; P.fA = [-12, 0]; P.fB = [12, 0]; }
   if (st === 'down' || st === 'ko') { P.rot = 90 * 1; P.hip = 14; P.sw = -170; P.fA = [-30, 0]; P.fB = [-26, 2]; P.lean = 0; }

@@ -112,7 +112,7 @@ body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--ui);use
 .gforge{display:flex;flex-direction:column;align-items:center;gap:6px;margin:8px 0 4px;}
 .gforge .gpull{border-color:#b5562a;background:#7a3417;} .gforge .gpull.arm{background:#c2581f;box-shadow:0 0 18px rgba(255,120,40,.45);}
 
-/* 絶（桜） */
-.gres.t4 .gm{background:linear-gradient(90deg,#fff,#ffc2d6,#fff0f5,#f59ab8,#fff);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-size:clamp(40px,12vh,76px);animation:iris 3.6s linear infinite;filter:drop-shadow(0 0 16px rgba(255,160,195,.75));}
-.gcard.t4{border-color:rgba(255,170,200,.6);box-shadow:0 0 22px rgba(255,150,190,.18) inset;}
-.gdsheet.t4{border-color:rgba(255,170,200,.75);box-shadow:0 0 36px rgba(255,150,190,.22);}
+/* 絶（赤黒） */
+.gres.t4 .gm{background:linear-gradient(90deg,#2a0408,#b3142a,#5a0a12,#d0233a,#2a0408);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-size:clamp(40px,12vh,76px);animation:iris 3.6s linear infinite;filter:drop-shadow(0 0 14px rgba(200,20,40,.75));}
+.gcard.t4{border-color:rgba(170,20,36,.75);box-shadow:0 0 22px rgba(150,10,28,.3) inset;}
+.gdsheet.t4{border-color:rgba(170,20,36,.85);box-shadow:0 0 36px rgba(150,10,28,.35);}

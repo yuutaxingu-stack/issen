@@ -1125,8 +1125,11 @@ const TP={
   '絶':{shake:0.18,d0:900,d1:3200,rev:5600,rays:28,parts:260,dark:true,slashes:3,promo:true}
 };
 function rainbow(a,now,off){ const c=hsl2rgb((now/6+(off||0))%360,0.85,0.75); return 'rgba('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+','+a+')'; }
-// 絶は桜色（白と薄紅のあいだで揺れる）
-function sakura(a,now,off){ const k=0.5+0.5*Math.sin((now+(off||0)*40)/260); return 'rgba(255,'+Math.round(176+50*k)+','+Math.round(204+30*k)+','+a+')'; }
+// 絶は赤黒（深い紅と黒のあいだで脈打つ）
+function sakura(a,now,off){ const k=0.5+0.5*Math.sin((now+(off||0)*40)/260); return 'rgba('+Math.round(120+70*k)+','+Math.round(8+12*k)+','+Math.round(18+14*k)+','+a+')'; }
+// 刀の階級の札の色（決着名の色 TIER とは別。絶だけ赤黒）
+const KTIER=t=>t==='絶'?'#6e0c18':TIER[t];
+const KTXT=t=>t==='絶'?';color:#f2d2d2':'';
 function tierRGBA(t,a,now){ return t==='幻'?rainbow(a,now):t==='絶'?sakura(a,now):TIERGLOW[t]+a+')'; }
 const tierFill=(t,a,now,off)=>t==='幻'?rainbow(a,now,off):t==='絶'?sakura(a,now,off):tierRGBA(t,a,now);
 // 幻は白→金→虹と化ける（昇格演出）
@@ -1183,7 +1186,7 @@ function skipAhead(){
 function showSkip(){ const b=document.getElementById('g_skip'); const left=GA.batch.length>1&&(GA.phase==='draw'||GA.phase==='quick'||GA.phase==='item')&&GA.idx<GA.batch.length-1;
   b.hidden=!left; }
 function fillCard(k){ const f=document.getElementById('g_res'); f.className='gres t'+TORD[k.tier];
-  const rt=document.getElementById('g_rt'); rt.hidden=false; rt.textContent=k.tier; rt.style.background=TIER[k.tier];
+  const rt=document.getElementById('g_rt'); rt.hidden=false; rt.textContent=k.tier; rt.style.background=KTIER(k.tier); rt.style.color=k.tier==='絶'?'#f2d2d2':'';
   document.getElementById('g_rm').textContent=k.mei; document.getElementById('g_ry').textContent=k.yomi;
   document.getElementById('g_rl').textContent=k.lore; return f; }
 function showItem(){
@@ -1206,7 +1209,7 @@ function showSummary(){
   document.getElementById('g_rl').textContent='';
   document.getElementById('g_rdup').textContent='新しい刀 '+news+'振り'+(GA.steel?'　玉鋼 +'+GA.steel:'')+(GA.back?'　銭 +'+GA.back:'');
   const bl=document.getElementById('g_batch');
-  bl.innerHTML=GA.batch.map(b=>'<span class="bc t'+TORD[b.k.tier]+(b.isNew?' nw':'')+'"><i style="background:'+TIER[b.k.tier]+'">'+b.k.tier+'</i>'+b.k.mei+(b.isNew?'<em>新</em>':'')+'</span>').join(''); bl.hidden=false;
+  bl.innerHTML=GA.batch.map(b=>'<span class="bc t'+TORD[b.k.tier]+(b.isNew?' nw':'')+'"><i style="background:'+KTIER(b.k.tier)+KTXT(b.k.tier)+'">'+b.k.tier+'</i>'+b.k.mei+(b.isNew?'<em>新</em>':'')+'</span>').join(''); bl.hidden=false;
   document.getElementById('g_tap').textContent='触れて閉じる';
   f.hidden=false; GA.phase='shown'; refreshCoins();
 }
@@ -1318,8 +1321,8 @@ function gLoop(){
     else { sl(150,-20,H*0.1,W+20,H*0.9); sl(450,W+20,H*0.1,-20,H*0.9); sl(800,-20,cy,W+20,cy); }
     const fl=k.tier==='絶'?[[370,0.7],[670,0.7],[1020,0.8],[1700,1]]:k.tier==='幻'?[[370,0.7],[670,0.7],[1020,1]]:[[370,0.8]];
     for(const [t,a0] of fl){ if(d>t&&d<t+400){ c.fillStyle=(ord>=3?tierFill(k.tier,a0*(1-(d-t)/400),now):'rgba(255,250,235,'+(a0*(1-(d-t)/400))+')'); c.fillRect(0,0,W,H); } }
-    if(ord>=3&&d>1100&&d<span){ const a=clamp((d-1100)/300); txt(c,k.tier,cx,cy,H*0.55,DISPLAY,'rgba(255,255,255,'+(0.85*a)+')','center'); }
-    if(k.tier==='絶'&&d>900){ const r=mulberry32(77); c.save(); for(let i=0;i<90;i++){ const x=(r()*W+Math.sin(now/700+i)*30+d*0.05*(r()-0.3))%W, y=((d/1000)*(40+r()*80)+r()*H)%H; c.fillStyle=sakura(0.8,now,i); c.beginPath(); c.ellipse(x,y,5,2.6,now/400+i,0,7); c.fill(); } c.restore(); }
+    if(ord>=3&&d>1100&&d<span){ const a=clamp((d-1100)/300); txt(c,k.tier,cx,cy,H*0.55,DISPLAY,k.tier==='絶'?'rgba(200,24,44,'+(0.95*a)+')':'rgba(255,255,255,'+(0.85*a)+')','center'); }
+    if(k.tier==='絶'&&d>900){ const r=mulberry32(77); c.save(); for(let i=0;i<90;i++){ const x=(r()*W+Math.sin(now/700+i)*30+d*0.05*(r()-0.3))%W, y=((d/1000)*(40+r()*80)+r()*H)%H; c.fillStyle=i%3?sakura(0.85,now,i):'rgba(12,4,6,0.85)'; c.beginPath(); c.ellipse(x,y,5,2.6,now/400+i,0,7); c.fill(); } c.restore(); }
   }
   // 名乗り
   if(revealed&&ord>=2){ const a=clamp((re-300)/500); txt(c,k.mei,cx,H*0.14,H*(ord>=3?0.13:0.1),DISPLAY,tierFill(k.tier,a,now),'center'); }
@@ -1334,11 +1337,11 @@ function drawStrip(c,W,H){
   if(n>60) return;
   const sz=Math.max(3,Math.min(9,(W*0.7)/n-3)), gap=Math.min(4,sz*0.5), tw=n*sz+(n-1)*gap, x0=(W-tw)/2, y=fs*0.9-sz/2+fs*1.1;
   for(let i=0;i<n;i++){ const b=GA.batch[i], x=x0+i*(sz+gap);
-    if(i<GA.idx||(i===GA.idx&&GA.phase!=='draw')){ c.globalAlpha=b.isNew?1:0.4; c.fillStyle=TIER[b.k.tier]; c.fillRect(x,y,sz,sz); c.globalAlpha=1; }
+    if(i<GA.idx||(i===GA.idx&&GA.phase!=='draw')){ c.globalAlpha=b.isNew?1:0.4; c.fillStyle=KTIER(b.k.tier); c.fillRect(x,y,sz,sz); c.globalAlpha=1; }
     else { c.strokeStyle='rgba(233,226,207,'+(i===GA.idx?0.8:0.2)+')'; c.lineWidth=1; c.strokeRect(x+0.5,y+0.5,sz-1,sz-1); } }
 }
 let FBAR=null; function FORGEBAR(){ return FBAR||(FBAR=tintCanvas(KMAP.mumei.canvas,'#ff8a3a')); }
-const TINTC={}; function tintCanvasCached(k,t){ const key=k.id+t; return TINTC[key]||(TINTC[key]=tintCanvas(k.canvas,t==='幻'?'#f3e6ff':t==='絶'?'#ffe0ea':(TIERGLOW[t]+'1)'))); }
+const TINTC={}; function tintCanvasCached(k,t){ const key=k.id+t; return TINTC[key]||(TINTC[key]=tintCanvas(k.canvas,t==='幻'?'#f3e6ff':t==='絶'?'#a3182c':(TIERGLOW[t]+'1)'))); }
 function renderBook(){
   const grid=document.getElementById('g_grid'); grid.innerHTML='';
   const got=KATANA.filter(k=>ARM.owned[k.id]).length;
@@ -1348,7 +1351,7 @@ function renderBook(){
     const cvs=document.createElement('canvas'); cvs.width=420; cvs.height=Math.round(420*KIMG_H/KIMG_W)+8;
     const x=cvs.getContext('2d'); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,4,420,420*KIMG_H/KIMG_W);
     const eq=[0,1].filter(i=>ARM.equip[i]===k.id).map(i=>'<i style="background:'+COL[i].main+'">'+COL[i].name+'</i>').join('');
-    b.innerHTML='<span class="ct" style="background:'+TIER[k.tier]+'">'+k.tier+'</span><span class="cm">'+(own?k.mei:'？？？')+'</span><span class="ce">'+eq+'</span>';
+    b.innerHTML='<span class="ct" style="background:'+KTIER(k.tier)+KTXT(k.tier)+'">'+k.tier+'</span><span class="cm">'+(own?k.mei:'？？？')+'</span><span class="ce">'+eq+'</span>';
     b.insertBefore(cvs,b.firstChild);
     b.addEventListener('click',()=>openDetail(k));
     grid.appendChild(b); });
@@ -1357,7 +1360,7 @@ let DETAIL=null;
 function openDetail(k){
   DETAIL=k; FORGEARM=0; const own=!!ARM.owned[k.id]; const d=document.getElementById('g_detail'); d.hidden=false; d.querySelector('.gdsheet').className='gdsheet t'+TORD[k.tier]+(own?'':' unk');
   const cvs=document.getElementById('gd_img'); const x=cvs.getContext('2d'); x.clearRect(0,0,cvs.width,cvs.height); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,0,cvs.width,cvs.width*KIMG_H/KIMG_W);
-  document.getElementById('gd_t').textContent=k.tier; document.getElementById('gd_t').style.background=TIER[k.tier];
+  document.getElementById('gd_t').textContent=k.tier; document.getElementById('gd_t').style.background=KTIER(k.tier); document.getElementById('gd_t').style.color=k.tier==='絶'?'#f2d2d2':'';
   document.getElementById('gd_m').textContent=k.mei; document.getElementById('gd_y').textContent=k.yomi+'　・　'+(own?(ARM.owned[k.id]||0)+'振り所持':'まだ持っていない');
   document.getElementById('gd_l').textContent=own?k.lore:'まだ見ぬ一振り。姿は鍛えあがるまでわからない。';
   document.getElementById('gd_own').hidden=!own; document.getElementById('gd_fg').hidden=own;

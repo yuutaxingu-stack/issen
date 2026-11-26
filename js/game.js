@@ -319,7 +319,7 @@ function startMatch(mode,base){
 /* オンライン対戦を始める。o={me,seed,startAt,clockOff,oppKat,oppName,myName,send} */
 function startOnline(o){
   NETCLK={off:o.clockOff}; NET.me=o.me; NET.seq=0; NET.oppH=-Infinity; NET.remoteQ.length=0; NET.fightFrom=Infinity;
-  NET.rng=mulberry32(o.seed|0); NET.send=o.send||null; NET.oppKat=o.oppKat||'mumei'; NET.oppName=o.oppName||'相手'; NET.myName=o.myName||'あなた'; NET.wait=''; NET.rate=null;
+  NET.rng=mulberry32(o.seed|0); NET.send=o.send||null; NET.oppKat=o.oppKat||'mumei'; NET.ids=o.ids||[]; if(window.IssenZetsu&&NET.ids.length) window.IssenZetsu.refresh(NET.ids.filter(Boolean)); NET.oppName=o.oppName||'相手'; NET.myName=o.myName||'あなた'; NET.wait=''; NET.rate=null;
   NET.watch=!!o.watch; NET.myH=-Infinity; NET.myKat=o.myKat||'mumei'; NET.toWin=o.toWin|0; NET.tag=o.tag||''; NET.back=o.back||''; NET.hSent=-Infinity; NET.st={n:0,inWait:0,inMax:0,stall:0,opp:0,oppMax:0,rtt:0,fps:60,maxAt:0};
   for(const k of TIMING_KEYS) CFG[k]=DEF[k];   // 二人の判定を必ずそろえるため、オンラインでは確定値だけを使う
   pauseWhy.clear(); pausedAt=null;
@@ -756,6 +756,11 @@ function drawHUD(c,now,vw){
     const lw=named?sz*(label.length*0.6+0.55):sz*1.2;
     c.save(); c.fillStyle='rgba(242,237,225,0.82)'; const bw2=lw+tw*sz*0.62+10;
     c.beginPath(); c.roundRect(L?x0-6:x0-bw2+6,y-sz*0.68,bw2,sz*1.36+sz*0.55,8); c.fill(); c.restore();
+    if(G.mode==='online'&&zetsuOf(i)){ // 絶の刀の持ち主の印
+      const zs=sz*0.95, zx=L?x0-6+bw2+6:x0+6-bw2-6-zs, zy=y-zs*0.5; c.save();
+      const zg=c.createLinearGradient(zx,zy,zx+zs,zy+zs); zg.addColorStop(0,'#c4142e'); zg.addColorStop(1,'#4a0710');
+      c.shadowColor='rgba(220,20,50,0.8)'; c.shadowBlur=10+Math.sin(performance.now()/300)*4; c.fillStyle=zg; c.fillRect(zx,zy,zs,zs); c.restore();
+      txt(c,'絶',zx+zs/2,zy+zs/2,zs*0.72,DISPLAY,'#f6dada','center'); }
     txt(c,label,L?x0+lw/2-sz*0.1:x0-lw/2+sz*0.1,y,named?sz*0.6:sz,named?UIF:DISPLAY,COL[i].main,'center');
     for(let k=0;k<tw;k++){ const cx=L?x0+lw+sz*0.05+k*sz*0.62:x0-lw-sz*0.05-k*sz*0.62; c.beginPath(); c.arc(cx,y,sz*0.2,0,7);
       if(k<p.score){ c.fillStyle=COL[i].main; c.fill(); } else { c.strokeStyle=COL[i].main; c.lineWidth=1.5; c.stroke(); } }
@@ -814,6 +819,7 @@ function netInfo(c,now){
   c.fillStyle='rgba(18,22,19,0.7)'; c.beginPath(); c.roundRect(VW/2-w/2,y0-sz*1.1,w,sz*3.3,sz*0.4); c.fill(); c.restore();
   lines.forEach((l,i)=>txt(c,l,VW/2,y0+i*sz*1.45,sz,UIF,'#e8c35a','center',0.95));
 }
+function zetsuOf(i){ const Z=window.IssenZetsu; return !!(Z&&NET.ids&&Z.has(NET.ids[i]))||katOf(i).tier==='絶'; }
 function whoName(i){ return G.mode==='cpu'?(i===0?'あなた':'其の'+kn(RUN.n)):G.mode==='online'?(i===NET.me?NET.myName:NET.oppName):COL[i].name; }
 function drawResult(c,now,vw){
   const e=now-G.resultAt, a=clamp(e/300), r=G.result, f=FIN[r.name];
@@ -1357,8 +1363,49 @@ function renderBook(){
     grid.appendChild(b); });
 }
 let DETAIL=null;
+// 絶の刀帳: 鞘から刃が抜け、赤黒い闇に桜が舞い続ける専用の頁
+const ZSAYA=new Image(); ZSAYA.src='assets/katana_ouka_saya.png';
+let ZST=null;
+function zetsuStage(k){
+  const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
+  if(ZST){ cancelAnimationFrame(ZST.raf); ZST=null; }
+  c.hidden=!k; zw.hidden=!k; if(!k) return;
+  const W=c.width, H=c.height, x=c.getContext('2d');
+  const P=[]; for(let i=0;i<70;i++) P.push({x:Math.random()*W,y:Math.random()*H,v:20+Math.random()*50,s:4+Math.random()*7,r:Math.random()*6,w:Math.random()*6,d:Math.random()<.35});
+  const t0=performance.now(); let last=t0;
+  ZST={raf:0};
+  const frame=now=>{
+    if(!ZST) return; const t=(now-t0)/1000, dt=Math.min(.05,(now-last)/1000); last=now;
+    const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,'#5a0d18'); g.addColorStop(.55,'#250609'); g.addColorStop(1,'#070203');
+    x.fillStyle=g; x.fillRect(0,0,W,H);
+    // 朱の月
+    x.save(); x.globalAlpha=.55; x.fillStyle='#b3122a'; x.shadowColor='#ff2a44'; x.shadowBlur=40; x.beginPath(); x.arc(W*.78,H*.3,64,0,7); x.fill(); x.restore();
+    // 大きな「絶」
+    x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore();
+    // 抜刀: 最初の1.2秒で鞘から刃が滑り出る
+    const e=Math.min(1,t/1.2), ease=1-Math.pow(1-e,3), kw=W*.9, kh=kw*106/900, ky=H*.62+Math.sin(t*1.3)*4;
+    const kx=W*.05;
+    if(KREADY){
+      x.save(); x.translate(kx,ky); x.rotate(-.12);
+      if(ZSAYA.complete&&ZSAYA.naturalWidth){ x.globalAlpha=.95; x.drawImage(ZSAYA,0,kh*.7,kw,kh); }
+      x.globalAlpha=1; x.shadowColor='rgba(255,40,70,.8)'; x.shadowBlur=24; x.drawImage(k.canvas,-kw*.55*(1-ease),-kh*.35,kw,kh);
+      // 刃を流れる光
+      const sx=((t*.45)%1.4-.2)*kw; const lg=x.createLinearGradient(sx-60,0,sx+60,0); lg.addColorStop(0,'rgba(255,255,255,0)'); lg.addColorStop(.5,'rgba(255,235,240,.75)'); lg.addColorStop(1,'rgba(255,255,255,0)');
+      x.globalCompositeOperation='lighter'; x.shadowBlur=0; x.fillStyle=lg; x.fillRect(sx-60,-kh*.35+kh*.25,120,kh*.3);
+      x.restore();
+    }
+    // 花びら
+    for(const p of P){ p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>H+10){p.y=-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
+      x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':'rgba('+(200+Math.random()*20|0)+',40,64,.85)'; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
+    // 落款
+    x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore();
+    ZST.raf=requestAnimationFrame(frame);
+  };
+  ZST.raf=requestAnimationFrame(frame);
+}
 function openDetail(k){
   DETAIL=k; FORGEARM=0; const own=!!ARM.owned[k.id]; const d=document.getElementById('g_detail'); d.hidden=false; d.querySelector('.gdsheet').className='gdsheet t'+TORD[k.tier]+(own?'':' unk');
+  zetsuStage(k.tier==='絶'&&own?k:null);
   const cvs=document.getElementById('gd_img'); const x=cvs.getContext('2d'); x.clearRect(0,0,cvs.width,cvs.height); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,0,cvs.width,cvs.width*KIMG_H/KIMG_W);
   document.getElementById('gd_t').textContent=k.tier; document.getElementById('gd_t').style.background=KTIER(k.tier); document.getElementById('gd_t').style.color=k.tier==='絶'?'#f2d2d2':'';
   document.getElementById('gd_m').textContent=k.mei; document.getElementById('gd_y').textContent=k.yomi+'　・　'+(own?(ARM.owned[k.id]||0)+'振り所持':'まだ持っていない');
@@ -1371,7 +1418,7 @@ function openDetail(k){
 }
 document.getElementById('gd_e0').addEventListener('click',()=>{ ARM.equip[0]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
 document.getElementById('gd_e1').addEventListener('click',()=>{ ARM.equip[1]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
-document.getElementById('gd_close').addEventListener('click',()=>{ document.getElementById('g_detail').hidden=true; });
+document.getElementById('gd_close').addEventListener('click',()=>{ document.getElementById('g_detail').hidden=true; zetsuStage(null); });
 /* 玉鋼で鍛える（まだ持っていない刀だけ）。間違えて押さないよう、二度触れて鍛える */
 let FORGEARM=0;
 function forgeLabel(msg){ const k=DETAIL, cost=FORGE[k.tier], have=WALLET.steel||0, btn=document.getElementById('gd_forge');

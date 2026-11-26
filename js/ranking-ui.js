@@ -38,7 +38,8 @@
     }
   };
 
-  function open(){ el.hidden = false; render(); load(); }
+  function open(){ el.hidden = false; render(); load(); if (window.IssenZetsu) window.IssenZetsu.refresh(); }
+  if (window.IssenZetsu) window.IssenZetsu.on(() => render());
   function close(){ el.hidden = true; }
   $('m_rank').addEventListener('click', open);
   $('r_back').addEventListener('click', close);
@@ -90,7 +91,7 @@
     $('r_list').innerHTML = list.map(({ r, no }, i) =>
       '<li class="' + (r.me ? 'me ' : '') + (no <= 3 ? 'top' + no : '') + '" style="animation-delay:' + Math.min(i, 12) * 45 + 'ms">' +
         '<span class="rno"><span>' + kn(no) + '</span></span>' +
-        '<span class="rwho"><span class="onm">' + esc(r.name) + '</span>' + (T.sub(r) ? '<small>' + esc(T.sub(r)) + '</small>' : '') + '</span>' +
+        '<span class="rwho"><span class="onm">' + esc(r.name) + (window.IssenZetsu ? window.IssenZetsu.mark(r.id) : '') + '</span>' + (T.sub(r) ? '<small>' + esc(T.sub(r)) + '</small>' : '') + '</span>' +
         '<span class="rval">' + T.cell(r) + '</span>' +
       '</li>').join('');
 

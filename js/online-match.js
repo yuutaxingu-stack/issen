@@ -107,7 +107,7 @@
     if (N.onMatchUi) N.onMatchUi('playing');
     I.NET.onPhase = ph => { if (ph === 'match') report(st); };
     I.NET.onLeave = ph => leave(st, ph);
-    I.startOnline({ me: st.me, seed: st.seed, startAt, clockOff: off, oppKat: o.kat || 'mumei', oppName, myName: st.myName,
+    I.startOnline({ me: st.me, seed: st.seed, startAt, clockOff: off, oppKat: o.kat || 'mumei', oppName, myName: st.myName, ids: st.me === 0 ? [N.user && N.user.id, st.oppId] : [st.oppId, N.user && N.user.id],
                     toWin: st.opts.toWin, tag: st.opts.tag, back: st.opts.back, send: msg => send(st, msg) });
   }
 
@@ -219,7 +219,7 @@
     I.NET.onPhase = null;
     I.NET.onLeave = () => wend(w, 'done');
     I.startOnline({ me: 0, watch: true, seed: i.seed, startAt, clockOff: w.base - WATCH_DELAY, myKat: h[0].kat || 'mumei', oppKat: h[1].kat || 'mumei',
-                    myName: i.names[0], oppName: i.names[1], toWin: i.toWin, tag: i.tag, back: i.back, send: null });
+                    myName: i.names[0], oppName: i.names[1], ids: i.ids, toWin: i.toWin, tag: i.tag, back: i.back, send: null });
     w.early.forEach(m => { const p = m.p === 1 ? 1 : 0; I.netHorizon(m.t, p); I.netInput(m.t, m.a, m.s, p); }); w.early = [];
     if (i.onStart) try { i.onStart(); } catch (e) {}
   }

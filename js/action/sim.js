@@ -60,11 +60,12 @@ const MV = {
   hana:  { n:'花嵐', k:'g', s:16, a:1, r:32, noBox:1, shot:'hana', arc:[150,-30] },
   petal: { n:'花嵐', k:'p', s:1, a:1, r:0, dmg:400, gd:800, hs:14, blk:-4, kb:[220,0], flinch:1 },
   petalS:{ n:'花嵐（落花）', k:'p', s:1, a:1, r:0, dmg:200, gd:400, hs:10, blk:-2, kb:[120,0], flinch:1 },
-  ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], arc:[-60,95], rise:1, after:'fall', pose:'rise' },
-  tenK:  { n:'天桜（開花）', k:'a', s:5, a:12, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1350], arc:[-60,95], rise:1, riseV:2300, after:'fall', pose:'rise' },
-  tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:26, kb:[150,1350], arc:[-60,95], rise:1, riseV:2300, after:'fall', pose:'rise', aura:[-75,0,150,160] },
-  tenR:  { n:'天桜（落花）', k:'a', s:5, a:12, r:6, land:20, dmg:700, gd:1200, hs:26, kb:[150,1100], arc:[-60,95], rise:1, riseV:2300, pose:'rise', aura:[-75,0,150,160], next:'tenFall' },
-  tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100] },
+  ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], arc:[-60,660], spin:1, rise:1, after:'fall', pose:'rise' },
+  tenK:  { n:'天桜（開花）', k:'a', s:5, a:12, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1350], arc:[-60,660], spin:1, rise:1, riseV:2300, after:'fall', pose:'rise' },
+  tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:26, kb:[150,1350], arc:[-60,660], spin:1, rise:1, riseV:2300, after:'fall', pose:'rise', aura:[-75,0,150,160] },
+  tenR:  { n:'天桜（落花）', k:'a', s:5, a:12, r:6, land:20, dmg:700, gd:1200, hs:26, kb:[150,1100], arc:[-60,660], spin:1, rise:1, riseV:2300, pose:'rise', aura:[-75,0,150,160], next:'tenFall' },
+  tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
+  petalG:{ n:'天桜（落花・着地の花）', k:'p', s:1, a:1, r:0, dmg:250, gd:500, hs:12, blk:-2, kb:[160,0], flinch:1 },
   plant: { n:'植樹', k:'g', s:14, a:1, r:16, noBox:1, plant:1, arc:[-70,-85] },
   airiai:{ n:'空中居合', k:'a', s:10, a:4, r:30, land:20, dmg:1000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,10,132,100], iai:1, arc:[-45,15], lunge:[2,10,3000], ext:30 },
 };
@@ -90,7 +91,7 @@ const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: '
   ouka: { n: '桜華', s1: 'hana', s1a: 'hana', s2: 'ten', s2a: 'ten', s3: 'plant', s3a: 'plant' } };
 /* 桜の木: 耐久は体力の4割。段階 1開花 2満開 3落花。u1/u2 = その段階の強化を花嵐/天桜で使ったか */
 const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [-22, 0, 44, 80], [-60, 0, 120, 170], [-60, 0, 120, 170]] };
-const PETAL = { w: 44, h: 44 };
+const PETAL = { w: 76, h: 76 }; // 花嵐の当たる大きさ（2026-11-26 面積で3倍に）
 const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
 /* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
 const DG = {
@@ -105,7 +106,7 @@ const DG = {
 const FIN = {
   '一閃':{tier:'絶'}, '明鏡止水':{tier:'幻'}, '紙一重':{tier:'極'}, '鏡返し':{tier:'極'}, '死中活':{tier:'極'}, '流転':{tier:'極'}, '百花':{tier:'極'},
   '二の太刀':{tier:'上'}, '陽炎':{tier:'上'}, '止め':{tier:'上'}, '落花':{tier:'上'}, '背水':{tier:'上'}, '刹那':{tier:'上'},
-  '先の先':{tier:'並'}, '隙穿ち':{tier:'並'}, '疾風':{tier:'並'}, '斬り伏せ':{tier:'並'}, '睨み合い':{tier:'分'}
+  '散華':{tier:'絶'}, '先の先':{tier:'並'}, '隙穿ち':{tier:'並'}, '疾風':{tier:'並'}, '斬り伏せ':{tier:'並'}, '睨み合い':{tier:'分'}
 };
 
 const sgn = v => v > 0 ? 1 : v < 0 ? -1 : 0;
@@ -413,6 +414,7 @@ Sim.prototype.land = function(p, y, plat){
   p.y = y; p.vy = 0; p.ground = true; p.plat = plat; p.jumps = 1; p.adUsed = false; p.ff = false; p.s1Used = false;
   if (p.st === 'atk') {
     const m = MV[p.mv];
+    if (m.landBurst) this.fallBurst(p);
     if (m.k === 'a') { p.st = 'land'; p.f = m.land; this.ev.push({ t: 'land', p: p.i, lag: m.land }); }
   } else if (p.st === 'tumble') {
     if (p.hs > 8 || p.kd || vy < -900) {
@@ -445,10 +447,17 @@ Sim.prototype.spawnPetals = function(p){
   const b = p.boost, x = p.x + p.face * SHOT.ox * FP, y = p.y + SHOT.oy * FP;
   this.pjN = (this.pjN || 0) + 1;
   const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: p.face * sp, vy, life: 48, w, h: w, mv, gid, petal: 1 });
-  if (b === 3) { const V = [-960, -640, -320, 0, 320, 640, 960]; V.forEach((v, k) => add(0, v, 1150, 50, 'petalS', this.pjN * 8 + k)); } // 落花: 散る角度は最初の3倍、七枚
-  else if (b === 2) { for (const dy of [-38, 0, 38]) add(dy, 0, 1300, 62, 'petal', this.pjN * 8); }
+  if (b === 3) { const V = [-960, -640, -320, 0, 320, 640, 960]; V.forEach((v, k) => add(0, v, 1150, 86, 'petalS', this.pjN * 8 + k)); } // 落花: 散る角度は最初の3倍、七枚
+  else if (b === 2) { for (const dy of [-60, 0, 60]) add(dy, 0, 1300, 108, 'petal', this.pjN * 8); }
   else add(0, 0, b === 1 ? 1350 : 800, PETAL.w, 'petal', this.pjN * 8);
   this.ev.push({ t: 'shot', p: p.i, petal: b });
+};
+/* 落花の天桜の着地: 前後へ三波ずつ、地を這う花びら。一枚ずつ当たる（多段） */
+Sim.prototype.fallBurst = function(p){
+  this.pjN = (this.pjN || 0) + 1;
+  let k = 0;
+  for (const d of [1, -1]) for (const sp of [650, 950, 1250]) this.pj.push({ o: p.i, x: p.x, y: p.y + 34 * FP, vx: d * sp, vy: 0, life: 32, w: 90, h: 70, mv: 'petalG', gid: this.pjN * 8 + (k++), petal: 1, ground: 1 });
+  this.ev.push({ t: 'fallBurst', p: p.i, x: p.x, y: p.y });
 };
 /* 植樹: 木が無ければ足元に植えて開花。あれば 満開→落花→撤去 と進める */
 Sim.prototype.plant = function(p){
@@ -616,6 +625,7 @@ Sim.prototype.finish = function(w, l, how, m, s){
   else if (w.comboFirst && w.comboFirst.counter) name = '先の先';
   else if (w.comboFirst && w.comboFirst.punish) name = '隙穿ち';
   else name = '斬り伏せ';
+  if (w.kit === 'ouka' && (FIN[name].tier === '並' || FIN[name].tier === '上')) name = '散華'; // 絶の刀で勝つと専用の決着名
   this.over = true;
   if (!this.opts.training) this.wins[w.i]++;
   l.st = 'ko';

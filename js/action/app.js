@@ -236,7 +236,7 @@ let sim = new A.Sim({ training: true });
 const FX = { ouka: [], grow: [null, null], pflash: 0, gone: [], parts: [], texts: [], shake: 0, finish: null, trails: [[], []], combo: [null, null], last: null, hist: [], calm: 0, flash: 0 };
 const cam = { x: 800, y: 0, z: 1 };
 
-function clearFx(){ FX.cut = null; WORLD.b = WORLD.f = WORLD.k = 0; FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; }
+function clearFx(){ FX.cut = null; WORLD.f = WORLD.m = 0; FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; }
 function resetRound(){ sim.resetRound(); clearFx(); }
 /* 持たせる刀（新・一閃の特殊技）。common＝今の共通の技、ouka＝桜華 */
 const KITS = ['common', 'common'];
@@ -248,6 +248,7 @@ function startMode(mode){
   sim = new A.Sim(mode === 'train' ? { training: true, kits: kitsFor(mode) } : { toWin: mode === 'cpu' ? 1 : 2, kits: kitsFor(mode) });
   if (mode === 'cpu') cpuReset(1);
   GAME.phase = mode === 'train' ? 'fight' : 'intro';
+  GAME.zin = mode !== 'train' && sim.p.some(p => p.kit === 'ouka') ? 110 : 0; // 絶の持ち主がいれば立ち合いの前に抜刀のカットイン
   clearFx(); FX.hist = []; FX.last = null;
   document.body.dataset.mode = mode;
   showMenu(false); showOver(false);
@@ -272,7 +273,7 @@ function stepOnce(){
   if (DBG.pause || GAME.mode === 'menu' || PAUSED) return;
   stepN++;
   if (GAME.phase === 'over') { tickParts(); return; }
-  if (GAME.phase === 'intro') { GAME.t++; if (GAME.t > 80) { GAME.phase = 'fight'; GAME.t = 0; } tickParts(); return; }
+  if (GAME.phase === 'intro') { GAME.t++; if (GAME.t === 1 && GAME.zin) SND.play('draw'); if (GAME.t > 80 + GAME.zin) { GAME.phase = 'fight'; GAME.t = 0; GAME.zin = 0; } tickParts(); return; }
   if (FX.cut) { FX.cut.t++; if (FX.cut.t >= 64) FX.cut = null; tickParts(); return; } // カットインの間は両者止まる
   if (FX.finish) {
     FX.finish.t++;
@@ -316,7 +317,7 @@ function onEvent(e){
   const wx = e.x / FP, wy = e.y / FP;
   if (e.t === 'hit' && sim.p[e.by].kit === 'ouka') { // 桜華の当たり: 花びらと紅の切り口
     petals(wx, wy, OUKA_MV[e.mv] ? 26 : 12, 6); burst(wx, wy, 10, '#8e0f22', 6, true);
-    FX.ouka.push({ k: 'cut', x: wx, y: wy, t: 0, life: 16, a: rnd() * 3 }); if (OUKA_MV[e.mv]) FX.pflash = 4; }
+    FX.ouka.push({ k: 'cut', x: wx, y: wy, t: 0, life: 16, a: rnd() * 3 }); if (OUKA_MV[e.mv]) FX.pflash = 4; SND.play('hit'); }
   if (e.t === 'hit') {
     burst(wx, wy, e.dmg >= 700 ? 18 : 10, INK, 5);
     burst(wx, wy, 6, COL[e.by].light, 3);
@@ -336,23 +337,64 @@ function onEvent(e){
   else if (e.t === 'down' || e.t === 'tech') { burst(wx, 6, 8, '#8d8a75', 3); if (e.t === 'tech') FX.texts.push({ s: '受け身', x: wx, y: 140, t: 0, life: 40, small: true }); }
   else if (e.t === 'counter') { burst(wx, wy, 16, '#fff6dc', 6, true); FX.shake = 8; FX.flash = 5; FX.texts.push({ s: '返し', x: wx, y: wy + 80, t: 0, life: 50, seal: true, c: e.p }); FX.last = { kind: 'カウンター成立', mv: 'ctrHit', adv: null }; }
   else if (e.t === 'clash') { burst(wx, wy, 12, '#ffffff', 5, true); }
-  else if (e.t === 'finish') { FX.finish = { t: 0, how: e.how, name: e.name, p: e.p, tier: sim.result.tier, x: e.x / FP, y: e.y / FP }; FX.shake = 14; }
+  else if (e.t === 'finish') { const z = e.p >= 0 && sim.p[e.p].kit === 'ouka'; FX.finish = { t: 0, how: e.how, name: e.name, p: e.p, tier: sim.result.tier, x: e.x / FP, y: e.y / FP, zetsu: z }; FX.shake = 14; if (z) { SND.play('finish'); petals(e.x / FP, e.y / FP, 80, 9); } }
   else if (e.t === 'bloom') { const p = sim.p[e.p];
     petals(e.x / FP, e.y / FP + 60, e.stage === 1 ? 30 : 80, e.stage === 1 ? 4 : 7);
     if (e.stage >= 2) petals(e.x / FP, e.y / FP + 140, 50, 9);
     FX.ouka.push({ k: 'ring', x: e.x / FP, y: e.y / FP + 4, t: 0, life: 36, r: e.stage === 1 ? 140 : 260, flat: true });
-    FX.cut = { t: 0, stage: e.stage, p: e.p }; for (const q of STORM) { q.x = Math.random(); q.y = Math.random(); }
+    FX.cut = { t: 0, stage: e.stage, p: e.p }; SND.play('bloom'); for (const q of STORM) { q.x = Math.random(); q.y = Math.random(); }
     FX.grow[e.p] = 0; FX.shake = 6 + e.stage * 3; FX.pflash = 6 + e.stage * 2; }
   else if (e.t === 'start' && OUKA_MV[e.mv]) oukaStart(e);
+  else if (e.t === 'fallBurst') { const x = e.x / FP, y = e.y / FP; for (const d of [1, -1]) for (let k = 0; k < 40; k++) FX.parts.push({ x, y: y + 10 + rnd() * 40, vx: d * (2 + rnd() * 9), vy: 1 + rnd() * 4, life: 50 + rnd() * 30, t: 0, col: k % 3 ? SAKURA[k % 3] : CRIM[k % 3], r: 3 + rnd() * 3, petal: true, rot: rnd() * 6 });
+    FX.ouka.push({ k: 'ring', x, y: y + 4, t: 0, life: 34, r: 420, flat: true }); FX.shake = 16; FX.pflash = 9; SND.play('drum'); SND.play('kotoChord'); }
   else if (e.t === 'treeGone') { petals(e.x / FP, e.y / FP + 70, 30, 3); FX.gone.push({ x: e.x / FP, y: e.y / FP, t: 0, p: e.p }); }
   else if (e.t === 'treeBreak') { petals(e.x / FP, e.y / FP + 70, 36, 6); burst(e.x / FP, e.y / FP + 40, 16, '#4a3528', 5); FX.shake = 8; FX.texts.push({ s: '折', x: e.x / FP, y: e.y / FP + 120, t: 0, life: 60, seal: true, c: e.by }); }
   else if (e.t === 'treeHit') { burst(e.x / FP, e.y / FP, 6, '#4a3528', 3); petals(e.x / FP, e.y / FP, 4, 3); }
   else if (e.t === 'sd') { FX.texts.push({ s: 'サドンデス　一太刀で決まる', x: 0, y: 0, t: 0, life: 120, screen: true }); }
 }
+/* ---------- 絶の音（琴と尺八を合成。絶の技だけ鳴る） ---------- */
+const SND = (function(){
+  let ac = null;
+  const wake = () => { try { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === 'suspended') ac.resume(); } catch (e) {} };
+  addEventListener('pointerdown', wake, true); addEventListener('keydown', wake, true);
+  const N = [146.83, 155.56, 196, 220, 233.08, 293.66, 311.13, 392, 440, 466.16, 587.33, 622.25, 783.99, 880]; // 都節（D Eb G A Bb）
+  function koto(f, t0, dur, g){ // 弦をはじく音（Karplus-Strong）
+    const sr = ac.sampleRate, n = Math.floor(sr * dur), buf = ac.createBuffer(1, n, sr), d = buf.getChannelData(0), P = Math.max(2, Math.round(sr / f)), ring = new Float32Array(P);
+    for (let i = 0; i < P; i++) ring[i] = Math.random() * 2 - 1;
+    let k = 0; for (let i = 0; i < n; i++) { const a = ring[k], b = ring[(k + 1) % P]; d[i] = a; ring[k] = (a + b) * 0.4985; k = (k + 1) % P; }
+    const src = ac.createBufferSource(), gn = ac.createGain(); src.buffer = buf; gn.gain.value = g; src.connect(gn).connect(ac.destination); src.start(t0);
+  }
+  function shaku(f, t0, dur, g, bend){ // 息の混じった笛
+    const o = ac.createOscillator(), lfo = ac.createOscillator(), ld = ac.createGain(), gn = ac.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f * (bend ? 0.94 : 1), t0); o.frequency.linearRampToValueAtTime(f, t0 + 0.25);
+    lfo.frequency.value = 5.2; ld.gain.value = f * 0.012; lfo.connect(ld).connect(o.frequency);
+    gn.gain.setValueAtTime(0, t0); gn.gain.linearRampToValueAtTime(g, t0 + 0.18); gn.gain.setValueAtTime(g, t0 + dur * 0.6); gn.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    o.connect(gn).connect(ac.destination); o.start(t0); lfo.start(t0); o.stop(t0 + dur); lfo.stop(t0 + dur);
+    const sr = ac.sampleRate, nb = ac.createBuffer(1, Math.floor(sr * dur), sr), nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+    const ns = ac.createBufferSource(), bp = ac.createBiquadFilter(), ng = ac.createGain(); ns.buffer = nb; bp.type = 'bandpass'; bp.frequency.value = f * 2; bp.Q.value = 3;
+    ng.gain.setValueAtTime(0, t0); ng.gain.linearRampToValueAtTime(g * 0.35, t0 + 0.08); ng.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+    ns.connect(bp).connect(ng).connect(ac.destination); ns.start(t0);
+  }
+  function drum(t0, g){ const o = ac.createOscillator(), gn = ac.createGain(); o.frequency.setValueAtTime(110, t0); o.frequency.exponentialRampToValueAtTime(42, t0 + 0.45);
+    gn.gain.setValueAtTime(g, t0); gn.gain.exponentialRampToValueAtTime(0.001, t0 + 0.6); o.connect(gn).connect(ac.destination); o.start(t0); o.stop(t0 + 0.6); }
+  const P = {
+    hana: t => [5, 7, 9, 12].forEach((n, i) => koto(N[n], t + i * 0.045, 1.2, 0.32)),
+    ten: t => { shaku(N[8], t, 0.9, 0.16, true); koto(N[5], t, 1.4, 0.3); koto(N[10], t + 0.12, 1.4, 0.25); },
+    plant: t => { koto(N[0], t, 2, 0.4); koto(N[2], t + 0.1, 2, 0.3); },
+    bloom: t => { for (let i = 0; i < 9; i++) koto(N[3 + i], t + i * 0.05, 1.6, 0.26); shaku(N[10], t + 0.2, 1.6, 0.15, true); drum(t, 0.5); },
+    draw: t => { shaku(N[7], t, 2.2, 0.16, true); for (let i = 0; i < 8; i++) koto(N[13 - i], t + 0.6 + i * 0.06, 1.8, 0.24); drum(t + 0.8, 0.6); },
+    drum: t => drum(t, 0.7),
+    kotoChord: t => [5, 8, 10].forEach(n => koto(N[n], t, 1.8, 0.28)),
+    hit: t => koto(N[12], t, 0.7, 0.22),
+    finish: t => { drum(t, 0.7); for (let i = 0; i < 12; i++) koto(N[2 + i % 12], t + 0.1 + i * 0.07, 2.2, 0.24); shaku(N[9], t + 0.5, 2.6, 0.17, true); },
+  };
+  return { play(n){ if (!ac || ac.state !== 'running' || !P[n]) return; try { P[n](ac.currentTime + 0.01); } catch (e) {} } };
+})();
 /* 桜華の技の始まりの演出 */
 const OUKA_MV = { hana: 1, ten: 1, tenK: 1, tenM: 1, tenR: 1, tenFall: 1, plant: 1, petal: 1, petalS: 1 };
 function oukaStart(e){
   const p = sim.p[e.p], x = p.x / FP, y = p.y / FP, b = p.boost || 0, f = p.face;
+  SND.play(e.mv === 'hana' ? 'hana' : e.mv === 'plant' ? 'plant' : e.mv === 'tenFall' ? 'kotoChord' : 'ten');
   if (e.mv === 'hana') { FX.ouka.push({ k: 'fan', x, y: y + 62, f, t: 0, life: 30, b }); FX.shake = 4 + b * 2; FX.pflash = 3 + b * 2; }
   else if (e.mv === 'plant') { FX.ouka.push({ k: 'roots', x: x + f * 20, y, t: 0, life: 40 }); FX.shake = 5; }
   else if (e.mv === 'tenFall') { FX.ouka.push({ k: 'storm', p: e.p, t: 0, life: 999 }); FX.pflash = 6; }
@@ -432,7 +474,8 @@ function drawFighter(p, fr){
   const P = pose(p, fr), col = COL[p.i];
   const sx = wx(p.x / FP), sy = wy(p.y / FP), z = cam.z;
   const c = cx;
-  c.save(); c.translate(sx, sy); c.scale(z * p.face * MIR, -z);
+  let spin = 1; if (p.st === 'atk' && MV[p.mv].spin && p.mvf < MV[p.mv].s + MV[p.mv].a) spin = Math.cos(p.mvf * 0.9); // 天桜: こまのように回りながら昇る
+  c.save(); c.translate(sx, sy); c.scale(z * p.face * MIR * (Math.abs(spin) < 0.15 ? 0.15 * Math.sign(spin || 1) : spin), -z);
   c.globalAlpha = P.alpha;
   if (WORLD.f > 0.3) { c.shadowColor = `rgba(255,214,224,${0.8 * WORLD.f})`; c.shadowBlur = 8; } // 落花の夜でも姿が見えるように縁を光らせる
   if (P.rot) { c.translate(0, P.hip); c.rotate(rad(P.rot)); c.translate(0, -P.hip); }
@@ -658,13 +701,16 @@ function drawBg(fr){
 
 /* ---------- 桜華の世界 ----------
    木が満開になると竹林が桜の森に、落花になると赤黒い夜に花が吹き荒れる世界に塗り替わる（両方の画面とも） */
-const WORLD = { b: 0, f: 0, k: 0 };
+const WORLD = { b: 0, f: 0, k: 0, m: 0 };
 const SKTREES = []; (function(){ let s = 4242; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   for (let layer = 0; layer < 3; layer++) for (let k = 0; k < 9 - layer * 2; k++) { const blobs = []; for (let j = 0; j < 9; j++) blobs.push([(r() - 0.5) * 1.6, r() * 0.7, 0.35 + r() * 0.45]);
     SKTREES.push({ layer, x: -300 + r() * 2200, h: [520, 420, 330][layer] * (0.8 + r() * 0.4), w: [190, 150, 120][layer] * (0.8 + r() * 0.4), blobs }); } })();
 function updateWorld(){
   let st = 0; for (const p of sim.p) if (p.tree && p.tree.stage > st) st = p.tree.stage;
-  WORLD.b += ((st >= 2 ? 1 : 0) - WORLD.b) * 0.06; WORLD.f += ((st >= 3 ? 1 : 0) - WORLD.f) * 0.05; WORLD.k += ((st >= 1 ? 1 : 0) - WORLD.k) * 0.05;
+  const zetsu = sim.p.some(p => p.kit === 'ouka'); // 絶の刀を持つ者がいる戦場は、最初から桜の森
+  WORLD.b += ((zetsu || st >= 2 ? 1 : 0) - WORLD.b) * 0.06; WORLD.f += ((st >= 3 ? 1 : 0) - WORLD.f) * 0.05;
+  WORLD.k += ((zetsu ? 1 : 0) - WORLD.k) * 0.05; WORLD.m += ((st >= 2 ? 1 : 0) - WORLD.m) * 0.05;
+  if (FX.finish && FX.finish.zetsu) { WORLD.k = 1; WORLD.m = Math.min(1, WORLD.m + 0.05); }
 }
 function drawSakuraWorld(fr){
   const b = WORLD.b, f = WORLD.f; if (b < 0.01) return;
@@ -674,6 +720,8 @@ function drawSakuraWorld(fr){
   cx.globalAlpha = b * (1 - f); cx.fillStyle = g; cx.fillRect(0, 0, W, gy + 2);
   g = cx.createLinearGradient(0, 0, 0, gy); g.addColorStop(0, '#060102'); g.addColorStop(0.55, '#3d0610'); g.addColorStop(1, '#8e0f22');
   cx.globalAlpha = b * f; cx.fillStyle = g; cx.fillRect(0, 0, W, gy + 2);
+  // 満開: 森全体が薄紅に光る
+  if (WORLD.m > 0.01) { const g2 = cx.createRadialGradient(W / 2, gy, 0, W / 2, gy, Math.max(W, H)); g2.addColorStop(0, `rgba(255,220,232,${0.35 * WORLD.m * (1 - f)})`); g2.addColorStop(1, 'rgba(255,220,232,0)'); cx.globalAlpha = 1; cx.fillStyle = g2; cx.fillRect(0, 0, W, gy); }
   // 落花の夜: 大きな月
   if (f > 0.01) { const mx = W * 0.72, my = H * 0.26, R = Math.min(W, H) * 0.2; cx.globalAlpha = b * f;
     const mg = cx.createRadialGradient(mx, my, R * 0.6, mx, my, R * 2.2); mg.addColorStop(0, 'rgba(255,214,222,.35)'); mg.addColorStop(1, 'rgba(255,214,222,0)'); cx.fillStyle = mg; cx.fillRect(mx - R * 2.2, my - R * 2.2, R * 4.4, R * 4.4);
@@ -690,15 +738,15 @@ function drawSakuraWorld(fr){
       cx.beginPath(); cx.moveTo(x, gy); cx.quadraticCurveTo(x + 18 * z, gy - h * 0.5, x + sway, gy - h * 0.72); cx.stroke();
       cx.lineWidth = (6 - t.layer) * z; cx.beginPath(); cx.moveTo(x + 6 * z, gy - h * 0.5); cx.lineTo(x - w * 0.5, gy - h * 0.78); cx.moveTo(x + 8 * z, gy - h * 0.58); cx.lineTo(x + w * 0.55, gy - h * 0.84); cx.stroke();
       const keep = mode ? 0.45 : 1; // 落花は花が散って少ない
-      t.blobs.forEach(([bx, by, br], j) => { if (mode && j % 2) return; cx.fillStyle = bloom[mode][(j + t.layer) % 3]; cx.beginPath(); cx.arc(x + sway + bx * w * 0.6, gy - h * 0.72 - by * h * 0.35, br * w * 0.55 * (mode ? 0.8 : 1), 0, Math.PI * 2); cx.fill(); }); }
+      t.blobs.forEach(([bx, by, br], j) => { if (mode && j % 2) return; if (!mode && WORLD.m < 0.5 && j % 3 === 2) return; /* 満開で花が増える */ cx.fillStyle = bloom[mode][(j + t.layer) % 3]; cx.beginPath(); cx.arc(x + sway + bx * w * 0.6, gy - h * 0.72 - by * h * 0.35, br * w * 0.55 * (mode ? 0.8 : 1), 0, Math.PI * 2); cx.fill(); }); }
   }
   cx.globalAlpha = 1;
 }
 /* 画面いっぱいの花吹雪（画面の座標。開花は少し、満開は舞い、落花は吹き荒れる） */
 const STORM = []; for (let k = 0; k < 420; k++) STORM.push({ x: Math.random(), y: Math.random(), s: 0.6 + Math.random() * 1.2, r: Math.random() * 6, v: Math.random() });
 function drawStorm(fr){
-  const k = WORLD.k, b = WORLD.b, f = WORLD.f; if (k < 0.01) return;
-  const n = Math.floor(40 * k + 120 * b + 260 * f), wind = 0.0006 + f * 0.006 + Math.max(0, Math.sin(fr * 0.02)) * f * 0.006, fall = 0.0012 + f * 0.003;
+  const k = WORLD.k, b = WORLD.b, f = WORLD.f; if (k < 0.01 && WORLD.m < 0.01) return;
+  const m = WORLD.m, n = Math.floor(30 * k + 150 * m + 240 * f), wind = 0.0006 + f * 0.006 + Math.max(0, Math.sin(fr * 0.02)) * f * 0.006, fall = 0.0012 + f * 0.003;
   const mv = CUR === VIEWS[0]; // 二画面のときも動かすのは一回だけ
   for (let i = 0; i < n; i++) { const q = STORM[i];
     if (mv) q.x += (wind + 0.0004 * Math.sin(fr * 0.03 + i)) * q.s * (MIR < 0 ? 1 : 1); if (mv) { q.y += fall * q.s + Math.sin(fr * 0.05 + i) * 0.0006; q.r += 0.05 * q.s; }
@@ -709,6 +757,48 @@ function drawStorm(fr){
   cx.globalAlpha = 1;
   // 落花は画面の縁が紅く沈む
   if (f > 0.01) { const g = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75); g.addColorStop(0, 'rgba(60,2,10,0)'); g.addColorStop(1, `rgba(40,0,6,${0.55 * f})`); cx.fillStyle = g; cx.fillRect(0, 0, W, H); }
+}
+/* 絶の刀で勝ったとき: 赤黒の幕に刀の絵が斜めに走り、花吹雪の中に決着名 */
+function drawZetsuFinish(f, t){
+  const s = Math.min(W, H), out = t > 170 ? Math.max(0, (200 - t) / 30) : 1;
+  cx.save(); cx.globalAlpha = Math.min(1, t / 10) * out * 0.9;
+  const g = cx.createRadialGradient(W / 2, H / 2, s * 0.1, W / 2, H / 2, Math.max(W, H) * 0.8); g.addColorStop(0, '#5a0a14'); g.addColorStop(1, '#050102'); cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+  cx.globalAlpha = out;
+  if (t >= 12 && t < 24) { cx.globalAlpha = (24 - t) / 12 * out; cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H); cx.globalAlpha = out; }
+  if (OUKA_IMG.complete && OUKA_IMG.naturalWidth && t > 6) { const u = Math.min(1, (t - 6) / 14), e = 1 - Math.pow(1 - u, 3), kw = s * 1.9, kh = kw * 106 / 900;
+    cx.save(); cx.translate(W / 2, H * 0.42); cx.rotate(-0.32); cx.shadowColor = 'rgba(255,90,130,1)'; cx.shadowBlur = 36; cx.drawImage(OUKA_IMG, -kw / 2 + (1 - e) * -W * 1.4, -kh / 2, kw, kh); cx.restore(); }
+  cx.restore();
+  for (let i = 0; i < 260; i++) { const q = STORM[i]; cx.globalAlpha = 0.85 * out; cx.fillStyle = i % 3 ? CRIM[i % 3] : SAKURA[i % 3];
+    cx.beginPath(); cx.ellipse(((q.x + t * 0.003 * q.s) % 1) * W, ((q.y + t * 0.005 * q.s) % 1) * H, 4 + q.s * 3, 2 + q.s * 1.5, q.r + t * 0.06, 0, Math.PI * 2); cx.fill(); }
+  cx.globalAlpha = 1;
+  if (t > 26) { const a = Math.min(1, (t - 26) / 12) * out, sc = 1 + Math.max(0, (38 - t) / 12) * 0.7;
+    cx.save(); cx.globalAlpha = a; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.shadowColor = 'rgba(220,30,60,1)'; cx.shadowBlur = 40; cx.fillStyle = '#fff1f4'; cx.font = `${Math.round(s * 0.2 * sc)}px ${DISPLAY}`; cx.fillText(f.name, W / 2, H * 0.62);
+    cx.shadowBlur = 0; cx.font = `500 ${Math.round(s * 0.04)}px ${UIF}`; cx.fillStyle = '#ffd6e2';
+    cx.fillText(`［${f.tier}］　${whoName(f.p)}　桜華にて一本`, W / 2, H * 0.62 + s * 0.15);
+    const r = s * 0.045; cx.fillStyle = '#8e0f22'; cx.fillRect(W / 2 - r, H * 0.2 - r, r * 2, r * 2); cx.fillStyle = '#ffe6ec'; cx.font = `${Math.round(r * 1.5)}px ${DISPLAY}`; cx.fillText('絶', W / 2, H * 0.2 + 1);
+    cx.restore(); }
+}
+/* 立ち合いの前: 絶の刀を抜くカットイン */
+const SAYA_IMG = new Image(); SAYA_IMG.src = 'assets/katana_ouka_saya.png';
+function drawZetsuIntro(t){
+  const L = GAME.zin, s = Math.min(W, H), who = sim.p.find(p => p.kit === 'ouka').i, fin = t > L - 16 ? (L - t) / 16 : 1;
+  cx.save(); cx.globalAlpha = fin;
+  const g = cx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#050102'); g.addColorStop(0.5, '#3a0610'); g.addColorStop(1, '#050102'); cx.fillStyle = g; cx.fillRect(0, 0, W, H);
+  const kw = Math.min(W * 0.92, s * 2.2), kh = kw * 106 / 900, cy = H * 0.5, x0 = (W - kw) / 2;
+  const pull = Math.max(0, Math.min(1, (t - 26) / 22)), ease = 1 - Math.pow(1 - pull, 3);
+  // 鞘から刃が抜けていく（刃の絵を左から見せる）
+  if (OUKA_IMG.complete && OUKA_IMG.naturalWidth) { const show = 226 / 900 + (1 - 226 / 900) * ease;
+    cx.save(); cx.shadowColor = 'rgba(255,110,150,.9)'; cx.shadowBlur = 20 + 30 * ease; cx.beginPath(); cx.rect(x0 - 10, cy - kh, kw * show + 10, kh * 2); cx.clip(); cx.drawImage(OUKA_IMG, x0 + ease * kw * 0.04, cy - kh / 2, kw, kh); cx.restore(); }
+  if (SAYA_IMG.complete && SAYA_IMG.naturalWidth && pull < 1) { cx.save(); cx.globalAlpha = fin * (1 - pull * 0.7); cx.beginPath(); cx.rect(x0 + kw * 0.25, cy - kh, kw, kh * 2); cx.clip(); cx.drawImage(SAYA_IMG, x0 + pull * kw * 0.5, cy - kh / 2 + 2, kw, kh); cx.restore(); }
+  if (t >= 46 && t < 56) { cx.globalAlpha = (56 - t) / 10 * fin; cx.fillStyle = '#fff'; cx.fillRect(0, 0, W, H); cx.globalAlpha = fin; }
+  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  if (t > 8) { cx.globalAlpha = Math.min(1, (t - 8) / 10) * fin; cx.font = `${Math.round(s * 0.05)}px ${DISPLAY}`; cx.fillStyle = COL[who].light; cx.fillText(whoName(who) + 'の刀', W / 2, H * 0.2); }
+  if (t > 50) { const a = Math.min(1, (t - 50) / 10) * fin, sc = 1 + Math.max(0, (60 - t) / 10) * 0.5;
+    cx.globalAlpha = a; cx.shadowColor = 'rgba(200,20,40,1)'; cx.shadowBlur = 30; cx.font = `${Math.round(s * 0.16 * sc)}px ${DISPLAY}`; cx.fillStyle = '#fff2f5'; cx.fillText('桜華', W / 2, H * 0.78);
+    cx.shadowBlur = 0; cx.fillStyle = '#8e0f22'; const r = s * 0.05; cx.fillRect(W / 2 + s * 0.2, H * 0.78 - r, r * 2, r * 2); cx.fillStyle = '#ffe6ec'; cx.font = `${Math.round(r * 1.5)}px ${DISPLAY}`; cx.fillText('絶', W / 2 + s * 0.2 + r, H * 0.78 + 1); }
+  cx.restore();
+  if (t > 46) { const n = Math.min(160, (t - 46) * 6); for (let i = 0; i < n; i++) { const q = STORM[i]; cx.globalAlpha = 0.8 * fin; cx.fillStyle = i % 3 ? SAKURA[i % 3] : CRIM[i % 3]; cx.beginPath(); cx.ellipse(q.x * W, ((q.y + t * 0.004 * q.s) % 1) * H, 4 + q.s * 2, 2 + q.s, q.r + t * 0.05, 0, Math.PI * 2); cx.fill(); } cx.globalAlpha = 1; }
 }
 /* 段階が上がった瞬間のカットイン。止め絵で刀の絵が走り、大きな字が出る（この間は両者とも止まる） */
 const OUKA_IMG = new Image(); OUKA_IMG.src = 'assets/katana_ouka.png';
@@ -775,7 +865,8 @@ function drawHud(){
 /* 一本の始め */
 function drawIntro(){
   if (GAME.phase !== 'intro') return;
-  const t = GAME.t, s = Math.min(W, H);
+  if (GAME.zin && GAME.t <= GAME.zin) return drawZetsuIntro(GAME.t);
+  const t = GAME.t - GAME.zin, s = Math.min(W, H);
   cx.textAlign = 'center';
   cx.fillStyle = `rgba(10,10,8,${0.35 * clamp(1 - (t - 60) / 20, 0, 1)})`; cx.fillRect(0, 0, W, H);
   const head = GAME.mode === 'cpu' ? '其の' + kn(GAME.n) : lastBout() ? '後なし' : kn(sim.roundNo) + '本目';
@@ -851,6 +942,7 @@ function readKeyFor(pi, id){ const km = keyMap(pi); return !!km && km[id].some(c
 function drawFinish(){
   const f = FX.finish; if (!f) return;
   const t = f.t;
+  if (f.zetsu) return drawZetsuFinish(f, t);
   if (f.how === 'iai' || f.how === 'sd') {
     const dark = clamp(t / 14, 0, 1) * (t < 150 ? 1 : clamp(1 - (t - 150) / 50, 0, 1));
     cx.fillStyle = `rgba(6,6,5,${0.88 * dark})`; cx.fillRect(0, 0, W, H);

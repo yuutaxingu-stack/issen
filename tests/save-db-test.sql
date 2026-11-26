@@ -62,3 +62,32 @@ do $$ begin update public.saves set steel = 999999; raise exception 'NG 直接�
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 select 'import steel', public.import_local('{"steel":77}') ->> 'steel';
 reset role;
+
+-- 絶の印: 自分・フレンド・渡した人のうち、絶の刀を持つ人だけ
+insert into auth.users values ('33333333-3333-3333-3333-333333333333', '{"login":"ccc","name":"丙"}');
+update public.saves set owned = owned || '{"ouka":1}' where id = '22222222-2222-2222-2222-222222222222';
+insert into public.saves (id, owned) values ('33333333-3333-3333-3333-333333333333', '{"mumei":1,"ouka":2}') on conflict (id) do update set owned = excluded.owned;
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+do $$ declare r jsonb; begin
+  r := public.zetsu_owners();
+  if r <> '[]'::jsonb then raise exception 'NG フレンドでない人が出た: %', r; end if;
+  r := public.zetsu_owners(array['22222222-2222-2222-2222-222222222222'::uuid]);
+  if r <> '["22222222-2222-2222-2222-222222222222"]'::jsonb then raise exception 'NG 渡した人: %', r; end if;
+  raise notice 'OK 絶の印: 渡した人だけ %', r;
+end $$;
+reset role;
+insert into public.friendships values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333', '11111111-1111-1111-1111-111111111111', 'accepted');
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+do $$ declare r jsonb; begin
+  r := public.zetsu_owners();
+  if r <> '["33333333-3333-3333-3333-333333333333"]'::jsonb then raise exception 'NG フレンド: %', r; end if;
+  raise notice 'OK 絶の印: フレンドの持ち主 %', r;
+end $$;
+reset role;
+do $$ begin
+  set local role anon;
+  perform public.zetsu_owners(); raise exception 'NG';
+exception when insufficient_privilege then raise notice 'OK ログインしていないと呼べない'; end $$;
+reset role;

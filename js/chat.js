@@ -308,7 +308,7 @@
     }
     const cls = ['cmsg', mine ? 'mine' : '', named(m) ? 'forme' : '', isDm(m) ? 'dm' : ''].join(' ');
     return '<li class="' + cls + '"><div class="chd"><button type="button" class="cwho" data-who="' + m.id + '">' +
-      esc(nameOf(m.author)) + '</button><time>' + when(m.created_at) + '</time></div>' + body + '</li>';
+      esc(nameOf(m.author)) + (window.IssenZetsu ? window.IssenZetsu.mark(m.author) : '') + '</button><time>' + when(m.created_at) + '</time></div>' + body + '</li>';
   }
   function dmIndex(){
     const rows = N.friends.map(f => { const l = dmMsgs(f.id); return { f, last: l[l.length - 1], un: unreadDm(f.id).length }; })
@@ -316,7 +316,7 @@
     if (!rows.length) return '<li class="cempty">フレンドができると、ここで一対一の話ができます。</li>';
     return rows.map(({ f, last, un }) => '<li class="cdm"><button type="button" data-open="' + f.id + '">' +
       '<span class="odot ' + ({ online: 'on', playing: 'play' }[N.statusOf(f.id)] || 'off') + '"></span>' +
-      '<span class="cdmn">' + esc(f.name) + '</span>' +
+      '<span class="cdmn">' + esc(f.name) + (window.IssenZetsu ? window.IssenZetsu.mark(f.id) : '') + '</span>' +
       '<span class="cdml">' + (last ? (last.author === me() ? 'あなた：' : '') + esc(last.body) : 'まだ密書はありません') + '</span>' +
       (un ? '<span class="cbadge named">' + un + '</span>' : '') + '</button></li>').join('');
   }
@@ -474,6 +474,7 @@
 
   /* ---------- ログインの変化についていく ---------- */
   let seenUser = null;
+  if (window.IssenZetsu) window.IssenZetsu.on(() => render());
   N.on(() => {
     const u = me() || null;
     if (u !== seenUser) { seenUser = u; if (u) start(); else { stop(); close(); } }

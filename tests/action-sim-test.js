@@ -101,4 +101,13 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   t.p[0].tree = { x: 610 * A.FP, y: 0, hp: 4000, stage: 1, u1: false, u2: false };
   let n = 0; for (let k = 0; k < 400 && t.p[0].tree; k++) { t.step([I(), I({ A: (k % 20) === 0 })]); }
   ok(!t.p[0].tree, '相手の斬りで木が折れる'); }
+// 桜華: 落花の天桜は着地で前後に花が散り、何度も当たる
+{ const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 800 * A.FP; s.p[1].x = 960 * A.FP; s.p[1].face = -1;
+  s.p[0].tree = { x: 300 * A.FP, y: 0, hp: 4000, stage: 3, u1: true, u2: false };
+  run(s, 1, () => I({ U: 1, A: 1, V: 'u' })); let n = 0, back = false;
+  for (let k = 0; k < 200; k++) { s.step([I(), I()]); for (const e of drain(s)) { if (e.t === 'fallBurst') back = s.pj.some(q => q.vx < 0); if (e.t === 'hit' && e.mv === 'petalG') n++; } }
+  ok(back && n >= 2, '着地の花が前後に散って多段ヒット (' + n + '回)'); }
+// 桜華で勝つと 並・上 の決着名は「散華」になる
+{ const s = new A.Sim({ kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 660 * A.FP; s.p[1].hp = 100; s.p[0].touched = true;
+  run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.result && s.result.name === '散華', '桜華の決着は散華 (' + (s.result && s.result.name) + ')'); }
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

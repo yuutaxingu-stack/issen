@@ -345,6 +345,26 @@ begin
 end;
 $$;
 
+-- 絶の刀の持ち主（名前に「絶」の印を出すため）。自分とフレンド、それに p_ids で渡した人（対戦相手など、最大64人）のうち、
+-- 絶の刀を1本でも持つ人の id を返す。返すのは「持っているか」だけで、銭や刀の中身は返さない
+create or replace function public.zetsu_owners(p_ids uuid[] default null) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  with me as (select auth.uid() as id),
+  people as (
+    select m.id from me m where m.id is not null
+    union
+    select case when f.a = m.id then f.b else f.a end from public.friendships f, me m
+      where m.id is not null and (f.a = m.id or f.b = m.id) and f.status = 'accepted'
+    union
+    select x from me m, unnest(coalesce(p_ids[1:64], '{}'::uuid[])) x where m.id is not null
+  )
+  select coalesce(jsonb_agg(s.id), '[]'::jsonb) from public.saves s join people p on p.id = s.id
+  where exists (select 1 from jsonb_each(s.owned) o join public.katana_catalog c on c.id = o.key
+                where c.tier = '絶' and jsonb_typeof(o.value) = 'number' and (o.value)::text::numeric > 0);
+$$;
+revoke execute on function public.zetsu_owners(uuid[]) from public, anon, authenticated;
+grant execute on function public.zetsu_owners(uuid[]) to authenticated;
+
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.save_num(jsonb, bigint), public.save_json(public.saves), public.save_lock(), public.save_has(public.saves, text),

@@ -70,6 +70,7 @@
     if (r.data.status === 'closed') { leaveLocal(); toast('部屋が解散されました', 4000); return; }
     const before = T.room.status;
     T.room = r.data; T.members = mem;
+    if (window.IssenZetsu) { const zk = mem.map(m => m.user_id).sort().join(','); if (zk !== T.zk) { T.zk = zk; window.IssenZetsu.refresh(mem.map(m => m.user_id)); } }
     T.lineups = {}; (l.data || []).forEach(x => { T.lineups[x.team] = x.slots || []; });
     if (before === 'playing' && T.room.status === 'done') finale();
     T.lastStatus = T.room.status;
@@ -290,7 +291,7 @@
       });
     }
     if (isHost() && !mine) btns += '<button type="button" class="obtn" data-ta="kick" data-id="' + m.user_id + '">外す</button>';
-    return '<li class="' + (mine ? 'me' : '') + '"><span class="onm">' + esc(m.name) + '</span>' + (host ? '<span class="thmark">主</span>' : '') + '<span class="ost"></span>' + btns + '</li>';
+    return '<li class="' + (mine ? 'me' : '') + '"><span class="onm">' + esc(m.name) + (window.IssenZetsu ? window.IssenZetsu.mark(m.user_id) : '') + '</span>' + (host ? '<span class="thmark">主</span>' : '') + '<span class="ost"></span>' + btns + '</li>';
   }
 
   function renderLobby(){
@@ -523,7 +524,7 @@
     if (I.G.mode !== 'title') return;   // CPU戦などで遊んでいる人は引っぱらない
     if (!force && el.hidden) return;    // 団体戦の画面を開いている人だけ
     T.watched[cur.match] = true;
-    const ok = M.watch(cur.match, { seed: cur.seed, toWin: cur.to_win, names: [nameOf(cur.a), nameOf(cur.b)], tag: tagOf(cur), back: '画面をタップで部屋へ',
+    const ok = M.watch(cur.match, { seed: cur.seed, toWin: cur.to_win, names: [nameOf(cur.a), nameOf(cur.b)], ids: [cur.a, cur.b], tag: tagOf(cur), back: '画面をタップで部屋へ',
       onStart: () => { el.hidden = true; },
       onEnd: why => { if (why === 'late') { T.lateFor = cur.match; } if (T.room) { open(); load(); } } });
     if (!ok) T.watched[cur.match] = false;
@@ -548,6 +549,7 @@
 
   // ログインしたら、前にいた部屋へ戻る
   let lastUser = null;
+  if (window.IssenZetsu) window.IssenZetsu.on(() => render());
   N.on(() => {
     const u = N.user ? N.user.id : null;
     if (u !== lastUser) {

@@ -56,6 +56,16 @@ const MV = {
   bair:  { n:'後空斬', k:'a', s:5, a:3, r:16, land:11, dmg:900, gd:1100, hs:24, kb:[860,430], box:[-118,22,114,88], arc:[200,280], ext:20 },
   uair:  { n:'上空斬', k:'a', s:8, a:5, r:14, land:10, dmg:500, gd:700, hs:24, kb:[100,1150], box:[-44,92,88,74], arc:[-10,190] },
   dair:  { n:'下空斬（突き）', k:'a', s:16, a:2, r:20, land:18, dmg:800, gd:1200, hs:34, kb:[60,0], flinch:1, box:[-13,-97,26,129], arc:[-90,-90], ext:45, pad:12 },
+  /* 刀「桜華」（絶）。強化は木の段階で決まり、段階ごとに一度だけ（startMove で判定） */
+  hana:  { n:'花嵐', k:'g', s:16, a:1, r:32, noBox:1, shot:'hana', arc:[150,-30] },
+  petal: { n:'花嵐', k:'p', s:1, a:1, r:0, dmg:400, gd:800, hs:14, blk:-4, kb:[220,0], flinch:1 },
+  petalS:{ n:'花嵐（落花）', k:'p', s:1, a:1, r:0, dmg:200, gd:400, hs:10, blk:-2, kb:[120,0], flinch:1 },
+  ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], arc:[-60,95], rise:1, after:'fall', pose:'rise' },
+  tenK:  { n:'天桜（開花）', k:'a', s:5, a:12, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1350], arc:[-60,95], rise:1, riseV:2300, after:'fall', pose:'rise' },
+  tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:26, kb:[150,1350], arc:[-60,95], rise:1, riseV:2300, after:'fall', pose:'rise', aura:[-75,0,150,160] },
+  tenR:  { n:'天桜（落花）', k:'a', s:5, a:12, r:6, land:20, dmg:700, gd:1200, hs:26, kb:[150,1100], arc:[-60,95], rise:1, riseV:2300, pose:'rise', aura:[-75,0,150,160], next:'tenFall' },
+  tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100] },
+  plant: { n:'植樹', k:'g', s:14, a:1, r:16, noBox:1, plant:1, arc:[-70,-85] },
   airiai:{ n:'空中居合', k:'a', s:10, a:4, r:30, land:20, dmg:1000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,10,132,100], iai:1, arc:[-45,15], lunge:[2,10,3000], ext:30 },
 };
 for (const id in MV) {
@@ -68,10 +78,19 @@ for (const id in MV) {
 /* 当たり判定: 刀の通り道から作った表（js/action/boxes.js、tools/action-boxes.js で作る）。無い技は box を使う */
 const BOXES = (typeof module !== 'undefined' && module.exports) ? (function(){ try { return require('./boxes.js'); } catch (e) { return {}; } })() : (root.IssenActionBoxes || {});
 for (const id in MV) if (BOXES[id]) MV[id].boxes = BOXES[id];
-function curBox(p){ const m = MV[p.mv]; return m.boxes ? m.boxes[Math.min(m.boxes.length - 1, Math.max(0, p.mvf - m.s))] : m.box; }
+function curBox(p){
+  const m = MV[p.mv], b = m.boxes ? m.boxes[Math.min(m.boxes.length - 1, Math.max(0, p.mvf - m.s))] : m.box;
+  if (!m.aura || !b) return b || m.aura;
+  const u = m.aura, x0 = Math.min(b[0], u[0]), y0 = Math.min(b[1], u[1]); // 花びらを纏う技は体のまわりも当たる
+  return [x0, y0, Math.max(b[0] + b[2], u[0] + u[2]) - x0, Math.max(b[1] + b[3], u[1] + u[3]) - y0];
+}
 const SMASH_MIN = 12, SMASH_MAX = 40;
 /* 斬ボタン＋向きで出る特殊技。刀ごとに入れ替える（今は共通の一組だけ） */
-const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: 'rise', s3: 'counter', s3a: 'counter' } };
+const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: 'rise', s3: 'counter', s3a: 'counter' },
+  ouka: { n: '桜華', s1: 'hana', s1a: 'hana', s2: 'ten', s2a: 'ten', s3: 'plant', s3a: 'plant' } };
+/* 桜の木: 耐久は体力の4割。段階 1開花 2満開 3落花。u1/u2 = その段階の強化を花嵐/天桜で使ったか */
+const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [-22, 0, 44, 80], [-60, 0, 120, 170], [-60, 0, 120, 170]] };
+const PETAL = { w: 44, h: 44 };
 const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
 /* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
 const DG = {
@@ -111,6 +130,7 @@ function Sim(opts){
 }
 Sim.prototype.resetRound = function(){
   this.p = [newPlayer(0), newPlayer(1)];
+  if (this.opts.kits) this.p.forEach((p, i) => { p.kit = this.opts.kits[i] || 'common'; });
   this.frame = 0; this.hitstop = 0; this.sd = false; this.sdStart = 0;
   this.over = false; this.result = null; this.ev = []; this.pj = [];
   this.roundNo++;
@@ -133,6 +153,8 @@ function takeC(p, inp){
   if (p.cb && --p.cb.n <= 0) p.cb = null;
   if (inp.C) { p.buf.A = C.buf; p.cb = { d: inp.C, n: C.buf }; }
 }
+/* 落花の間は速く動ける（1.5倍） */
+const spd = (p, v) => p.tree && p.tree.stage === 3 ? Math.trunc(v * 3 / 2) : v;
 const horiz = p => (p.inp.R ? 1 : 0) - (p.inp.L ? 1 : 0);
 /* 技の向き。スティックは強く倒した方（V）、キーボードなどは斜めなら横を優先（急降下しながらでも空前・空後が出る） */
 function hsign(p){ return p.cb ? (p.cb.d === 'r' ? 1 : p.cb.d === 'l' ? -1 : 0) : horiz(p); }
@@ -166,6 +188,13 @@ function invuln(p){
 }
 
 Sim.prototype.startMove = function(p, id){
+  p.boost = 0;
+  if (id === 'hana' || id === 'ten') { // 使う瞬間の木の段階で強化（段階ごとに一度だけ）
+    const t = p.tree, k = id === 'hana' ? 'u1' : 'u2';
+    if (t && !t[k]) { t[k] = true; p.boost = t.stage; }
+    if (id === 'ten' && p.boost) id = ['ten', 'tenK', 'tenM', 'tenR'][p.boost];
+  }
+  p.treeHit = false;
   p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null;
   if (id === 'iai' || id === 'airiai') { p.buf.G = 0; const o = this.p[1 - p.i]; if (o.x !== p.x) p.face = sgn(o.x - p.x); }
   this.ev.push({ t: 'start', p: p.i, mv: id });
@@ -285,8 +314,8 @@ Sim.prototype.update = function(p, o){
   switch (p.st) {
     case 'idle': case 'crouch': case 'guard': case 'unguard': case 'bstun': case 'hit': case 'land': case 'tech': case 'stun':
       p.vx = toward(p.vx, 0, PH.gFric); break;
-    case 'walk': p.vx = h * PH.walk; break;
-    case 'dash': p.f++; p.vx = p.face * PH.dash; break;
+    case 'walk': p.vx = spd(p, h * PH.walk); break;
+    case 'dash': p.f++; p.vx = spd(p, p.face * PH.dash); break;
     case 'jsq':
       p.f++;
       if (p.f >= C.jsq) { p.st = 'air'; p.ground = false; p.plat = -1; p.vy = p.inp.J ? PH.jumpF : PH.jumpS; p.vx = h * Math.floor(PH.airMax * 4 / 5); p.ff = false; this.ev.push({ t: 'jump', p: p.i }); }
@@ -313,17 +342,18 @@ Sim.prototype.update = function(p, o){
       p.vx = toward(p.vx, 0, PH.gFric * 2); p.downT++; if (p.f > 0) p.f--; break;
   }
   if (p.st === 'air' || (p.st === 'atk' && !p.ground) || p.st === 'adodge') {
-    if (p.st !== 'adodge') p.vx = toward(p.vx, h * PH.airMax, PH.airAcc);
+    if (p.st !== 'adodge') p.vx = toward(p.vx, spd(p, h * PH.airMax), PH.airAcc);
   }
   if (p.st === 'atk') {
     const m = MV[p.mv];
     p.mvf++;
-    if (m.rise && p.mvf === 3) { p.ground = false; p.plat = -1; p.vy = 1750; p.vx = p.face * 250; p.ff = false; }
+    if (m.rise && p.mvf === 3) { p.ground = false; p.plat = -1; p.vy = m.riseV || 1750; p.vx = p.face * 250; p.ff = false; }
     if (m.plunge) { if (p.mvf < m.s) { p.vy = 0; p.vx = toward(p.vx, 0, 60); } else { p.vy = -2200; p.vx = 0; } }
     if (m.hover && p.mvf <= m.lunge[1]) p.vy = 0;
     if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
     else if (p.ground) p.vx = toward(p.vx, 0, PH.gFric);
-    if (m.shot && p.mvf === m.s) this.spawnShot(p);
+    if (m.shot && p.mvf === m.s) { if (m.shot === 'hana') this.spawnPetals(p); else this.spawnShot(p); }
+    if (m.plant && p.mvf === m.s) this.plant(p);
   }
   // 当たった・守った後の固まり
   if (p.st === 'hit' || p.st === 'bstun' || p.st === 'tumble') {
@@ -410,6 +440,33 @@ Sim.prototype.spawnShot = function(p){
   this.pj.push({ o: p.i, x: p.x + p.face * SHOT.ox * FP, y: p.y + SHOT.oy * FP, vx: p.face * SHOT.speed, life: SHOT.life });
   this.ev.push({ t: 'shot', p: p.i });
 };
+/* 花嵐: 普通は一枚。開花で速く、満開で三枚・大きく（まとめて一回当たる）、落花で五枚に散って一枚ずつ当たる */
+Sim.prototype.spawnPetals = function(p){
+  const b = p.boost, x = p.x + p.face * SHOT.ox * FP, y = p.y + SHOT.oy * FP;
+  this.pjN = (this.pjN || 0) + 1;
+  const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: p.face * sp, vy, life: 48, w, h: w, mv, gid, petal: 1 });
+  if (b === 3) { for (const v of [-320, -160, 0, 160, 320]) add(0, v, 1150, 50, 'petalS', this.pjN * 8 + (v / 160 + 2)); }
+  else if (b === 2) { for (const dy of [-38, 0, 38]) add(dy, 0, 1300, 62, 'petal', this.pjN * 8); }
+  else add(0, 0, b === 1 ? 1350 : 800, PETAL.w, 'petal', this.pjN * 8);
+  this.ev.push({ t: 'shot', p: p.i, petal: b });
+};
+/* 植樹: 木が無ければ足元に植えて開花。あれば 満開→落花→撤去 と進める */
+Sim.prototype.plant = function(p){
+  const t = p.tree;
+  if (!t) {
+    let gy = 0; if (p.ground) gy = p.y; else for (const pl of PLATS) if (p.x >= pl.x0 && p.x <= pl.x1 && p.y >= pl.y && pl.y > gy) gy = pl.y;
+    p.tree = { x: p.x, y: gy, hp: TREE.hp, stage: 1, u1: false, u2: false };
+  } else if (t.stage < 3) { t.stage++; t.u1 = t.u2 = false; }
+  else { p.tree = null; this.ev.push({ t: 'treeGone', p: p.i, x: t.x, y: t.y }); return; }
+  this.ev.push({ t: 'bloom', p: p.i, stage: p.tree.stage, x: p.tree.x, y: p.tree.y });
+};
+function treeBox(t){ const b = TREE.box[t.stage]; return [t.x + b[0] * FP, t.y + b[1] * FP, t.x + (b[0] + b[2]) * FP, t.y + (b[1] + b[3]) * FP]; }
+/* 相手の木を斬る（技ごとに一回） */
+Sim.prototype.hitTree = function(a, d, dmg, x, y){
+  const t = d.tree; t.hp -= dmg;
+  if (t.hp <= 0) { d.tree = null; this.ev.push({ t: 'treeBreak', p: d.i, by: a.i, x: t.x, y: t.y }); }
+  else this.ev.push({ t: 'treeHit', p: d.i, by: a.i, x, y, hp: t.hp });
+};
 const inCounter = d => d.st === 'atk' && MV[d.mv].counter && d.mvf >= MV[d.mv].s && d.mvf < MV[d.mv].s + MV[d.mv].a;
 Sim.prototype.triggerCounter = function(d, a){
   if (a.x !== d.x) d.face = sgn(a.x - d.x);
@@ -419,21 +476,23 @@ Sim.prototype.triggerCounter = function(d, a){
 };
 Sim.prototype.moveShots = function(){
   const P = this.p;
-  for (const q of this.pj) { q.x += q.vx; q.life--; if (q.x < WALL_L || q.x > WALL_R) q.life = 0; }
+  for (const q of this.pj) { q.x += q.vx; q.y += q.vy || 0; q.life--; if (q.x < WALL_L || q.x > WALL_R || q.y < 0) q.life = 0; }
   // 斬撃どうしは相殺
   for (let i = 0; i < this.pj.length; i++) for (let j = i + 1; j < this.pj.length; j++) {
     const a = this.pj[i], b = this.pj[j];
-    if (a.o !== b.o && a.life > 0 && b.life > 0 && Math.abs(a.x - b.x) < SHOT.w * FP && Math.abs(a.y - b.y) < SHOT.h * FP) { a.life = b.life = 0; this.ev.push({ t: 'clash', x: a.x, y: a.y }); }
+    if (a.o !== b.o && a.life > 0 && b.life > 0 && Math.abs(a.x - b.x) < ((a.w || SHOT.w) + (b.w || SHOT.w)) / 2 * FP && Math.abs(a.y - b.y) < ((a.h || SHOT.h) + (b.h || SHOT.h)) / 2 * FP) { a.life = b.life = 0; this.ev.push({ t: 'clash', x: a.x, y: a.y }); }
   }
   for (const q of this.pj) {
     if (q.life <= 0) continue;
-    const d = P[1 - q.o], a = P[q.o];
+    const d = P[1 - q.o], a = P[q.o], w = q.w || SHOT.w, h = q.h || SHOT.h;
+    const bx = [q.x - w * FP / 2, q.y - h * FP / 2, q.x + w * FP / 2, q.y + h * FP / 2];
+    const kill = () => { for (const r of this.pj) if (r === q || (q.gid != null && r.gid === q.gid)) r.life = 0; };
+    if (d.tree && overlap(bx, treeBox(d.tree))) { kill(); this.hitTree(a, d, MV[q.mv || 'shotP'].dmg, q.x, q.y); continue; }
     if (invuln(d)) continue;
-    const bx = [q.x - SHOT.w * FP / 2, q.y - SHOT.h * FP / 2, q.x + SHOT.w * FP / 2, q.y + SHOT.h * FP / 2];
     if (!overlap(bx, hbox(d))) continue;
-    q.life = 0;
+    kill();
     if (inCounter(d)) { this.triggerCounter(d, a); continue; }
-    this.applyHit(a, d, MV.shotP, { a: a.i, dst: d.st, dmv: d.mv, dmvf: d.mvf, dground: d.ground }, q);
+    this.applyHit(a, d, MV[q.mv || 'shotP'], { a: a.i, dst: d.st, dmv: d.mv, dmvf: d.mvf, dground: d.ground }, q);
   }
   this.pj = this.pj.filter(q => q.life > 0);
 };
@@ -444,9 +503,10 @@ Sim.prototype.hits = function(){
     if (a.st !== 'atk' || a.hitDone) continue;
     const m = MV[a.mv];
     if (m.noBox || a.mvf < m.s || a.mvf >= m.s + m.a) continue;
-    const d = P[1 - a.i];
+    const d = P[1 - a.i], ab = box(a, curBox(a));
+    if (d.tree && !a.treeHit && !m.grab && overlap(ab, treeBox(d.tree))) { a.treeHit = true; this.hitTree(a, d, m.dmg, Math.trunc((ab[0] + ab[2]) / 2), Math.trunc((ab[1] + ab[3]) / 2)); }
     if (invuln(d)) continue;
-    if (!overlap(box(a, curBox(a)), hbox(d))) continue;
+    if (!overlap(ab, hbox(d))) continue;
     if (inCounter(d) && !m.grab && !m.iai) { a.hitDone = true; this.triggerCounter(d, a); continue; }
     todo.push([a, d, m]);
   }
@@ -460,7 +520,8 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   const dir = pj ? sgn(pj.vx) : (sgn(d.x - a.x) || a.face);
   const mvRem = pj ? null : m.total - a.mvf;
   const pw = a.power || 0;
-  const dmgBase = Array.isArray(m.dmg) ? m.dmg[0] + Math.floor((m.dmg[1] - m.dmg[0]) * pw / 100) : m.dmg;
+  let dmgBase = Array.isArray(m.dmg) ? m.dmg[0] + Math.floor((m.dmg[1] - m.dmg[0]) * pw / 100) : m.dmg;
+  if (a.tree && a.tree.stage === 2) dmgBase = Math.floor(dmgBase * 14 / 10); // 満開: 花びらを纏って威力1.4倍
   const gdBase = Array.isArray(m.gd) ? m.gd[0] + Math.floor((m.gd[1] - m.gd[0]) * pw / 100) : m.gd;
   const guarding = (s.dst === 'guard' || s.dst === 'bstun' || s.dst === 'unguard') && s.dground;
   const hx = pj ? pj.x : Math.trunc((a.x + d.x) / 2), hy = d.y + 60 * FP;
@@ -596,6 +657,7 @@ Sim.prototype.step = function(inputs){
     if (p.st !== 'atk') continue;
     const m = MV[p.mv];
     if (m.chain && p.chainReq && p.mvf >= m.s + m.a - 1) { this.startMove(p, m.chain); continue; }
+    if (m.next && p.mvf >= m.total) { this.startMove(p, m.next); continue; }
     if (p.mvf >= m.total) {
       p.st = p.ground ? 'idle' : m.after === 'fall' ? 'fall' : 'air'; p.mv = null; p.power = 0;
     }
@@ -613,11 +675,11 @@ Sim.prototype.hash = function(){
   let h = 2166136261 >>> 0;
   const mix = v => { h ^= (v | 0); h = Math.imul(h, 16777619) >>> 0; };
   mix(this.frame); mix(this.hitstop); for (const q of this.pj) { mix(q.x); mix(q.y); mix(q.life); }
-  for (const p of this.p) { mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
+  for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
   return h;
 };
 
-const API = { curBox, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
+const API = { curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 else root.IssenAction = API;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -12,7 +12,8 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const rad = d => d * Math.PI / 180;
 
 /* 技 m の f フレーム目の形 */
-function attackPose(id, m, f){
+function attackPose(id0, m, f){
+  const id = m.pose || id0; // 桜華の技は形の近い技の姿勢を借りる
   const P = { hip: 56, lean: 6, fA: [-16, 0], fB: [18, 0], sw: 25, arm: -30, sheath: false };
   const a0 = m.arc[0], a1 = m.arc[1];
   if (m.iai) P.sheath = f < m.s;

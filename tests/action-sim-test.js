@@ -77,4 +77,28 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 // 22) 走りながら攻撃スティックでダッシュ斬り。飛ぶ斬撃は当たっても少し怯むだけ
 { const s = sim(600); run(s, 1, () => I({ R: 1, F: 1 })); run(s, 3, () => I({ R: 1 })); run(s, 1, () => I({ R: 1, C: 'r' })); ok(s.p[0].mv === 'dashatk', 'ダッシュ斬り'); }
 { const s = sim(250); run(s, 1, () => I({ A: 1, R: 1 })); const sts = new Set(); for (let k = 0; k < 80; k++) { s.step([I(), I()]); sts.add(s.p[1].st); } ok(sts.has('hit') && !sts.has('tumble') && !sts.has('down'), '飛ぶ斬撃は怯むだけ ' + [...sts]); }
+
+// 桜華: 下Bで 植樹(開花)→満開→落花→撤去、強化は段階ごとに一度
+{ const ou = d => { const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
+  const down = s => { run(s, 1, () => I({ D: 1, A: 1, V: 'd' })); run(s, 40); };
+  const s = ou(600);
+  down(s); ok(s.p[0].tree && s.p[0].tree.stage === 1 && s.p[0].tree.x === 600 * A.FP, '植樹で開花の木');
+  const tx = s.p[0].tree.x; run(s, 20, () => I({ R: 1 })); ok(s.p[0].tree.x === tx, '木は動かない');
+  run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 20); ok(s.pj.length === 1 && Math.abs(s.pj[0].vx) === 1350, '開花の花嵐は速い');
+  run(s, 50); run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 20); ok(s.pj.length === 1 && Math.abs(s.pj[0].vx) === 800, '強化は一度だけ、二度目は普通');
+  run(s, 60); down(s); ok(s.p[0].tree.stage === 2, '満開');
+  run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 20); ok(s.pj.length === 3, '満開の花嵐は三枚'); run(s, 60);
+  down(s); ok(s.p[0].tree.stage === 3, '落花');
+  run(s, 1, () => I({ R: 1, A: 1, V: 'h' })); run(s, 20); ok(s.pj.length === 5 && new Set(s.pj.map(q => q.vy)).size === 5, '落花の花嵐は五枚に散る'); run(s, 60);
+  { const x0 = s.p[0].x; run(s, 10, () => I({ L: 1 })); ok(x0 - s.p[0].x === 10 * Math.trunc(A.PH.walk * 3 / 2), '落花は歩きが1.5倍'); }
+  run(s, 1, () => I({ U: 1, A: 1, V: 'u' })); ok(s.p[0].mv === 'tenR', '落花の天桜'); let fell = false; for (let k = 0; k < 120; k++) { run(s, 1); if (s.p[0].mv === 'tenFall') fell = true; } ok(fell, '天桜のあと降下攻撃');
+  run(s, 40); down(s); ok(!s.p[0].tree, '四回目で撤去'); down(s); ok(s.p[0].tree && s.p[0].tree.stage === 1, '撤去のあとはまた植えられる'); }
+// 桜華: 満開は威力1.4倍、木は相手に斬られて折れる（耐久4000）
+{ const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 660 * A.FP;
+  s.p[0].tree = { x: 200 * A.FP, y: 0, hp: 4000, stage: 2, u1: true, u2: true };
+  run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.p[1].hp === 10000 - Math.floor(300 * 14 / 10), '満開で弱斬り 300→420 (' + (10000 - s.p[1].hp) + ')');
+  const t = new A.Sim({ training: true, kits: ['ouka', 'common'] }); t.p[0].x = 300 * A.FP; t.p[1].x = 660 * A.FP; t.p[1].face = -1;
+  t.p[0].tree = { x: 610 * A.FP, y: 0, hp: 4000, stage: 1, u1: false, u2: false };
+  let n = 0; for (let k = 0; k < 400 && t.p[0].tree; k++) { t.step([I(), I({ A: (k % 20) === 0 })]); }
+  ok(!t.p[0].tree, '相手の斬りで木が折れる'); }
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

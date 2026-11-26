@@ -254,9 +254,9 @@ try { const q = JSON.parse(localStorage.getItem('issen-action-arm-v1') || 'null'
 if (!SNAP.owned.some(k => k.id === 'mumei')) SNAP.owned.unshift({ id: 'mumei', mei: '無銘', tier: '並' });
 const owns = id => SNAP.owned.some(k => k.id === id);
 const KITS = [(SNAP.equip && owns(SNAP.equip[0])) ? SNAP.equip[0] : 'mumei', (SNAP.equip && owns(SNAP.equip[1])) ? SNAP.equip[1] : 'mumei'];
-try { const k = JSON.parse(localStorage.getItem('issen-action-kit2') || 'null'); if (Array.isArray(k)) k.forEach((v, i) => { if (owns(v) || (i === 0 && v === 'ouka')) KITS[i] = v; }); } catch (e) {}
+try { const k = JSON.parse(localStorage.getItem('issen-action-kit2') || 'null'); if (Array.isArray(k)) k.forEach((v, i) => { if (owns(v)) KITS[i] = v; }); } catch (e) {}
 function saveKits(){ try { localStorage.setItem('issen-action-kit2', JSON.stringify(KITS)); } catch (e) {} }
-const kitOf = (id, mode) => id === 'ouka' && (mode === 'train' || owns('ouka')) ? 'ouka' : 'common';
+const kitOf = id => id === 'ouka' && owns('ouka') ? 'ouka' : 'common'; // 桜華の技は、ガチャなどで手に入れた人だけ
 const kitsFor = mode => mode === 'vs' ? [kitOf(KITS[0], mode), kitOf(KITS[1], mode)] : [kitOf(KITS[0], mode), 'common'];
 function recordWin(r){ // 勝った刀の戦績と銭
   const i = r.winner; if (i < 0 || GAME.mode === 'train' || (GAME.mode === 'cpu' && i !== 0)) return;
@@ -1136,7 +1136,7 @@ function setupMenu(){
   $('ed_ok').onclick = () => endEdit(true); $('ed_cancel').onclick = () => endEdit(false);
   const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : '')]);
   for (const [id, i] of [['kt0', 0], ['kt1', 1], ['a_kit', 0]]) { const el = $(id);
-    const opts = KOPT.slice(); if (id === 'a_kit' && !owns('ouka')) opts.push(['ouka', '桜華〔絶〕（稽古で試す）']);
+    const opts = KOPT.slice();
     opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });
     el.value = KITS[i]; el.onchange = () => { KITS[i] = el.value; saveKits(); ['kt0', 'kt1', 'a_kit'].forEach((q, j) => { $(q).value = KITS[j === 2 ? 0 : j]; }); el.blur();
       if (id === 'a_kit' && GAME.mode === 'train') startMode('train'); }; }

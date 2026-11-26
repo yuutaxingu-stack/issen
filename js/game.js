@@ -43,7 +43,7 @@ const SPEC=[
 ];
 const SKEY='issen-proto-v1';
 let CFG=Object.assign({},DEF);
-try{ const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s&&typeof s.sound==='boolean') CFG.sound=s.sound; }catch(e){}
+try{ const s=JSON.parse(localStorage.getItem(SKEY)||'null'); if(s&&typeof s.sound==='boolean') CFG.sound=s.sound; if(s&&s.netInfo) CFG.netInfo=true; }catch(e){}
 function saveCfg(){ try{ localStorage.setItem(SKEY,JSON.stringify(CFG)); }catch(e){} }
 
 /* ---------- 便利関数 ---------- */
@@ -277,7 +277,7 @@ const inputQ=[];
 /* オンライン対戦の出入り口（js/online-match.js が使う）。ローカルの対戦では使わない */
 /* 観戦（watch）のときは、二人とも届いた操作で動かす。me=0（朱）の目線で見せ、myH は朱の「ここまで送った」知らせ */
 const NET={me:0,seq:0,oppH:-Infinity,remoteQ:[],fightFrom:0,rng:Math.random,send:null,oppKat:'mumei',oppName:'相手',myName:'あなた',wait:'',onPhase:null,onLeave:null,rate:null,
-  watch:false,myH:-Infinity,myKat:'mumei',toWin:0,tag:'',back:'',hSent:-Infinity};
+  watch:false,myH:-Infinity,myKat:'mumei',toWin:0,tag:'',back:'',hSent:-Infinity,st:{n:0,inWait:0,inMax:0,stall:0,opp:0,oppMax:0,rtt:0,fps:60,maxAt:0}};
 const ONLINE=()=>G.mode==='online';
 function opp(){ return P[1-NET.me]; }
 /* 相手から届いた操作（t: 合わせた時計での押した時刻、s: 何度目の決着の後か） */
@@ -317,7 +317,7 @@ function startMatch(mode,base){
 function startOnline(o){
   NETCLK={off:o.clockOff}; NET.me=o.me; NET.seq=0; NET.oppH=-Infinity; NET.remoteQ.length=0; NET.fightFrom=Infinity;
   NET.rng=mulberry32(o.seed|0); NET.send=o.send||null; NET.oppKat=o.oppKat||'mumei'; NET.oppName=o.oppName||'相手'; NET.myName=o.myName||'あなた'; NET.wait=''; NET.rate=null;
-  NET.watch=!!o.watch; NET.myH=-Infinity; NET.myKat=o.myKat||'mumei'; NET.toWin=o.toWin|0; NET.tag=o.tag||''; NET.back=o.back||''; NET.hSent=-Infinity;
+  NET.watch=!!o.watch; NET.myH=-Infinity; NET.myKat=o.myKat||'mumei'; NET.toWin=o.toWin|0; NET.tag=o.tag||''; NET.back=o.back||''; NET.hSent=-Infinity; NET.st={n:0,inWait:0,inMax:0,stall:0,opp:0,oppMax:0,rtt:0,fps:60,maxAt:0};
   for(const k of TIMING_KEYS) CFG[k]=DEF[k];   // 二人の判定を必ずそろえるため、オンラインでは確定値だけを使う
   pauseWhy.clear(); pausedAt=null;
   startMatch('online',o.startAt);
@@ -386,6 +386,7 @@ function stepOnline(now){
   if(G.phase==='fight'&&now>=G.roundEnd&&netH()>=G.roundEnd&&!P.some(p=>p.end>0&&p.end<=G.roundEnd)) timeUp(G.roundEnd);
 }
 function onInput(p,a,t){
+  if(G.mode==='online'&&!NET.watch&&p.i===NET.me){ const w=gnow()-t; NET.st.inWait=w; NET.st.inMax=Math.max(NET.st.inMax,w); NET.st.n++; }
   if(a==='iai'){
     if(p.state==='idle'){ setState(p,'charge',t,CFG.charge); sfx('koi'); }
     else if(p.state==='charge'){ setState(p,'cancelRec',t,CFG.cancelRec); p.lastCancelAt=t; sfx('cancel'); }
@@ -428,6 +429,7 @@ const FXDUR={iai:1900,counter1:1350,counterWin:2100,just:2300,aiuchi:1100,issen:
 const NET_FX_DELAY=250;
 function beginFx(kind,W,L,extra){
   const now=G.mode==='online'?G.evT+NET_FX_DELAY:gnow(); inputQ.length=0; AI.plans.length=0; NET.seq++; NET.fightFrom=Infinity;
+  if(G.mode==='online'){ NET.st.stall=Math.max(0,gnow()-G.evT); NET.st.stallMax=Math.max(NET.st.stallMax||0,NET.st.stall); }
   G.frozenLeft=Math.max(0,G.roundEnd-now);
   G.fx=Object.assign({kind,W,L,t0:now,v0:Math.max(now,gnow()),dur:FXDUR[kind],done:{},sW:W.side,sL:L.side,poseL:poseName(L),poseW:poseName(W)},extra);
   if(G.fx.mutual&&kind!=='issen') G.fx.dur+=700;
@@ -793,7 +795,21 @@ function drawCenterTexts(c,now,vw){
     txt(c,tg,VW/2,ty2,ts2,UIF,'#e8c35a','center',0.95); }
   if(G.mode==='online'&&NET.wait){ const ws=clamp(VH*0.04,13,22); c.save(); c.fillStyle='rgba(18,22,19,0.66)'; c.beginPath(); c.roundRect(VW/2-ws*4.5,VH*0.16-ws*0.8,ws*9,ws*1.6,ws*0.4); c.fill(); c.restore();
     txt(c,NET.wait,VW/2,VH*0.16+1,ws,UIF,PALE,'center',0.75+0.25*Math.sin(now/220)); }
+  if(G.mode==='online'&&CFG.netInfo&&!NET.watch) netInfo(c,now);
   if(G.debug&&CFG.gauges&&now-G.debug.at<3000) txt(c,G.debug.text,VW/2,GY+FH*0.18,clamp(VH*0.032,11,18),UIF,'#f6f1e4','center',0.95);
+}
+/* 通信の様子（一時停止の「通信の様子を表示」）。ラグの原因を実機で確かめるため
+   往復: 相手まで行って帰る時間 / 相手の動き: 相手が押してから自分の画面に届くまで / 斬撃待ち: 斬る瞬間に相手の知らせを待った時間
+   操作待ち: 自分が押してから自分の画面に出るまで / 画面: 1秒あたりの描画回数。（ ）は直近10秒の最大 */
+function netInfo(c,now){
+  const S=NET.st, ms=v=>Math.max(0,Math.round(v))+'ms';
+  if(performance.now()-S.maxAt>10000){ S.maxAt=performance.now(); S.oppMax=S.opp; S.inMax=0; S.stallMax=S.stall; }
+  const lines=['往復 '+(S.rtt?ms(S.rtt):'…')+'　相手の動き '+ms(S.opp)+'（'+ms(S.oppMax)+'）',
+    '斬撃待ち '+ms(S.stall)+'（'+ms(S.stallMax||0)+'）　操作待ち '+ms(S.inWait)+'（'+ms(S.inMax)+'）　画面 '+Math.round(S.fps)];
+  const sz=clamp(VH*0.028,10,14), y0=GY+FH*0.22;
+  c.save(); c.font=sz+'px '+UIF; const w=Math.max(...lines.map(l=>c.measureText(l).width))+sz*1.4;
+  c.fillStyle='rgba(18,22,19,0.7)'; c.beginPath(); c.roundRect(VW/2-w/2,y0-sz*1.1,w,sz*3.3,sz*0.4); c.fill(); c.restore();
+  lines.forEach((l,i)=>txt(c,l,VW/2,y0+i*sz*1.45,sz,UIF,'#e8c35a','center',0.95));
 }
 function whoName(i){ return G.mode==='cpu'?(i===0?'あなた':'其の'+kn(RUN.n)):G.mode==='online'?(i===NET.me?NET.myName:NET.oppName):COL[i].name; }
 function drawResult(c,now,vw){
@@ -962,7 +978,7 @@ function drawIssenFx(c,now){
 /* ---------- ループ ---------- */
 let lastReal=performance.now();
 function frame(){
-  const real=performance.now(); const dt=Math.min(0.05,(real-lastReal)/1000); lastReal=real;
+  const real=performance.now(); const dt=Math.min(0.05,(real-lastReal)/1000); if(real>lastReal) NET.st.fps+=(1000/(real-lastReal)-NET.st.fps)*0.05; lastReal=real;
   const now=gnow(), running=pausedAt==null;
   setView(VIEWS[0]);
   if(running){
@@ -1394,10 +1410,11 @@ document.getElementById('p_copy').addEventListener('click',()=>{
 document.getElementById('c_gauges').addEventListener('change',e=>{ CFG.gauges=e.target.checked; saveCfg(); });
 document.getElementById('c_sound').addEventListener('change',e=>{ CFG.sound=e.target.checked; saveCfg(); });
 const pauseEl=document.getElementById('pausep');
-document.getElementById('gear').addEventListener('click',()=>{ document.getElementById('ps_sound').checked=CFG.sound; pauseEl.hidden=false; pause('panel',true); });
+document.getElementById('gear').addEventListener('click',()=>{ document.getElementById('ps_sound').checked=CFG.sound; document.getElementById('ps_net').checked=!!CFG.netInfo; pauseEl.hidden=false; pause('panel',true); });
 document.getElementById('ps_resume').addEventListener('click',()=>{ pauseEl.hidden=true; pause('panel',false); });
 document.getElementById('ps_title').addEventListener('click',()=>{ pauseEl.hidden=true; pause('panel',false); goTitle(); });
 document.getElementById('ps_sound').addEventListener('change',e=>{ CFG.sound=e.target.checked; saveCfg(); });
+document.getElementById('ps_net').addEventListener('change',e=>{ CFG.netInfo=e.target.checked; saveCfg(); });
 document.getElementById('p_close').addEventListener('click',()=>{ panel.hidden=true; pause('panel',false); });
 document.getElementById('p_restart').addEventListener('click',()=>{ panel.hidden=true; pause('panel',false); goTitle(); });
 document.getElementById('p_reset').addEventListener('click',()=>{ Object.assign(CFG,DEF); saveCfg(); syncPanel(); });

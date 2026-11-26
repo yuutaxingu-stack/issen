@@ -24,7 +24,7 @@
   M.start = async function(matchId, me, opts){
     if (M.active) return;
     const st = { id: matchId, me, opts: opts || {}, ch: null, timers: [], lastRecv: performance.now(), oppHello: null, seenMe: false,
-                 pings: [], off: 0, started: false, startMsg: null, reported: false, ended: false, report: null };
+                 pings: [], off: 0, pn: 0, started: false, startMsg: null, reported: false, ended: false, report: null };
     M.active = st;
     N.setStatus('playing');
     if (N.onMatchUi) N.onMatchUi('connecting');
@@ -60,6 +60,8 @@
         if (!m.seen) send(st, { k: 'hello', name: st.myName, kat: st.kat, seen: true });
         if (st.me === 1 && st.seenMe && !st.pinging) beginSync(st);
         break;
+      case 'p2': send(st, { k: 'q2', t1: m.t1 }); break;   // 通信の様子: 往復の時間を測る
+      case 'q2': I.NET.st.rtt = performance.now() - m.t1; break;
       case 'ping': if (st.me === 0) send(st, { k: 'pong', i: m.i, t1: m.t1, t2: performance.now() }); break;
       case 'pong': onPong(st, m); break;
       case 'ready':
@@ -70,7 +72,7 @@
         }
         break;
       case 'start': if (st.me === 1) begin(st, m.startAt, st.off); break;
-      case 'in': if (st.started) { I.netHorizon(m.t); I.netInput(m.t, m.a, m.s); } break;
+      case 'in': if (st.started) { I.NET.st.opp = I.now() - m.t; I.NET.st.oppMax = Math.max(I.NET.st.oppMax, I.NET.st.opp); I.netHorizon(m.t); I.netInput(m.t, m.a, m.s); } break;
       case 'h': if (st.started) I.netHorizon(m.h); break;
       case 'rep': if (st.report) report(st); break;
       case 'say': if (window.IssenChat && IssenChat.matchSay) IssenChat.matchSay(String(m.t || '').slice(0, 30)); break;
@@ -113,6 +115,7 @@
     if (M.active !== st || !st.started || st.ended) return;
     const G = I.G, NET = I.NET;
     send(st, { k: 'h', h: performance.now() + (st.me === 1 ? st.off : 0) });
+    if (I.CFG.netInfo && ++st.pn % 4 === 0) send(st, { k: 'p2', t1: performance.now() });
     if (st.reported) { NET.wait = ''; return; }   // 決着のあとは、相手が先に画面を閉じても「切れた」とは言わない
     const silent = performance.now() - st.lastRecv;
     if (silent > DROP_MS) return end(st, '相手との通信が切れました。この試合は記録しません');

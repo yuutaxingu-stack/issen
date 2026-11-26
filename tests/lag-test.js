@@ -4,7 +4,8 @@
 // 使い方: node tests/lag-test.js [試合数] [最小遅延ms] [最大遅延ms] [off]   （off で「すぐ知らせる」を止めて、直す前と比べる）
 const { chromium } = require('playwright');
 const path = require('path');
-const N = +(process.argv[2] || 8), LMIN = +(process.argv[3] || 150), LMAX = +(process.argv[4] || 300), OFF = process.argv[5] === 'off';
+const N = +(process.argv[2] || 8), LMIN = +(process.argv[3] || 150), LMAX = +(process.argv[4] || 300), OFF = process.argv[5] === 'off', HB = +(process.argv[6] || 500), SPIKE = process.argv[7] === 'spike';
+const waits = [];
 const stalls = [];
 
 function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -38,7 +39,7 @@ function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.im
     for (let i = 0; i < 2; i++) await pages[i].evaluate(([me, seed]) => {
       window.__T = 1000; window.__out = [];
       startOnline({ me, seed, startAt: 1000, clockOff: 0, send: msg => window.__out.push(msg), oppName: '相手', myName: 'あなた' });
-      window.__lastH = 0; window.__waitFrom = null; window.__stalls = [];
+      window.__lastH = 0; window.__waitFrom = null; window.__stalls = []; window.__waits = []; window.__n = 0;
     }, [i, seed]);
     const inflight = [[], []]; // inflight[i]: ページiに届く予定の通信
     const lastDeliver = [0, 0];
@@ -50,20 +51,20 @@ function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.im
       for (let i = 0; i < 2; i++) {
         const deliver = inflight[i].filter(x => x.at <= T); inflight[i] = inflight[i].filter(x => x.at > T);
         const actions = [];
-        const st = await pages[i].evaluate(([T, deliver, OFF]) => {
+        const st = await pages[i].evaluate(([T, deliver, OFF, HB]) => {
           if (OFF) NET.hSent = Infinity;
           window.__T = T;
           for (const d of deliver) { if (d.k === 'in') { netHorizon(d.t); netInput(d.t, d.a, d.s); } else if (d.k === 'h') netHorizon(d.h); }
-          const ph0 = G.phase;
           __tick(gnow());
+          if (NET.st.n !== window.__n) { window.__n = NET.st.n; window.__waits.push(NET.st.inWait); }
           // 溜めの終わりを過ぎても決着していない（止まって見える）時間
           if (G.phase === 'fight' && P.some(p => p.state === 'charge' && p.end <= gnow())) { if (window.__waitFrom == null) window.__waitFrom = Math.min(...P.filter(p => p.state === 'charge').map(p => p.end)); }
           else if (window.__waitFrom != null) { window.__stalls.push(gnow() - window.__waitFrom); window.__waitFrom = null; }
-          if (gnow() - window.__lastH >= 500) { window.__lastH = gnow(); window.__out.push({ k: 'h', h: gnow() }); }
+          if (gnow() - window.__lastH >= HB) { window.__lastH = gnow(); window.__out.push({ k: 'h', h: gnow() }); }
           const out = window.__out; window.__out = [];
           const me = P[NET.me], op = P[1 - NET.me];
           return { out, phase: G.phase, me: me.state, op: op.state, opStart: op.start, opEnd: op.end, now: gnow() };
-        }, [T, deliver, OFF]);
+        }, [T, deliver, OFF, HB]);
         // 作戦
         const pl = plan[i];
         let act = null;
@@ -76,14 +77,14 @@ function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.im
         }
         if (act) st.out.push(...await pages[i].evaluate(a => { input(NET.me, a); const o = window.__out; window.__out = []; return o; }, act));
         for (const msg of st.out) {
-          const at = Math.max(lastDeliver[1 - i], T + LMIN + R() * (LMAX - LMIN));
+          const at = Math.max(lastDeliver[1 - i], T + LMIN + R() * (LMAX - LMIN) + (SPIKE && R() < 0.05 ? 300 + R() * 400 : 0));
           lastDeliver[1 - i] = at; inflight[1 - i].push({ ...msg, at });
         }
         if (i === 1 && st.phase === 'match') done = true;
       }
     }
     const res = await Promise.all(pages.map(pg => pg.evaluate(() => ({ h: G.history.map(x => x.name + ':' + x.winner).join(' '), s: P.map(p => p.score).join('-'), phase: G.phase }))));
-    for (const pg of pages) stalls.push(...await pg.evaluate(() => window.__stalls));
+    for (const pg of pages) { stalls.push(...await pg.evaluate(() => window.__stalls)); waits.push(...await pg.evaluate(() => window.__waits)); }
     const ok = res[0].h === res[1].h && res[0].s === res[1].s && res[0].phase === 'match' && res[1].phase === 'match';
     if (!ok) bad++;
     console.log((ok ? '  一致 ' : '  不一致 ') + `第${m + 1}試合 ${res[0].s}  ${res[0].h}` + (ok ? '' : `\n         もう一方: ${res[1].s}  ${res[1].h} (${res[0].phase}/${res[1].phase})`));
@@ -92,6 +93,8 @@ function rng(a) { return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.im
   stalls.sort((a, b) => a - b);
   const avg = stalls.reduce((a, b) => a + b, 0) / (stalls.length || 1);
   console.log(`${OFF ? '直す前' : '直した後'}  片道${LMIN}〜${LMAX}ms: 斬撃が止まって見えた時間 平均${Math.round(avg)}ms 中央${Math.round(stalls[stalls.length >> 1] || 0)}ms 最大${Math.round(stalls[stalls.length - 1] || 0)}ms（${stalls.length}回）`);
+  waits.sort((a, b) => a - b); const late = waits.filter(w => w > 20);
+  console.log(`自分の操作が画面に出るまでの待ち: 待たされた ${late.length}/${waits.length}回 平均${Math.round(late.reduce((a, b) => a + b, 0) / (late.length || 1))}ms 最大${Math.round(waits[waits.length - 1] || 0)}ms（知らせの間隔 ${HB}ms）`);
   console.log(bad ? `不一致 ${bad}件` : '全試合一致');
   process.exit(bad ? 1 : 0);
 })();

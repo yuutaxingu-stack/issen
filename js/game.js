@@ -1372,62 +1372,69 @@ let DETAIL=null;
 // 絶の刀帳: 鞘から刃が抜け、赤黒い闇に桜が舞い続ける専用の頁
 const ZSAYA=new Image(); ZSAYA.src='assets/katana_ouka_saya.png';
 let ZST=null;
-/* 刀帳・桜華の抜刀を漫画のコマで: 柄に手 → 鯉口が鳴る → 刃が走る → 見開きの抜き身、とコマがバッと次々に入る。
-   画面全体は動かさない（コマの中だけ動く） */
-const ZPEND=2.6;
+/* 刀帳・桜華の抜刀: 闇に細い帯のカットが次々と斬り込む（鍔 → 鯉口の光 → 走る刃）。
+   最後に一筋の斬線が帯を裂き、赤黒い頁に抜き身が据わる。画面全体は動かさない（帯の中だけ動く） */
+const ZSLASH=1.75, ZPEND=ZSLASH+0.55;
+const ZTINT=new Map();
+function zTint(src){ // 赤黒く沈めた絵（一度だけ作る）
+  if(ZTINT.has(src)) return ZTINT.get(src);
+  const c=document.createElement('canvas'); c.width=src.width||KIMG_W; c.height=src.height||KIMG_H; const t=c.getContext('2d');
+  t.drawImage(src,0,0,c.width,c.height); t.globalCompositeOperation='source-atop';
+  t.fillStyle='rgba(40,2,8,.6)'; t.fillRect(0,0,c.width,c.height);
+  const g=t.createLinearGradient(0,0,0,c.height); g.addColorStop(0,'rgba(255,70,95,.45)'); g.addColorStop(.35,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,.5)'); t.fillStyle=g; t.fillRect(0,0,c.width,c.height);
+  ZTINT.set(src,c); return c;
+}
 function drawManga(x,W,H,rt,k){
-  const G=10, out=rt>ZPEND?Math.max(0,1-(rt-ZPEND)/0.3):1;
-  const CUTS=[
-    {at:0.0, poly:[[G,G],[372,G],[318,H-G],[G,H-G]], draw:cut1},
-    {at:0.45,poly:[[384,G],[W-G,G],[W-G,196],[358,212]], draw:cut2},
-    {at:0.9, poly:[[355,224],[W-G,208],[W-G,H-G],[328,H-G]], draw:cut3},
-    {at:1.45,poly:[[0,150],[W,52],[W,282],[0,380]], draw:cut4, big:1},
+  if(rt>=ZPEND) return;
+  const ee=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),4);
+  const BANDS=[
+    {at:0.15, poly:[[0,26],[W,4],[W,128],[0,150]], draw:b1},
+    {at:0.55, poly:[[0,162],[W,140],[W,268],[0,290]], draw:b2},
+    {at:0.95, poly:[[0,302],[W,280],[W,H],[0,H]], draw:b3},
   ];
-  x.save(); x.globalAlpha=out;
-  if(rt<ZPEND){ x.fillStyle='#f4ede4'; x.fillRect(0,0,W,H); } // コマの間の余白（紙）
-  for(const c of CUTS){ const lt=rt-c.at; if(lt<0) continue;
-    const pop=lt<0.09?1.06-0.06*(lt/0.09):1; // コマが叩きつけられる（コマの中だけ）
-    const cx0=c.poly.reduce((a,p)=>a+p[0],0)/c.poly.length, cy0=c.poly.reduce((a,p)=>a+p[1],0)/c.poly.length;
-    x.save(); x.translate(cx0,cy0); x.scale(pop,pop); x.translate(-cx0,-cy0);
-    if(c.big){ x.save(); x.fillStyle='#f4ede4'; path(c.poly,-12); x.fill(); x.restore(); }
-    x.save(); path(c.poly,0); x.clip(); c.draw(lt,c.poly); 
-    if(lt<0.12){ x.fillStyle='rgba(255,255,255,'+(1-lt/0.12)+')'; x.fillRect(0,0,W,H); } x.restore();
-    x.lineWidth=c.big?7:5; x.strokeStyle='#0b0304'; path(c.poly,0); x.stroke(); x.restore(); }
-  if(rt>ZPEND-0.12&&rt<ZPEND+0.3){ x.fillStyle='rgba(255,235,240,'+(1-Math.abs(rt-ZPEND)/0.3)+')'; x.fillRect(0,0,W,H); }
+  const split=ee((rt-ZSLASH)/0.5); // 斬線のあと、帯が上下に裂けて消える
+  x.save();
+  if(rt<ZSLASH){ x.fillStyle='#050102'; x.fillRect(0,0,W,H); }
+  // 始まりの一筋（横一文字の細い紅）
+  if(rt<0.5){ const a=ee(rt/0.12)*(1-ee((rt-0.25)/0.25)); x.fillStyle='rgba(220,30,55,'+a+')'; x.fillRect(W*0.5-W*0.5*ee(rt/0.15),H*0.5-1,W*ee(rt/0.15),2); }
+  BANDS.forEach((b,bi)=>{ const lt=rt-b.at; if(lt<0) return;
+    const off=(bi===0?-1:bi===2?1:(bi%2?1:-1))*split*H*0.35, fade=1-split;
+    if(fade<=0) return;
+    x.save(); x.globalAlpha=fade; x.translate(0,off);
+    const wipe=ee(lt/0.14); // 左から一瞬で斬り開く
+    x.save(); path(b.poly); x.clip(); x.beginPath(); x.rect(0,0,W*wipe,H); x.clip();
+    x.fillStyle='#0a0203'; x.fillRect(0,0,W,H); b.draw(lt);
+    const vg=x.createLinearGradient(0,0,W,0); vg.addColorStop(0,'rgba(5,1,2,.85)'); vg.addColorStop(.25,'rgba(5,1,2,0)'); vg.addColorStop(.75,'rgba(5,1,2,0)'); vg.addColorStop(1,'rgba(5,1,2,.85)'); x.fillStyle=vg; x.fillRect(0,0,W,H);
+    x.restore();
+    // 帯の縁の紅い細線、斬り開く先に光
+    x.strokeStyle='rgba(200,24,48,.9)'; x.lineWidth=1.5; x.beginPath(); x.moveTo(b.poly[0][0],b.poly[0][1]); x.lineTo(b.poly[1][0],b.poly[1][1]); x.moveTo(b.poly[3][0],b.poly[3][1]); x.lineTo(b.poly[2][0],b.poly[2][1]); x.stroke();
+    if(wipe<1){ const ex=W*wipe; x.fillStyle='rgba(255,220,228,.9)'; x.shadowColor='#ff2a4a'; x.shadowBlur=18; x.fillRect(ex-2,0,3,H); }
+    x.restore(); });
+  // 斬線: 左下から右上へ一閃
+  if(rt>=ZSLASH-0.12&&rt<ZPEND){ const p=ee((rt-ZSLASH+0.12)/0.14), a=1-ee((rt-ZSLASH-0.05)/0.45);
+    const x0=-40,y0=H*0.86,x1=W+40,y1=H*0.1, xe=x0+(x1-x0)*p, ye=y0+(y1-y0)*p;
+    x.save(); x.globalAlpha=Math.max(0,a); x.lineCap='round'; x.shadowColor='#ff1f45'; x.shadowBlur=30;
+    x.strokeStyle='rgba(200,20,45,.9)'; x.lineWidth=10; x.beginPath(); x.moveTo(x0,y0); x.lineTo(xe,ye); x.stroke();
+    x.strokeStyle='#fff3f5'; x.lineWidth=2.5; x.beginPath(); x.moveTo(x0,y0); x.lineTo(xe,ye); x.stroke(); x.restore(); }
   x.restore();
-  function path(poly,grow){ const mx=poly.reduce((a,p)=>a+p[0],0)/poly.length, my=poly.reduce((a,p)=>a+p[1],0)/poly.length; x.beginPath();
-    poly.forEach(([px,py],i)=>{ const dx=px-mx, dy=py-my, l=Math.hypot(dx,dy)||1, X=px+dx/l*grow, Y=py+dy/l*grow; i?x.lineTo(X,Y):x.moveTo(X,Y); }); x.closePath(); }
-  function bg(c1,c2){ const g=x.createLinearGradient(0,0,W,H); g.addColorStop(0,c1); g.addColorStop(1,c2); x.fillStyle=g; x.fillRect(0,0,W,H); }
-  function focus(fx,fy,n,r0,col,seed){ let s=seed; const r=()=>(s=(s*16807)%2147483647)/2147483647; x.fillStyle=col;
-    for(let i=0;i<n;i++){ const a=r()*Math.PI*2, w=0.004+r()*0.012, R=W*1.4, ri=r0*(0.7+r()*0.6); x.beginPath(); x.moveTo(fx+Math.cos(a)*ri,fy+Math.sin(a)*ri); x.lineTo(fx+Math.cos(a-w)*R,fy+Math.sin(a-w)*R); x.lineTo(fx+Math.cos(a+w)*R,fy+Math.sin(a+w)*R); x.fill(); } }
-  function speed(y0,y1,n,col,seed,dir,lt){ let s=seed; const r=()=>(s=(s*16807)%2147483647)/2147483647; x.fillStyle=col;
-    for(let i=0;i<n;i++){ const y=y0+r()*(y1-y0), len=120+r()*380, xx=((r()*W*1.4+lt*dir*2600)%(W*1.4)+W*1.4)%(W*1.4)-W*0.2; x.fillRect(xx,y,len,1+r()*2.5); } }
-  function sfx(str,px,py,size,rot,col){ x.save(); x.translate(px,py); x.rotate(rot); x.font='900 '+size+'px serif'; x.textAlign='center'; x.textBaseline='middle';
-    x.lineJoin='round'; x.lineWidth=size*0.16; x.strokeStyle='#0b0304'; x.strokeText(str,0,0); x.fillStyle=col; x.fillText(str,0,0); x.restore(); }
-  function img(src,sx,sw,dx,dy,dw,rot){ const dh=dw*KIMG_H/sw; x.save(); x.translate(dx,dy); x.rotate(rot); x.drawImage(src,sx*src.width/KIMG_W,0,sw*src.width/KIMG_W,src.height,-dw/2,-dh/2,dw,dh); x.restore(); }
-  // 一: 柄に手がかかる（柄と鍔の大写し・集中線）
-  function cut1(lt){ bg('#2a0408','#090102'); focus(180,210,70,90,'rgba(255,190,200,.22)',7);
-    if(ZSAYA.complete) img(ZSAYA,0,330,170+lt*6,215,560,-1.05);
-    sfx('グッ',90,70,54,-0.15,'#f6dada'); x.save(); x.fillStyle='#f6dada'; x.font='700 22px serif'; x.textAlign='center'; '鯉口を切る'.split('').forEach((ch,i)=>x.fillText(ch,300-40,250+i*26)); x.restore(); }
-  // 二: 鯉口が鳴る（鍔元の大写し・火花）
-  function cut2(lt){ bg('#120203','#3c0710'); speed(10,212,40,'rgba(255,200,210,.18)',11,-1,lt);
-    const mx=700+((226-150)/260-0.5)*860, pull=Math.min(1,lt/0.25)*40;
-    if(ZSAYA.complete){ x.save(); x.beginPath(); x.rect(mx,0,W,H); x.clip(); img(ZSAYA,150,260,700,108,860,0.04); x.restore(); }
-    x.save(); x.beginPath(); x.rect(0,0,mx,H); x.clip(); img(k.canvas,150,260,700-pull,108,860,0.04); x.restore(); const g=x.createRadialGradient(mx,108,0,mx,108,120); g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(.3,'rgba(255,120,150,.6)'); g.addColorStop(1,'rgba(255,40,70,0)');
-    x.globalCompositeOperation='lighter'; x.fillStyle=g; x.fillRect(mx-120,0,240,220); x.globalCompositeOperation='source-over';
-    sfx('キンッ',900,70,62,0.12,'#ffe9ee'); }
-  // 三: 刃が走る（切っ先が流れる・流線）
-  function cut3(lt){ bg('#f2e6e8','#e7c4cc'); speed(214,H,60,'rgba(40,4,10,.55)',23,-1,lt);
-    const run=-lt*1400; img(k.canvas,330,570,760+run%60,318,980,-0.03);
-    x.fillStyle='rgba(255,255,255,.7)'; x.fillRect(340,300,W,3);
-    sfx('シャッ',540,270,70,-0.1,'#c4142e'); }
-  // 四: 見開き、抜き身の桜華
-  function cut4(lt){ bg('#3d0610','#050102'); focus(W/2,215,110,130,'rgba(255,160,180,.25)',41);
-    x.save(); x.globalAlpha=.5; x.fillStyle='#b3122a'; x.beginPath(); x.arc(W*.8,150,90,0,7); x.fill(); x.restore();
-    x.save(); x.shadowColor='rgba(255,50,80,.95)'; x.shadowBlur=30; img(k.canvas,0,900,W/2-60+Math.min(1,lt/0.3)*40,222,W*0.86,-0.09); x.restore();
-    const sx=((lt*1.6)%1.4-0.2)*W; const lg=x.createLinearGradient(sx-80,0,sx+80,0); lg.addColorStop(0,'rgba(255,255,255,0)'); lg.addColorStop(.5,'rgba(255,240,245,.7)'); lg.addColorStop(1,'rgba(255,255,255,0)');
-    x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(sx-80,0,160,H); x.globalCompositeOperation='source-over';
-    sfx('桜華',W-200,215,72,-0.09,'#ffe3e8'); x.save(); x.translate(W-80,190); x.rotate(-0.09); x.fillStyle='#a8101f'; x.fillRect(-23,-23,46,46); x.fillStyle='#f4d6d6'; x.font='bold 32px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',0,1); x.restore(); }
+  function path(poly){ x.beginPath(); poly.forEach(([px,py],i)=>i?x.lineTo(px,py):x.moveTo(px,py)); x.closePath(); }
+  function img(src,sx,sw,dx,dy,dw,rot){ const dh=dw*KIMG_H/sw; x.save(); x.translate(dx,dy); x.rotate(rot||0); x.drawImage(src,sx*src.width/KIMG_W,0,sw*src.width/KIMG_W,src.height,-dw/2,-dh/2,dw,dh); x.restore(); }
+  function glow(cx,cy,r,a){ const g=x.createRadialGradient(cx,cy,0,cx,cy,r); g.addColorStop(0,'rgba(255,245,248,'+a+')'); g.addColorStop(.18,'rgba(255,70,100,'+a*0.7+')'); g.addColorStop(1,'rgba(160,0,30,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=g; x.fillRect(cx-r,cy-r,r*2,r*2); x.globalCompositeOperation='source-over'; }
+  function streaks(y0,y1,n,seed,lt,sp){ let s=seed; const r=()=>(s=(s*16807)%2147483647)/2147483647; x.fillStyle='rgba(180,20,40,.35)';
+    for(let i=0;i<n;i++){ const y=y0+r()*(y1-y0), len=80+r()*260, xx=((r()*W*1.5-lt*sp)%(W*1.5)+W*1.5)%(W*1.5)-W*0.25; x.fillRect(xx,y,len,1); } }
+  // 一: 鍔の大写し。紅い縁の光がゆっくり流れる
+  function b1(lt){ const sv=ZSAYA.complete?zTint(ZSAYA):null; if(sv) img(sv,0,900,W*0.5+20-lt*40,77,W*0.95,-0.02);
+    const gx=W*0.2+((lt*0.5)%1)*W*0.7; const lg=x.createLinearGradient(gx-90,0,gx+90,0); lg.addColorStop(0,'rgba(255,40,70,0)'); lg.addColorStop(.5,'rgba(255,60,90,.35)'); lg.addColorStop(1,'rgba(255,40,70,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(gx-90,0,180,160); x.globalCompositeOperation='source-over'; }
+  // 二: 鯉口が切られ、刃の付け根から白い光
+  function b2(lt){ const mx=W*0.46, pull=ee(lt/0.3)*36; const sv=ZSAYA.complete?zTint(ZSAYA):null, kv=zTint(k.canvas);
+    const dw=W*1.05, sx=60, sw=480, cx0=mx-((226-sx)/sw-0.5)*dw;
+    if(sv){ x.save(); x.beginPath(); x.rect(mx,0,W,H); x.clip(); img(sv,sx,sw,cx0,215,dw,0.0); x.restore(); }
+    x.save(); x.beginPath(); x.rect(0,0,mx+pull,H); x.clip(); img(kv,sx,sw,cx0-pull,215,dw,0.0); x.restore();
+    const fl=Math.min(1,lt/0.08)*(0.75+0.25*Math.sin(lt*30)); glow(mx+pull*0.5,215,170,fl);
+    x.save(); x.globalCompositeOperation='lighter'; x.fillStyle='rgba(255,235,240,'+fl*0.8+')'; x.fillRect(mx+pull*0.5-220*fl,214,440*fl,2); x.fillRect(mx+pull*0.5-1,215-60*fl,2,120*fl); x.restore(); }
+  // 三: 刃が闇を走る。刃文に紅が映る
+  function b3(lt){ streaks(290,H,40,23,lt,1800); const kv=zTint(k.canvas); img(kv,240,660,W*0.58-lt*220,352,W*1.15,0.0);
+    const rx=W*1.2-lt*1700; const lg=x.createLinearGradient(rx-120,0,rx+120,0); lg.addColorStop(0,'rgba(255,60,90,0)'); lg.addColorStop(.5,'rgba(255,200,210,.55)'); lg.addColorStop(1,'rgba(255,60,90,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(rx-120,290,240,H); x.globalCompositeOperation='source-over'; }
 }
 function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
@@ -1440,7 +1447,7 @@ function zetsuStage(k){
   c.onclick=()=>zetsuStage(k); // 触るともう一度抜く
   const frame=now=>{
     if(!ZST) return; const rt=(now-t0)/1000*(window.__zslow||1), dt=Math.min(.05,(now-last)/1000); last=now;
-    const t=rt<ZPEND?0:2.3+(rt-ZPEND); // 漫画のコマが終わったら、抜き終わりの瞬間から続ける
+    const t=rt<ZSLASH?0:2.9+(rt-ZSLASH); // 斬線で帯が裂けると、その下に抜き身が据わっている
     const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,'#5a0d18'); g.addColorStop(.55,'#250609'); g.addColorStop(1,'#070203');
     x.fillStyle=g; x.fillRect(0,0,W,H);
     // 朱の月
@@ -1480,7 +1487,7 @@ function zetsuStage(k){
       x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':'rgba('+(200+Math.random()*20|0)+',40,64,.85)'; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
     // 落款
     x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore();
-    if(rt<ZPEND+0.3) drawManga(x,W,H,rt,k);
+    drawManga(x,W,H,rt,k);
     ZST.raf=requestAnimationFrame(frame);
   };
   ZST.raf=requestAnimationFrame(frame);

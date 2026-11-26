@@ -17,14 +17,14 @@
 -- 刀をゲームから外したいときは、行を消さずに in_gacha を false にする（持っている人の刀は残る）
 create table if not exists public.katana_catalog (
   id text primary key check (id ~ '^[a-z0-9_]{1,32}$'),
-  tier text not null check (tier in ('並', '上', '極', '幻')),
+  tier text not null check (tier in ('並', '上', '極', '幻', '絶')),
   in_gacha boolean not null default true,
   added_at timestamptz not null default now()
 );
 
 -- ---------- ガチャの確率と、重なったときに戻る銭 ----------
 create table if not exists public.gacha_tiers (
-  tier text primary key check (tier in ('並', '上', '極', '幻')),
+  tier text primary key check (tier in ('並', '上', '極', '幻', '絶')),
   weight numeric not null check (weight >= 0),   -- 割合（%）
   dup_back int not null check (dup_back >= 0)    -- 持っている刀が出たときに戻る銭
 );
@@ -34,6 +34,12 @@ create table if not exists public.finish_coins (
   finish text primary key,
   coins int not null check (coins >= 0)
 );
+
+-- 階級「絶」（2026-11-26）: 前に作った表の決まり（並・上・極・幻だけ）を、絶も入れられるように付け替える
+alter table public.katana_catalog drop constraint if exists katana_catalog_tier_check;
+alter table public.katana_catalog add constraint katana_catalog_tier_check check (tier in ('並', '上', '極', '幻', '絶'));
+alter table public.gacha_tiers drop constraint if exists gacha_tiers_tier_check;
+alter table public.gacha_tiers add constraint gacha_tiers_tier_check check (tier in ('並', '上', '極', '幻', '絶'));
 
 -- 玉鋼（2026-11-26）: 持っている刀が出たら銭の代わりに玉鋼になり、玉鋼でまだ持っていない刀を鍛えられる
 alter table public.gacha_tiers add column if not exists steel int not null default 0 check (steel >= 0);         -- 持っている刀が出たときの玉鋼
@@ -76,7 +82,7 @@ revoke all on public.katana_catalog, public.gacha_tiers, public.finish_coins, pu
 -- ---------- 中身（ゲームの js/game.js と同じ値。tests/save-values-test.js で一致を確かめている） ----------
 -- 割合(%)・重なって戻る銭(今は0。玉鋼に置きかえた)・重なったときの玉鋼・鍛える玉鋼
 insert into public.gacha_tiers (tier, weight, dup_back, steel, forge_cost) values
-  ('並', 60, 0, 5, 50), ('上', 28, 0, 10, 110), ('極', 10, 0, 25, 300), ('幻', 2, 0, 100, 1500)
+  ('並', 59.5, 0, 5, 50), ('上', 28, 0, 10, 110), ('極', 10, 0, 25, 300), ('幻', 2, 0, 100, 1500), ('絶', 0.5, 0, 300, 6000)
 on conflict (tier) do update set weight = excluded.weight, dup_back = excluded.dup_back, steel = excluded.steel, forge_cost = excluded.forge_cost;
 
 insert into public.finish_coins (finish, coins) values
@@ -118,6 +124,7 @@ insert into public.katana_catalog (id, tier) values
   ('shiden', '極'),
   ('mugen', '幻'),
   ('nichirin', '幻'),
+  ('ouka', '絶'),
   ('geppaku', '幻')
   -- KATANA-END
 on conflict (id) do update set tier = excluded.tier;
@@ -285,7 +292,7 @@ begin
     r := random() * total; t := null;
     for t in select g.tier from public.gacha_tiers g
         where exists (select 1 from public.katana_catalog c where c.tier = g.tier and c.in_gacha)
-        order by case g.tier when '並' then 1 when '上' then 2 when '極' then 3 else 4 end loop
+        order by case g.tier when '並' then 1 when '上' then 2 when '極' then 3 when '幻' then 4 else 5 end loop
       r := r - (select g.weight from public.gacha_tiers g where g.tier = t);
       exit when r <= 0;
     end loop;

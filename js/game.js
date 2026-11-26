@@ -215,14 +215,17 @@ const KATANA=[
   {id:'shiden',mei:'紫電',yomi:'しでん',tier:'極',wrap:[72,32,112],metal:'silver',blade:[172,102,255,0.45],lore:'研ぎ澄まされた刃のきらめき。紫の稲妻。',slash:{col:'#f3e8ff',glow:'rgba(170,90,255,1)',double:true,thick:1.3}},
   {id:'mugen',mei:'夢幻',yomi:'むげん',tier:'幻',wrap:[22,22,32],metal:'gold',blade:'iris',lore:'夢か、幻か。持つ者の影さえ映さない。',slash:{rainbow:true,glow:'rgba(180,140,255,1)',double:true,thick:1.5}},
   {id:'nichirin',mei:'日輪',yomi:'にちりん',tier:'幻',wrap:[232,202,122],metal:'gold',blade:[255,232,152,0.5],lore:'昇る日の輪。抜けば竹林に朝が来るという。',slash:{col:'#fff6d0',glow:'rgba(255,190,40,1)',double:true,thick:1.6}},
+  {id:'ouka',mei:'桜華',yomi:'おうか',tier:'絶',src:'assets/katana_ouka.png',lore:'散ってなお咲く、ただ一振りの桜。抜けば竹林に花が舞う。',slash:{col:'#ffe8f0',glow:'rgba(255,140,185,1)',double:true,thick:1.7}},
   {id:'geppaku',mei:'月白',yomi:'げっぱく',tier:'幻',wrap:[236,236,242],metal:'silver',blade:'iris',lore:'月が昇る前、東の空がわずかに白む色。鍛えた者を誰も知らない。',slash:{rainbow:true,glow:'rgba(233,184,255,1)',double:true,thick:1.5}}
 ];
 const KMAP={}; KATANA.forEach(k=>KMAP[k.id]=k);
+// 描いた絵がある刀（src）は、その絵を読み込んでから作り直す
+KATANA.forEach(k=>{ if(!k.src) return; k.img=new Image(); k.img.onload=()=>{ if(KREADY) try{ buildKatanas(); }catch(e){ console.error(e); } }; k.img.src=k.src; });
 const METAL={gold:null,silver:[198,204,214],copper:[206,122,82],black:[44,40,38]};
-const TIERRATE=[['並',60],['上',28],['極',10],['幻',2]];
+const TIERRATE=[['並',59.5],['上',28],['極',10],['幻',2],['絶',0.5]];
 // 持っている刀が出たら玉鋼に変わる。玉鋼で好きな刀を鍛えられる（値段 ≒ その階級が出るまでの平均の銭 × 3）
-const STEEL={'並':5,'上':10,'極':25,'幻':100};
-const FORGE={'並':50,'上':110,'極':300,'幻':1500};
+const STEEL={'並':5,'上':10,'極':25,'幻':100,'絶':300};
+const FORGE={'並':50,'上':110,'極':300,'幻':1500,'絶':6000};
 let PULLCOST=10;
 function hsl2rgb(h,s,l){ h=((h%360)+360)%360/360; const f=n=>{ const k=(n+h*12)%12, a=s*Math.min(l,1-l); return 255*(l-a*Math.max(-1,Math.min(k-3,9-k,1))); }; return [f(0),f(8),f(4)]; }
 function tintCanvas(src,col){ const t=document.createElement('canvas'); t.width=src.width; t.height=src.height; const x=t.getContext('2d'); x.drawImage(src,0,0); x.globalCompositeOperation='source-in'; x.fillStyle=col; x.fillRect(0,0,t.width,t.height); return t; }
@@ -260,7 +263,7 @@ function saveArm(){ if(ACCT) return; try{ localStorage.setItem('issen-armory-v1'
 let CPUKAT='mumei';
 function katOf(i){ if(G.mode==='online') return KMAP[i===NET.me?(NET.watch?NET.myKat:(ARM.equip[0]||'mumei')):NET.oppKat]||KMAP.mumei;
   return KMAP[(G.mode==='cpu'&&i===1)?CPUKAT:(ARM.equip[i]||'mumei')]||KMAP.mumei; }
-function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x)],['上',lerp(0.12,0.45,x)],['極',lerp(0,0.22,x)],['幻',lerp(0,0.06,x)]];
+function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x)],['上',lerp(0.12,0.45,x)],['極',lerp(0,0.22,x)],['幻',lerp(0,0.06,x)],['絶',lerp(0,0.015,x)]];
   let r=Math.random()*w.reduce((s,v)=>s+v[1],0), t='並'; for(const [k,v] of w){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
 function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&(NET.watch||i!==NET.me)) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0); }
@@ -1111,19 +1114,23 @@ const gcv=document.getElementById('gc'), gctx=gcv.getContext('2d');
 // phase: idle 待ち / wait サーバー待ち / forge 鍛える槌 / draw 一振りずつの抜刀 / quick 持っている刀を素早く / item 一振りの札 / shown まとめ
 const GA={phase:'idle',t0:0,kat:null,batch:[],idx:-1,steel:0,back:0,forge:false,silent:false,raf:0,W:0,H:0,cued:{}};
 const gBusy=()=>!(GA.phase==='idle'||GA.phase==='shown');
-const TORD={'並':0,'上':1,'極':2,'幻':3};
-const TIERGLOW={'並':'rgba(236,230,214,','上':'rgba(120,180,255,','極':'rgba(245,196,70,','幻':null};
+const TORD={'並':0,'上':1,'極':2,'幻':3,'絶':4};
+const TIERGLOW={'並':'rgba(236,230,214,','上':'rgba(120,180,255,','極':'rgba(245,196,70,','幻':null,'絶':null};
 // 階級ごとの演出。数字はミリ秒
 const TP={
   '並':{shake:0.02,d0:350,d1:1000,rev:1150,rays:0,parts:0,dark:false},
   '上':{shake:0.05,d0:500,d1:1400,rev:1650,rays:8,parts:40,dark:false},
   '極':{shake:0.09,d0:650,d1:1700,rev:2600,rays:14,parts:90,dark:true,slashes:1},
-  '幻':{shake:0.14,d0:800,d1:2400,rev:4200,rays:22,parts:170,dark:true,slashes:2,promo:true}
+  '幻':{shake:0.14,d0:800,d1:2400,rev:4200,rays:22,parts:170,dark:true,slashes:2,promo:true},
+  '絶':{shake:0.18,d0:900,d1:3200,rev:5600,rays:28,parts:260,dark:true,slashes:3,promo:true}
 };
 function rainbow(a,now,off){ const c=hsl2rgb((now/6+(off||0))%360,0.85,0.75); return 'rgba('+(c[0]|0)+','+(c[1]|0)+','+(c[2]|0)+','+a+')'; }
-function tierRGBA(t,a,now){ return t==='幻'?rainbow(a,now):TIERGLOW[t]+a+')'; }
+// 絶は桜色（白と薄紅のあいだで揺れる）
+function sakura(a,now,off){ const k=0.5+0.5*Math.sin((now+(off||0)*40)/260); return 'rgba(255,'+Math.round(176+50*k)+','+Math.round(204+30*k)+','+a+')'; }
+function tierRGBA(t,a,now){ return t==='幻'?rainbow(a,now):t==='絶'?sakura(a,now):TIERGLOW[t]+a+')'; }
+const tierFill=(t,a,now,off)=>t==='幻'?rainbow(a,now,off):t==='絶'?sakura(a,now,off):tierRGBA(t,a,now);
 // 幻は白→金→虹と化ける（昇格演出）
-function shownTier(k,e){ if(k.tier!=='幻') return e<TP[k.tier].d0*0.8&&k.tier!=='並'?'並':k.tier; return e<1000?'並':e<1700?'極':'幻'; }
+function shownTier(k,e){ if(k.tier==='絶') return e<1000?'並':e<1700?'極':e<2600?'幻':'絶'; if(k.tier!=='幻') return e<TP[k.tier].d0*0.8&&k.tier!=='並'?'並':k.tier; return e<1000?'並':e<1700?'極':'幻'; }
 function gSize(){ const r=gcv.getBoundingClientRect(); GA.W=Math.max(200,r.width); GA.H=Math.max(120,r.height); gcv.width=Math.round(GA.W*DPR); gcv.height=Math.round(GA.H*DPR); }
 function openGacha(tab){ gachaEl.hidden=false; uiCache=''; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
@@ -1155,7 +1162,7 @@ function startDraw(batch,back,forge){
   if(forge){ GA.idx=0; GA.kat=batch[0].k; GA.isNew=true; GA.phase='forge'; GA.t0=performance.now(); GA.cued={}; GA.silent=false; refreshCoins(); showSkip(); return; }
   nextItem();
 }
-const QUICK={'並':480,'上':640,'極':900,'幻':1150};
+const QUICK={'並':480,'上':640,'極':900,'幻':1150,'絶':1400};
 function itemFull(b){ return b.isNew||GA.batch.length===1; }
 function beginItem(){ const b=GA.batch[GA.idx]; GA.kat=b.k; GA.isNew=b.isNew; GA.t0=performance.now(); GA.cued={}; GA.silent=false;
   GA.phase=itemFull(b)?'draw':'quick'; GA.qdur=QUICK[b.k.tier]*(GA.batch.length>30?0.6:1); }
@@ -1251,7 +1258,7 @@ function gLoop(){
     if(!out||e<sl+150) drawSaya(mouth,1-clamp((e-sl)/150));
     if(ord>=2&&e>sl&&e<sl+220){ c.fillStyle=tierRGBA(k.tier,0.25*(1-(e-sl)/220),now); c.fillRect(0,0,W,H); }
     const ta=clamp((e-sl)/160);
-    txt(c,k.mei,cx,H*0.16,Math.max(14,H*0.085),DISPLAY,k.tier==='幻'?rainbow(ta,now):tierRGBA(k.tier,ta,now),'center');
+    txt(c,k.mei,cx,H*0.16,Math.max(14,H*0.085),DISPLAY,tierFill(k.tier,ta,now),'center');
     txt(c,'所持　玉鋼 +'+b.steel,cx,H*0.86,Math.max(11,H*0.055),UIF,'rgba(232,195,90,'+(0.85*ta)+')','center');
     drawStrip(c,W,H);
     if(e>=D) nextItem();
@@ -1264,7 +1271,8 @@ function gLoop(){
   if(ord>=1) cue('chime',tp.d0+200,()=>sfx('chime'));
   if(tp.promo){ cue('p1',1000,()=>{ sfx('clash'); }); cue('p2',1700,()=>{ sfx('clash'); sfx('chime'); }); }
   if(tp.dark){ cue('drum',tp.d1,()=>sfx('drum')); cue('gong',tp.rev,()=>sfx('gong')); }
-  if(k.tier==='幻') cue('gong2',tp.rev+600,()=>sfx('gong'));
+  if(k.tier==='幻'||k.tier==='絶') cue('gong2',tp.rev+600,()=>sfx('gong'));
+  if(k.tier==='絶') cue('p3',2600,()=>{ sfx('clash'); sfx('chime'); });
   const st=shownTier(k,e);
   // 揺れ
   const shk=e<tp.d0?tp.shake*kh*(e/tp.d0)*(Math.random()-0.5)*2:0;
@@ -1276,10 +1284,10 @@ function gLoop(){
   if(revealed&&ord>=1){
     const a=clamp(re/500);
     const gr=c.createRadialGradient(cx,cy,0,cx,cy,kw*(0.45+0.12*ord)); gr.addColorStop(0,tierRGBA(k.tier,(0.25+0.12*ord)*a,now)); gr.addColorStop(1,tierRGBA(k.tier,0,now)); c.fillStyle=gr; c.fillRect(0,0,W,H);
-    c.save(); c.globalCompositeOperation='lighter'; const n=tp.rays, rot=now/(k.tier==='幻'?3000:6000);
-    for(let i=0;i<n;i++){ const an=rot+i*Math.PI*2/n; c.fillStyle=k.tier==='幻'?rainbow(0.09*a,now,i*30):tierRGBA(k.tier,0.07*a,now); c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,Math.max(W,H),an,an+Math.PI/n*0.55); c.closePath(); c.fill(); }
+    c.save(); c.globalCompositeOperation='lighter'; const n=tp.rays, rot=now/(ord>=3?3000:6000);
+    for(let i=0;i<n;i++){ const an=rot+i*Math.PI*2/n; c.fillStyle=ord>=3?tierFill(k.tier,0.09*a,now,i*30):tierRGBA(k.tier,0.07*a,now); c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,Math.max(W,H),an,an+Math.PI/n*0.55); c.closePath(); c.fill(); }
     c.restore();
-    if(k.tier==='幻'){ txt(c,'幻',cx,cy,H*0.9,DISPLAY,rainbow(0.12*a,now,180),'center'); }
+    if(ord>=3){ txt(c,k.tier,cx,cy,H*0.9,DISPLAY,tierFill(k.tier,0.12*a,now,180),'center'); }
   }
   // 漂う光の粒
   if(revealed&&tp.parts){ const r=mulberry32(5+ord); c.save(); c.globalCompositeOperation='lighter';
@@ -1308,12 +1316,13 @@ function gLoop(){
       c.beginPath(); c.moveTo(x0,y0); c.lineTo(xx+nx*w/2,yy+ny*w/2); c.lineTo(xx-nx*w/2,yy-ny*w/2); c.closePath(); c.fill(); c.restore(); };
     if(tp.slashes===1){ sl(150,-20,cy-kh*1.2,W+20,cy-kh*0.6); }
     else { sl(150,-20,H*0.1,W+20,H*0.9); sl(450,W+20,H*0.1,-20,H*0.9); sl(800,-20,cy,W+20,cy); }
-    const fl=k.tier==='幻'?[[370,0.7],[670,0.7],[1020,1]]:[[370,0.8]];
-    for(const [t,a0] of fl){ if(d>t&&d<t+400){ c.fillStyle=(k.tier==='幻'?rainbow(a0*(1-(d-t)/400),now):'rgba(255,250,235,'+(a0*(1-(d-t)/400))+')'); c.fillRect(0,0,W,H); } }
-    if(k.tier==='幻'&&d>1100&&d<span){ const a=clamp((d-1100)/300); txt(c,'幻',cx,cy,H*0.55,DISPLAY,'rgba(255,255,255,'+(0.85*a)+')','center'); }
+    const fl=k.tier==='絶'?[[370,0.7],[670,0.7],[1020,0.8],[1700,1]]:k.tier==='幻'?[[370,0.7],[670,0.7],[1020,1]]:[[370,0.8]];
+    for(const [t,a0] of fl){ if(d>t&&d<t+400){ c.fillStyle=(ord>=3?tierFill(k.tier,a0*(1-(d-t)/400),now):'rgba(255,250,235,'+(a0*(1-(d-t)/400))+')'); c.fillRect(0,0,W,H); } }
+    if(ord>=3&&d>1100&&d<span){ const a=clamp((d-1100)/300); txt(c,k.tier,cx,cy,H*0.55,DISPLAY,'rgba(255,255,255,'+(0.85*a)+')','center'); }
+    if(k.tier==='絶'&&d>900){ const r=mulberry32(77); c.save(); for(let i=0;i<90;i++){ const x=(r()*W+Math.sin(now/700+i)*30+d*0.05*(r()-0.3))%W, y=((d/1000)*(40+r()*80)+r()*H)%H; c.fillStyle=sakura(0.8,now,i); c.beginPath(); c.ellipse(x,y,5,2.6,now/400+i,0,7); c.fill(); } c.restore(); }
   }
   // 名乗り
-  if(revealed&&ord>=2){ const a=clamp((re-300)/500); txt(c,k.mei,cx,H*0.14,H*(ord===3?0.13:0.1),DISPLAY,k.tier==='幻'?rainbow(a,now):tierRGBA(k.tier,a,now),'center'); }
+  if(revealed&&ord>=2){ const a=clamp((re-300)/500); txt(c,k.mei,cx,H*0.14,H*(ord>=3?0.13:0.1),DISPLAY,tierFill(k.tier,a,now),'center'); }
   drawStrip(c,W,H);
   if(revealed&&GA.phase==='draw') showItem();
 }
@@ -1329,7 +1338,7 @@ function drawStrip(c,W,H){
     else { c.strokeStyle='rgba(233,226,207,'+(i===GA.idx?0.8:0.2)+')'; c.lineWidth=1; c.strokeRect(x+0.5,y+0.5,sz-1,sz-1); } }
 }
 let FBAR=null; function FORGEBAR(){ return FBAR||(FBAR=tintCanvas(KMAP.mumei.canvas,'#ff8a3a')); }
-const TINTC={}; function tintCanvasCached(k,t){ const key=k.id+t; return TINTC[key]||(TINTC[key]=tintCanvas(k.canvas,t==='幻'?'#f3e6ff':(TIERGLOW[t]+'1)'))); }
+const TINTC={}; function tintCanvasCached(k,t){ const key=k.id+t; return TINTC[key]||(TINTC[key]=tintCanvas(k.canvas,t==='幻'?'#f3e6ff':t==='絶'?'#ffe0ea':(TIERGLOW[t]+'1)'))); }
 function renderBook(){
   const grid=document.getElementById('g_grid'); grid.innerHTML='';
   const got=KATANA.filter(k=>ARM.owned[k.id]).length;

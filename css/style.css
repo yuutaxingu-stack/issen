@@ -15,7 +15,7 @@ body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--ui);use
 .gpull.sec{background:none;color:#e9e2cf;border-color:rgba(233,226,207,.4);}
 .gbatch{display:flex;flex-wrap:wrap;gap:4px 8px;justify-content:center;max-width:44em;margin-top:4px;}
 .gbatch .bc{font-size:12px;display:inline-flex;align-items:center;gap:4px;opacity:.85;} .gbatch .bc i{font-style:normal;color:#151512;font-size:10px;padding:0 4px;border-radius:2px;} .gbatch .bc em{font-style:normal;color:#e8c35a;font-size:10px;}
-.gbatch .bc.t2,.gbatch .bc.t3{opacity:1;font-weight:700;}
+.gbatch .bc.t2,.gbatch .bc.t3,.gbatch .bc.t4{opacity:1;font-weight:700;}
 .gres.t1 .gm{color:#cfe3ff;text-shadow:0 0 14px rgba(120,180,255,.6);}
 .gres.t2 .gm{color:#f5d77c;text-shadow:0 0 18px rgba(245,196,70,.7),0 0 40px rgba(245,196,70,.35);font-size:clamp(32px,9vh,56px);}
 .gres.t3 .gm{background:linear-gradient(90deg,#ffb3c8,#ffe9a8,#b8ffd8,#b3d4ff,#e6b8ff,#ffb3c8);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-size:clamp(36px,11vh,68px);animation:iris 3s linear infinite;filter:drop-shadow(0 0 12px rgba(233,184,255,.6));}
@@ -111,3 +111,8 @@ body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--ui);use
 .gdsheet.unk .gm{opacity:.75;} .gdsheet.unk .gl{opacity:.6;font-style:italic;}
 .gforge{display:flex;flex-direction:column;align-items:center;gap:6px;margin:8px 0 4px;}
 .gforge .gpull{border-color:#b5562a;background:#7a3417;} .gforge .gpull.arm{background:#c2581f;box-shadow:0 0 18px rgba(255,120,40,.45);}
+
+/* 絶（桜） */
+.gres.t4 .gm{background:linear-gradient(90deg,#fff,#ffc2d6,#fff0f5,#f59ab8,#fff);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;font-size:clamp(40px,12vh,76px);animation:iris 3.6s linear infinite;filter:drop-shadow(0 0 16px rgba(255,160,195,.75));}
+.gcard.t4{border-color:rgba(255,170,200,.6);box-shadow:0 0 22px rgba(255,150,190,.18) inset;}
+.gdsheet.t4{border-color:rgba(255,170,200,.75);box-shadow:0 0 36px rgba(255,150,190,.22);}

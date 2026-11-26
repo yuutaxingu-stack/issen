@@ -14,8 +14,8 @@ const ids = katanaRows().map(r => r[0]); ok(new Set(ids).size === ids.length, '�
 const ev = s => Function('return ' + s)();
 const rate = ev(js.match(/const TIERRATE=(\[.*?\]);/)[1]);
 const steel = ev(js.match(/const STEEL=(\{.*?\});/)[1]), forge = ev(js.match(/const FORGE=(\{.*?\});/)[1]);
-const tiers = [...sql.matchAll(/\('(.)', (\d+), (\d+), (\d+), (\d+)\)/g)].map(m => [m[1], +m[2], +m[3], +m[4], +m[5]]);
-ok(tiers.length === 4 && rate.every(([t, w]) => tiers.some(x => x[0] === t && x[1] === w && x[2] === 0 && x[3] === steel[t] && x[4] === forge[t])), 'ガチャの確率・玉鋼・鍛える値段が一致');
+const tiers = [...sql.matchAll(/\('(.)', ([\d.]+), (\d+), (\d+), (\d+)\)/g)].map(m => [m[1], +m[2], +m[3], +m[4], +m[5]]);
+ok(tiers.length === rate.length && rate.reduce((a, [, w]) => a + w, 0) === 100 && rate.every(([t, w]) => tiers.some(x => x[0] === t && x[1] === w && x[2] === 0 && x[3] === steel[t] && x[4] === forge[t])), 'ガチャの確率・玉鋼・鍛える値段が一致');
 const coin = ev(js.match(/const COIN=(\{.*?\});/)[1]);
 const fin = ev(js.slice(js.indexOf('const FIN=') + 10, js.indexOf('};', js.indexOf('const FIN=')) + 1));
 const fc = Object.fromEntries([...sql.matchAll(/\('([^']+)', (\d+)\)/g)].map(m => [m[1], +m[2]]));

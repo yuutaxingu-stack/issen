@@ -57,7 +57,7 @@ const MV = {
   uair:  { n:'上空斬', k:'a', s:8, a:5, r:14, land:10, dmg:500, gd:700, hs:24, kb:[100,1150], box:[-44,92,88,74], arc:[-10,190] },
   dair:  { n:'下空斬（突き）', k:'a', s:16, a:2, r:20, land:18, dmg:800, gd:1200, hs:34, kb:[60,0], flinch:1, box:[-13,-97,26,129], arc:[-90,-90], ext:45, pad:12 },
   /* 刀「桜華」（絶）。強化は木の段階で決まり、段階ごとに一度だけ（startMove で判定） */
-  hana:  { n:'花嵐', k:'g', s:16, a:1, r:32, noBox:1, shot:'hana', arc:[150,-30] },
+  hana:  { n:'花嵐', k:'g', s:20, a:1, r:40, noBox:1, shot:'hana', arc:[150,-30] },
   petal: { n:'花嵐', k:'p', s:1, a:1, r:0, dmg:400, gd:800, hs:14, blk:-4, kb:[220,0], flinch:1 },
   petalS:{ n:'花嵐（落花）', k:'p', s:1, a:1, r:0, dmg:200, gd:400, hs:10, blk:-2, kb:[120,0], flinch:1 },
   ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], arc:[-60,95], rise:1, after:'fall', pose:'rise' },
@@ -93,7 +93,7 @@ const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: '
 const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [-22, 0, 44, 80], [-60, 0, 120, 170], [-60, 0, 120, 170]] };
 // 花嵐の当たる大きさ（2026-11-26 面積で3倍に）。射程は無限で壁まで飛ぶ。飛んだ距離 grow px ごとに大きさ +1倍（最大 maxW 倍）、
 // dmgPer px ごとに威力 +100%（最大 maxDm%）。遠いほど花が散って広く、重くなる
-const PETAL = { w: 76, h: 76, life: 600, grow: 500, maxW: 4, dmgPer: 800, maxDm: 250 };
+const PETAL = { slow: 0.4, w: 76, h: 76, life: 900, grow: 500, maxW: 4, dmgPer: 800, maxDm: 250 };
 const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
 /* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
 const DG = {
@@ -449,7 +449,8 @@ Sim.prototype.spawnShot = function(p){
 Sim.prototype.spawnPetals = function(p){
   const b = p.boost, x = p.x + p.face * SHOT.ox * FP, y = p.y + SHOT.oy * FP;
   this.pjN = (this.pjN || 0) + 1;
-  const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: p.face * sp, vy, life: PETAL.life, w, h: w, w0: w, x0: x, dm: 100, mv, gid, petal: 1, hana: 1 });
+  // 置き技（2026-11-26）: 弾の速さは前の slow 倍。大きさと威力の増え方は前と同じ速さ（前の速さで飛んだとした距離で決める）
+    const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: Math.trunc(p.face * sp * PETAL.slow), vy: Math.trunc(vy * PETAL.slow), eq: sp, life: PETAL.life, w, h: w, w0: w, x0: x, dm: 100, mv, gid, petal: 1, hana: 1 });
   if (b === 3) { const V = [-960, -640, -320, 0, 320, 640, 960]; V.forEach((v, k) => add(0, v, 1150, 86, 'petalS', this.pjN * 8 + k)); } // 落花: 散る角度は最初の3倍、七枚
   else if (b === 2) { for (const dy of [-60, 0, 60]) add(dy, 0, 1300, 108, 'petal', this.pjN * 8); }
   else add(0, 0, b === 1 ? 1350 : 800, PETAL.w, 'petal', this.pjN * 8);
@@ -489,7 +490,7 @@ Sim.prototype.triggerCounter = function(d, a){
 Sim.prototype.moveShots = function(){
   const P = this.p;
   for (const q of this.pj) { q.x += q.vx; q.y += q.vy || 0; q.life--;
-    if (q.hana) { const k = Math.abs(q.x - q.x0) / FP | 0; q.w = q.h = Math.min(q.w0 * PETAL.maxW, q.w0 + Math.floor(q.w0 * k / PETAL.grow)); q.dm = Math.min(PETAL.maxDm, 100 + Math.floor(k * 100 / PETAL.dmgPer)); }
+    if (q.hana) { const k = (PETAL.life - q.life) * q.eq / FP | 0; q.w = q.h = Math.min(q.w0 * PETAL.maxW, q.w0 + Math.floor(q.w0 * k / PETAL.grow)); q.dm = Math.min(PETAL.maxDm, 100 + Math.floor(k * 100 / PETAL.dmgPer)); }
     if (q.petal && q.y < 12 * FP) { q.y = 12 * FP; q.vy = 0; } if (q.x < WALL_L || q.x > WALL_R || q.y < 0 || q.y > 900 * FP) q.life = 0; } // 花びらは地面に着くと地を這う
   // 斬撃どうしは相殺
   for (let i = 0; i < this.pj.length; i++) for (let j = i + 1; j < this.pj.length; j++) {

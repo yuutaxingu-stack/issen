@@ -289,4 +289,9 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   for (let k = 0; k < 80; k++) s.step([I(), I()]); s.step([I({ K: 'd' }), I()]);
   ok(flying && blocked && s.p[0].mv === 'yatagarasu', '烏が飛んでいる間は八咫烏を出せず、消えたら出せる'); }
 
+// 羽跳の二度目は一度目と同じ向きには跳べない
+{ const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 400 * A.FP; s.p[1].x = 1500 * A.FP;
+  s.step([I({ K: 'u' }), I({})]); for (let k = 0; k < 30; k++) s.step([I({ U: 1 }), I()]);
+  ok(!s.p[0].hane2, '上へ跳んで上を押し続けても、二度目は跳ばない'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

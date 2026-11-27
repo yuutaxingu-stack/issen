@@ -530,7 +530,7 @@ Sim.prototype.haneMove = function(p, m){
   if (f === a) { const d = nd || p.hq || [0, 1000]; p.hq = null; p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); this.ev.push({ t: 'hane', p: p.i, n: 1 }); }
   if (f >= a && f < b) go();
   else if (f >= c && f < e) go();
-  if (f >= c - HANE.win && f < c && nd) p.hq = nd;                                      // 二度目の向きの受付
+  if (f >= c - HANE.win && f < c && nd && !(nd[0] === p.hdx && nd[1] === p.hdy)) p.hq = nd; // 二度目の向きの受付（入れたときだけ跳ぶ。一度目と同じ向きには跳べない）
   if (f >= b && f < c) { p.vx = 0; p.vy = p.ground ? 0 : PH.grav;                // 間: 止まって次の向きを待つ
     if (f === c - 1) { const d = p.hq; p.hq = null; if (!d) { p.mvf = e; p.vy = 0; }          // 向きを入れていなければ一度で終わり
       else { p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); p.hane2 = true; p.hitDone = false; p.treeHit = false; this.ev.push({ t: 'hane', p: p.i, n: 2 }); } } }

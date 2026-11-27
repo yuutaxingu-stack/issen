@@ -171,4 +171,11 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   ok(go(7, I({ K: 'u' })).includes('rise'), '弱斬りが当たったら技スティック上（昇り斬り）へ');
   const nb = sim(400); nb.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 7; k++) nb.step([I(), I()]); nb.step([I({ A: 1, C: 'r' }), I()]); for (let k = 0; k < 6; k++) nb.step([I(), I()]); ok(nb.p[0].mv !== 'ftilt', '空振りの弱斬りは切り替えられない (' + nb.p[0].mv + ')'); }
 
+// 先行入力: 持続から硬直の終わりまでに押したものは覚えておき、動けるようになった瞬間に出る。発生前の入力は受け付けない
+{ const s = sim(400); s.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 8; k++) s.step([I(), I()]); // 弱斬りの硬直の始め（終わりの8F以上前）
+  s.step([I({ A: 1, C: 'u' }), I()]); let f = 0; while (s.p[0].mv === 'jab1' && f < 40) { s.step([I(), I()]); f++; } s.step([I(), I()]);
+  ok(s.p[0].mv === 'utilt', '硬直中に入れた上斬りが、弱斬りの終わりにすぐ出る (' + s.p[0].mv + ')');
+  const b = sim(400); b.step([I({ A: 1, C: 'n' }), I()]); b.step([I(), I()]); b.step([I({ J: 1 }), I()]); let g = 0; while (b.p[0].mv === 'jab1' && g < 40) { b.step([I(), I()]); g++; }
+  ok(b.p[0].st !== 'jsq' && b.p[0].ground, '発生前に押した跳は受け付けない (' + b.p[0].st + ')'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

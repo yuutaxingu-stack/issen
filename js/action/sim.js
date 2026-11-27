@@ -142,24 +142,31 @@ Sim.prototype.resetRound = function(){
   this.roundNo++;
 };
 
-/* 入力を読み、押した瞬間を先行入力として覚える */
+/* 入力を読み、押した瞬間を先行入力として覚える。
+   技の途中は、持続から硬直の終わり（着地の硬直も）までに押した斬・技・跳を覚えておき、動けるようになった瞬間に出す。
+   発生の前に押したものは受け付けない（2026-11-27） */
 function readInput(p, inp){
   const pi = p.inp; p.pi = pi; p.inp = inp;
+  const m = p.st === 'atk' ? MV[p.mv] : null;
+  p.bHold = (m && p.mvf >= m.s) || p.st === 'land';
+  p.bBlock = !!(m && p.mvf < m.s);
   for (const k of ['A', 'J', 'G']) {
-    if (inp[k] && !pi[k]) p.buf[k] = C.buf; else if (p.buf[k] > 0) p.buf[k]--;
+    const ok = k === 'G' || !p.bBlock, keep = k !== 'G' && p.bHold;
+    if (inp[k] && !pi[k]) { if (ok) p.buf[k] = C.buf; } else if (p.buf[k] > 0 && !keep) p.buf[k]--;
   }
   const h = (inp.R ? 1 : 0) - (inp.L ? 1 : 0), ph = (pi.R ? 1 : 0) - (pi.L ? 1 : 0);
   p.hEdge = (h && h !== ph) ? h : 0;
   p.holdA = inp.A ? p.holdA + 1 : 0;
-  if (inp.S && !pi.S) p.spB = C.buf; else if (p.spB > 0) p.spB--; // 技ボタン: 向きなしでも刀の技（横の技）が出る
+  if (inp.S && !pi.S) { if (!p.bBlock) p.spB = C.buf; } else if (p.spB > 0 && !p.bHold) p.spB--; // 技ボタン: 向きなしでも刀の技（横の技）が出る
   p.lastG = (inp.G && !pi.G) ? 0 : p.lastG + 1;
   takeC(p, inp);
 }
 /* 攻撃スティック: 弾いた瞬間を斬の先行入力として覚え、向きも一緒に覚える */
 function takeC(p, inp){
-  if (p.cb && --p.cb.n <= 0) p.cb = null;
-  if (inp.C) { p.buf.A = C.buf; p.cb = { d: inp.C, n: C.buf }; }
-  if (p.wk && --p.wk.n <= 0) p.wk = null;
+  if (p.cb && !p.bHold && --p.cb.n <= 0) p.cb = null;
+  if (p.wk && !p.bHold && --p.wk.n <= 0) p.wk = null;
+  if (p.bBlock) return;
+  if (inp.C) { p.buf.A = C.buf; p.cb = { d: inp.C, n: C.buf }; p.wk = null; }
   if (inp.K) { p.buf.A = C.buf; p.wk = { d: inp.K, n: C.buf }; p.cb = null; } // 技スティック
 }
 /* 落花の間は速く動ける（1.5倍） */
@@ -318,7 +325,7 @@ Sim.prototype.think = function(p, o){
       const m = MV[p.mv];
       // 弱斬り三段は、当たったら（ガードされても）途中で 横・上・下の斬り や 刀の技 に切り替えられる（2026-11-27）
       if (m.cancel && p.hitDone && p.ground && p.mvf >= m.s && (p.wk || (p.buf.A && ((p.cb && p.cb.d !== 'n') || p.spB)))) { p.chainReq = false; return this.groundAttack(p); }
-      if (m.chain && p.buf.A && !p.wk && p.mvf >= m.s) p.chainReq = true;
+      if (m.chain && p.buf.A && !p.wk && !p.spB && (!p.cb || p.cb.d === 'n') && p.mvf >= m.s) p.chainReq = true; // 向きなしの斬だけ次の段へ
       return;
     }
     case 'down':

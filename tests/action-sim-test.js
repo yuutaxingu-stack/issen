@@ -309,4 +309,12 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
     n++; if (two) good++; }
   ok(good === n, '羽跳の一度目→二度目が続けて当たる ' + good + '/' + n); }
 
+// 初虧: 前の索敵に相手が入るまで斬らない。入らなければ斬らずに終わり、入ったらそこで斬る
+{ const mk = d => { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
+  const go = d => { const s = mk(d), ev = []; let act = false; s.step([I({ K: 'r' }), I()]); for (let k = 0; k < 60; k++) { s.step([I(), I()]); ev.push(...drain(s)); const m = A.MV.shoki; if (s.p[0].mv === 'shoki' && s.p[0].mvf >= m.s && s.p[0].mvf < m.s + m.a) act = true; }
+    return { act, hit: ev.some(e => e.t === 'hit' && e.mv === 'shoki'), x: s.p[0].x / 100 | 0 }; };
+  const far = go(900), near = go(150);
+  ok(!far.act && !far.hit, '初虧: 相手が索敵に入らなければ斬らない');
+  ok(near.act && near.hit && near.x < 680, '初虧: 踏み込みの途中で相手が入ったら、そこで止まって斬る (' + near.x + 'px)'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

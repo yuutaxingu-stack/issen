@@ -1207,6 +1207,7 @@ function drawView(v){
     cx.strokeStyle = A.invuln(p) ? 'rgba(255,255,255,.9)' : 'rgba(44,79,150,.85)'; cx.lineWidth = 1.5;
     cx.strokeRect(wx(p.x / FP + hb[0]), wy(p.y / FP + hb[1] + hb[3]), hb[2] * cam.z * MIR, hb[3] * cam.z);
     if (p.st === 'atk') { const m = MV[p.mv];
+      if (m.shoki && p.mvf >= m.lunge[0] && p.mvf < m.s) { const b = A.box(p, [0, 10, A.SHOKI.dw, A.SHOKI.dh]); cx.strokeStyle = 'rgba(200,55,45,.8)'; cx.setLineDash([5, 4]); cx.strokeRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z * MIR, (b[3] - b[1]) / FP * cam.z); cx.setLineDash([]); } // 初虧の索敵
       if (!m.noBox && p.mvf >= m.s && p.mvf < m.s + m.a) { const b = A.box(p, A.curBox(p)); cx.fillStyle = 'rgba(200,55,45,.45)'; cx.fillRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z * MIR, (b[3] - b[1]) / FP * cam.z); } }
   }
   drawOukaFx();
@@ -1420,7 +1421,7 @@ const TF0 = [ // [鍵, 名前, 単位の説明, 刻み]
 ];
 // 技ごとの特別な数（八咫）。[鍵, 名前, 単位, 刻み, 入れ物, 中の名前]
 const TX = { hane: [['hsp', '跳ぶ速さ（1Fに進む距離）', 'px', 2, A.HANE, 'sp', 100], ['hd1', '一度目に跳ぶ長さ', 'F', 1, A.HANE, 'd1'], ['hgap', '二度目までの間', 'F', 1, A.HANE, 'gap'], ['hd2', '二度目に跳ぶ長さ', 'F', 1, A.HANE, 'd2'], ['hwin', '二度目の向きの受付', 'F', 1, A.HANE, 'win']],
-  shoki: [['smax', '溜めの最大', 'F', 1, A.SHOKI, 'max'], ['sd0', '踏み込み（溜めなし）', 'px', 5, A.SHOKI, 'd0'], ['sdp', '溜め1Fで伸びる', 'px', 1, A.SHOKI, 'dPer']],
+  shoki: [['smax', '溜めの最大', 'F', 1, A.SHOKI, 'max'], ['sd0', '踏み込み（溜めなし）', 'px', 5, A.SHOKI, 'd0'], ['sdp', '溜め1Fで伸びる', 'px', 1, A.SHOKI, 'dPer'], ['sdw', '前の索敵の幅', 'px', 5, A.SHOKI, 'dw'], ['sdh', '前の索敵の高さ', 'px', 5, A.SHOKI, 'dh']],
   fukuen: [['fmax', '溜めきるまで', 'F', 5, A.FUKU, 'max']],
   yatagarasu: [['csp', '烏の速さ（1Fに進む距離）', 'px', 1, A.CROW, 'speed', 100], ['clife', '烏が飛ぶ長さ', 'F', 5, A.CROW, 'life']],
   shokujin: [['sjt', '羽跳の二度当ての後の余裕', 'F', 1, A.SJ, 'tight']] };

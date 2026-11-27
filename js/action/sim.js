@@ -69,7 +69,7 @@ const MV = {
   // 八咫（2026-11-28）: 羽跳 = 8方向へまっすぐ二度跳ぶ。二度目は跳び終わりに向きを入れたときだけ。二度とも当てると相手に大きい硬直（haneX）
   hane:  { n:'羽跳', k:'a', s:9, a:23, r:14, land:14, dmg:400, gd:700, hs:24, blk:-4, kb:[0,0], kd:0, hold:1, box:[-38,6,76,104], arc:[0,0], hane:1, after:'fall', noLate:1 },
   haneX: { n:'羽跳（二度当て）', k:'a', s:9, a:23, r:14, land:14, dmg:500, gd:900, hs:60, blk:-4, kb:[320,900], box:[-38,6,76,104], arc:[0,0], hane:1, noBox:1, noLate:1 },
-  shoki: { n:'初虧', k:'g', s:8, a:4, r:20, land:16, dmg:[600, 1000], gd:[1200, 1800], hs:26, blk:-6, kb:[700,450], box:[0,30,110,70], arc:[150,-30], shoki:1, hover:1, lunge:[2,11,0], noLate:1, pose:'side' },
+  shoki: { n:'初虧', k:'g', s:13, a:4, r:20, land:16, dmg:[600, 1000], gd:[1200, 1800], hs:26, blk:-6, kb:[700,450], box:[0,30,110,70], arc:[150,-30], shoki:1, hover:1, lunge:[2,11,0], noLate:1, pose:'side' },
   shokujin:{ n:'食甚', k:'g', s:16, a:1, r:24, land:16, dmg:900, gd:2000, hs:30, blk:-14, kb:[800,700], noBox:1, sj:1, after:'air', noLate:1, arc:[150,-30], pose:'side' },
   fukuen:{ n:'復円', k:'g', s:4, a:1, r:12, land:12, noBox:1, fuku:1, arc:[100,100] },
   yatagarasu:{ n:'八咫烏', k:'g', s:25, a:1, r:26, land:14, noBox:1, shot:'crow', arc:[120,-10] },
@@ -107,7 +107,7 @@ const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [
 const HANE = { sp: 3400, d1: 9, gap: 5, d2: 9, win: 9 }; // 羽跳: 速さ（1Fに進むpx×100）、一度目・間・二度目のF（d1+gap+d2 = hane の持続）、win = 二度目の向きを受け付けるF（間の終わりから数える。間より長ければ一度目の終わりも含む）
 /* 八咫の横＋技は使うたびに 初虧 → 食甚 → 復円 と変わる。復円を溜めきると初虧に戻る */
 const ECL = ['shoki', 'shokujin', 'fukuen'], ECLN = ['初虧', '食甚', '復円'];
-const SHOKI = { max: 56, d0: 90, dPer: 7 };   // 初虧: 溜めは最大56F、踏み込みは 90px + 溜め1Fごとに7px（2026-11-28 ユーザーの調整）
+const SHOKI = { max: 56, d0: 90, dPer: 7, dw: 90, dh: 100 }; // dw・dh = 前の索敵の幅・高さ（相手が入ったら斬る）   // 初虧: 溜めは最大56F、踏み込みは 90px + 溜め1Fごとに7px（2026-11-28 ユーザーの調整）
 const FUKU = { max: 90 };                    // 復円: 合わせて90F溜めると初虧に戻る（途中で離しても溜めは残る）
 const CROW = { speed: 700, life: 70, w: 64, h: 54, oy: 70 }; // 八咫烏: つかむ烏の速さ・飛ぶF・大きさ・高さ
 const SJ = { tight: 0, K: 1 };                     // 食甚: 羽跳の二度当ての後、最速で出せばちょうど当たる（tight = 余裕のF）
@@ -424,6 +424,10 @@ Sim.prototype.update = function(p, o){
     if (m.shoki && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * Math.trunc((SHOKI.d0 + SHOKI.dPer * p.chg) * FP / (m.lunge[1] - m.lunge[0] + 1));
     else if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
     if (m.shoki && p.mvf === m.lunge[1] + 1) p.vx = 0; // 踏み込みはぴたりと止まる
+    if (m.shoki && p.mvf >= m.lunge[0] && p.mvf < m.s) { // 初虧: 踏み込みながら前の索敵に相手が入るのを待ち、入ったら斬る。入らなければ斬らずに終わる
+      const det = box(p, [0, 10, SHOKI.dw, SHOKI.dh]);
+      if (!invuln(o) && overlap(det, hbox(o))) { p.mvf = m.s - 1; p.vx = 0; }
+      else if (p.mvf === m.s - 1) { p.mvf = m.s + m.a; p.vx = 0; } }
     else if (p.ground && !m.hane && !m.sj) p.vx = toward(p.vx, 0, PH.gFric);
     if (m.shot && p.mvf === m.s) { if (m.shot === 'hana') this.spawnPetals(p); else if (m.shot === 'crow') this.spawnCrow(p); else this.spawnShot(p); }
     if (m.plant && p.mvf === m.s) this.plant(p);

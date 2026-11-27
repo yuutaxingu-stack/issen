@@ -67,8 +67,11 @@ const MV = {
   tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:86, kb:[150,2300], arc:[-60,95], rise:1, kd:1, riseV:2300, after:'fall', dfall:1, pose:'rise', aura:[-75,0,150,160] },
   tenR:  { n:'天桜（落花）', k:'a', s:5, a:12, r:6, land:20, dmg:700, gd:1200, hs:54, kb:[150,1850], arc:[-60,95], rise:1, dfall:1, kd:1, riseV:2300, pose:'rise', aura:[-75,0,150,160], next:'tenFall' },
   // 八咫（2026-11-28）: 羽跳 = 8方向へまっすぐ二度跳ぶ。二度目は跳び終わりに向きを入れたときだけ。二度とも当てると相手に大きい硬直（haneX）
-  hane:  { n:'羽跳', k:'a', s:6, a:19, r:14, land:14, dmg:400, gd:700, hs:24, blk:-4, kb:[120,320], box:[-38,6,76,104], arc:[0,0], hane:1, after:'fall', noLate:1 },
-  haneX: { n:'羽跳（二度当て）', k:'a', s:6, a:19, r:14, land:14, dmg:500, gd:900, hs:60, blk:-4, kb:[320,900], box:[-38,6,76,104], arc:[0,0], hane:1, noBox:1, noLate:1 },
+  hane:  { n:'羽跳', k:'a', s:6, a:23, r:14, land:14, dmg:400, gd:700, hs:24, blk:-4, kb:[120,320], box:[-38,6,76,104], arc:[0,0], hane:1, after:'fall', noLate:1 },
+  haneX: { n:'羽跳（二度当て）', k:'a', s:6, a:23, r:14, land:14, dmg:500, gd:900, hs:60, blk:-4, kb:[320,900], box:[-38,6,76,104], arc:[0,0], hane:1, noBox:1, noLate:1 },
+  shoki: { n:'初虧', k:'g', s:8, a:4, r:20, land:16, dmg:[600, 1000], gd:[1200, 1800], hs:26, blk:-6, kb:[700,450], box:[0,30,110,70], arc:[150,-30], shoki:1, hover:1, lunge:[2,11,0], noLate:1, pose:'side' },
+  shokujin:{ n:'食甚', k:'g', s:16, a:1, r:24, land:16, dmg:900, gd:2000, hs:30, blk:-14, kb:[800,700], noBox:1, sj:1, after:'air', noLate:1, arc:[150,-30], pose:'side' },
+  fukuen:{ n:'復円', k:'g', s:4, a:1, r:12, land:12, noBox:1, fuku:1, arc:[100,100] },
   tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
   petalG:{ n:'天桜（落花・着地の花）', k:'p', s:1, a:1, r:0, dmg:250, gd:500, hs:12, blk:-2, kb:[160,0], flinch:1 },
   plant: { n:'植樹', k:'g', s:14, a:1, r:16, noBox:1, plant:1, arc:[-70,-85] },
@@ -93,13 +96,18 @@ function curBox(p){
 const SMASH_MIN = 12, SMASH_MAX = 40;
 /* 斬ボタン＋向きで出る特殊技。刀ごとに入れ替える（今は共通の一組だけ） */
 const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: 'rise', s3: 'counter', s3a: 'counter' },
-  yata: { n: '八咫', s1: 'shot', s1a: 'shot', s2: 'hane', s2a: 'hane', s3: 'counter', s3a: 'counter' },
+  yata: { n: '八咫', s1: 'ecl', s1a: 'ecl', s2: 'hane', s2a: 'hane', s3: 'counter', s3a: 'counter' },
   ouka: { n: '桜華', s1: 'hana', s1a: 'hana', s2: 'ten', s2a: 'ten', s3: 'plant', s3a: 'plant' } };
 /* 桜の木: 耐久は体力の4割。段階 1開花 2満開 3落花。u1/u2 = その段階の強化を花嵐/天桜で使ったか */
 const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [-22, 0, 44, 80], [-60, 0, 120, 170], [-60, 0, 120, 170]] };
 // 花嵐の当たる大きさ（2026-11-26 面積で3倍に）。射程は無限で壁まで飛ぶ。飛んだ距離 grow px ごとに大きさ +1倍（最大 maxW 倍）、
 // dmgPer px ごとに威力 +100%（最大 maxDm%）。遠いほど花が散って広く、重くなる
-const HANE = { sp: 2600, d1: 7, gap: 5, d2: 7 }; // 羽跳: 速さ（1Fに進むpx×100）、一度目・間・二度目のF（d1+gap+d2 = hane の持続）
+const HANE = { sp: 3400, d1: 9, gap: 5, d2: 9, win: 5 }; // 羽跳: 速さ（1Fに進むpx×100）、一度目・間・二度目のF（d1+gap+d2 = hane の持続）、win = 二度目の向きを受け付けるF（間の終わりから数える。間より長ければ一度目の終わりも含む）
+/* 八咫の横＋技は使うたびに 初虧 → 食甚 → 復円 と変わる。復円を溜めきると初虧に戻る */
+const ECL = ['shoki', 'shokujin', 'fukuen'], ECLN = ['初虧', '食甚', '復円'];
+const SHOKI = { max: 40, d0: 90, dPer: 5 };   // 初虧: 溜めは最大40F、踏み込みは 90px + 溜め1Fごとに5px
+const FUKU = { max: 90 };                    // 復円: 合わせて90F溜めると初虧に戻る（途中で離しても溜めは残る）
+const SJ = { tight: 0, K: 1 };                     // 食甚: 羽跳の二度当ての後、最速で出せばちょうど当たる（tight = 余裕のF）
 const PETAL = { slow: 0.4, w: 76, h: 76, life: 900, grow: 500, maxW: 4, dmgPer: 800, maxDm: 250 };
 const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
 /* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
@@ -126,7 +134,7 @@ function newPlayer(i){
   return { i, x: (i ? 1000 : 600) * FP, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, ground: true, plat: -1,
     st: 'idle', f: 0, mv: null, mvf: 0, hitDone: false, chainReq: false, chargeF: 0, power: 0,
     jumps: 1, adUsed: false, ff: false, dropF: 0,
-    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0,
+    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0, hq: null, ecl: 0, fuku: 0, chg: 0, sjOK: false, sjHit: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
     stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
@@ -215,6 +223,9 @@ Sim.prototype.startMove = function(p, id){
     if (t && !t[k]) { t[k] = true; p.boost = t.stage; }
     if (id === 'ten' && p.boost) id = ['ten', 'tenK', 'tenM', 'tenR'][p.boost];
   }
+  if (id === 'ecl') id = ECL[p.ecl] || 'shoki';
+  p.sjOK = false;
+  if (id === 'shoki') { p.ecl = 1; p.chg = 0; } else if (id === 'shokujin') { p.ecl = 2; } else if (id === 'fukuen') p.chg = 0;
   p.treeHit = false;
   if (id === 'hane') { p.haneUsed = true; p.haneN = 0; p.hane2 = false; p.hdx = 0; p.hdy = 1000; }
   p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null; p.wk = null; p.spB = 0;
@@ -272,6 +283,10 @@ Sim.prototype.think = function(p, o){
   const h = horiz(p), i = p.inp;
   const oppStun = o.st === 'stun';
   const canIai = oppStun && p.buf.G > 0;
+  // 八咫: 羽跳を二度当てた後は、跳び終わった後の硬直・無防備落下・着地の硬直を食甚で打ち消せる（最速で出せばちょうど確定）
+  if (p.sjOK && p.ecl === 1 && (p.st === 'fall' || p.st === 'land' || (p.st === 'atk' && p.mv === 'hane' && p.mvf >= MV.hane.s + MV.hane.a)) && (o.st === 'hit' || o.st === 'tumble')) {
+    const side = (p.wk && p.wk.d !== 'u' && p.wk.d !== 'd') || (p.spB && !i.U && !i.D && !p.wk);
+    if (side) return this.startMove(p, 'shokujin'); }
   switch (p.st) {
     case 'idle': case 'walk': case 'crouch':
       if (canIai) return this.startMove(p, 'iai');
@@ -392,9 +407,19 @@ Sim.prototype.update = function(p, o){
     if (m.hane) this.haneMove(p, m);
     if (m.rise && p.mvf === 3) { p.ground = false; p.plat = -1; p.vy = m.riseV || 1750; p.vx = p.face * 250; p.ff = false; }
     if (m.plunge) { if (p.mvf < m.s) { p.vy = 0; p.vx = toward(p.vx, 0, 60); } else { p.vy = -2200; p.vx = 0; } }
+    if (m.shoki && p.mvf === 2 && p.inp.H && p.chg < SHOKI.max) { p.chg++; p.mvf = 1; if (p.chg === SHOKI.max) this.ev.push({ t: 'charged', p: p.i }); } // 初虧: 押し続けると溜める
+    if (m.shoki) p.power = Math.floor(p.chg * 100 / SHOKI.max);
+    if (m.fuku && p.mvf === 2 && p.inp.H) {                                    // 復円: 押し続けると溜まる（離しても溜めは残る）
+      if (p.inp.G && !p.pi.G) { p.mv = null; p.st = p.ground ? 'guard' : 'air'; p.f = 0; p.slideF = C.slideF; return; }
+      p.fuku++; p.mvf = 1;
+      if (p.fuku >= FUKU.max) { p.fuku = 0; p.ecl = 0; p.mvf = 2; this.ev.push({ t: 'fukuen', p: p.i, x: p.x, y: p.y }); } }
+    if (m.fuku && p.mvf <= 2 && !p.ground) p.vy = Math.max(p.vy, -300);       // 溜めている間はゆっくり落ちる
+    if (m.sj && p.mvf === m.s) this.shokujin(p, o);
     if (m.hover && p.mvf <= m.lunge[1]) p.vy = 0;
-    if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
-    else if (p.ground && !m.hane) p.vx = toward(p.vx, 0, PH.gFric);
+    if (m.shoki && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * Math.trunc((SHOKI.d0 + SHOKI.dPer * p.chg) * FP / (m.lunge[1] - m.lunge[0] + 1));
+    else if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
+    if (m.shoki && p.mvf === m.lunge[1] + 1) p.vx = 0; // 踏み込みはぴたりと止まる
+    else if (p.ground && !m.hane && !m.sj) p.vx = toward(p.vx, 0, PH.gFric);
     if (m.shot && p.mvf === m.s) { if (m.shot === 'hana') this.spawnPetals(p); else this.spawnShot(p); }
     if (m.plant && p.mvf === m.s) this.plant(p);
   }
@@ -495,14 +520,29 @@ Sim.prototype.haneMove = function(p, m){
   const f = p.mvf, a = m.s, b = a + HANE.d1, c = b + HANE.gap, e = m.s + m.a;
   const go = () => { p.vx = Math.trunc(p.hdx * HANE.sp / 1000); p.vy = Math.trunc(p.hdy * HANE.sp / 1000);
     if (p.ground && p.hdy > 0) { p.ground = false; p.plat = -1; } if (p.ground) p.vy = 0; else p.vy += PH.grav; p.ff = false; };
-  if (f < a) { p.vx = toward(p.vx, 0, 200); if (!p.ground) p.vy = PH.grav; }          // 構え: 宙に止まる
-  if (f === a) { const d = haneDir(p) || [0, 1000]; p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); this.ev.push({ t: 'hane', p: p.i, n: 1 }); }
+  const nd = haneDir(p);
+  if (f < a) { p.vx = toward(p.vx, 0, 200); if (!p.ground) p.vy = PH.grav; if (nd) p.hq = nd; }          // 構え: 宙に止まる。向きは構えの間に入れた最後のもの
+  if (f === a) { const d = nd || p.hq || [0, 1000]; p.hq = null; p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); this.ev.push({ t: 'hane', p: p.i, n: 1 }); }
   if (f >= a && f < b) go();
-  else if (f >= b && f < c) { p.vx = 0; p.vy = p.ground ? 0 : PH.grav;                // 間: 止まって次の向きを待つ
-    if (f === c - 1) { const d = haneDir(p); if (!d) { p.mvf = e; p.vy = 0; }          // 向きを入れていなければ一度で終わり
-      else { p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); p.hane2 = true; p.hitDone = false; p.treeHit = false; this.ev.push({ t: 'hane', p: p.i, n: 2 }); } } }
   else if (f >= c && f < e) go();
+  if (f >= c - HANE.win && f < c && nd) p.hq = nd;                                      // 二度目の向きの受付
+  if (f >= b && f < c) { p.vx = 0; p.vy = p.ground ? 0 : PH.grav;                // 間: 止まって次の向きを待つ
+    if (f === c - 1) { const d = p.hq; p.hq = null; if (!d) { p.mvf = e; p.vy = 0; }          // 向きを入れていなければ一度で終わり
+      else { p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); p.hane2 = true; p.hitDone = false; p.treeHit = false; this.ev.push({ t: 'hane', p: p.i, n: 2 }); } } }
   else if (f === e) { p.vx = Math.trunc(p.vx / 3); p.vy = p.ground ? 0 : Math.min(p.vy, 400); }
+};
+/* 食甚: 自分と相手を結ぶ線の上を斬り抜けて、相手の向こう側へ出る（どこにいても届く） */
+Sim.prototype.shokujin = function(p, o){
+  const x0 = p.x, y0 = p.y, tx = o.x, ty = o.y;
+  let dx = tx - x0, dy = ty - y0; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+  if (L < FP) { dx = p.face; dy = 0; }
+  let nx = tx + Math.trunc(dx * 110 * FP), ny = ty + Math.trunc(dy * 110 * FP);
+  nx = Math.min(WALL_R, Math.max(WALL_L, nx)); if (ny <= 0) { ny = 0; }
+  p.x = nx; p.y = ny; p.vx = Math.trunc(dx * 600); p.vy = ny > 0 ? Math.trunc(dy * 400) : 0;
+  if (ny > 0) { p.ground = false; p.plat = -1; } else { p.ground = true; p.plat = -1; p.vy = 0; }
+  if (o.x !== p.x) p.face = sgn(o.x - p.x);
+  p.sjHit = true;
+  this.ev.push({ t: 'sj', p: p.i, x0, y0, x1: nx, y1: ny });
 };
 Sim.prototype.spawnShot = function(p){
   p.pjCut = false;
@@ -593,6 +633,7 @@ Sim.prototype.hits = function(){
   for (const a of P) {
     if (a.st !== 'atk' || a.hitDone) continue;
     const m = MV[a.mv];
+    if (m.sj && a.sjHit) { a.sjHit = false; const d = P[1 - a.i]; if (!invuln(d)) todo.push([a, d, m]); continue; } // 食甚は線の上にいれば当たる
     if (m.noBox || a.mvf < m.s || a.mvf >= m.s + m.a) continue;
     if (m.hane && a.mvf >= m.s + HANE.d1 && a.mvf < m.s + HANE.d1 + HANE.gap) continue; // 羽跳の間は当たらない
     const d = P[1 - a.i], ab = box(a, curBox(a));
@@ -600,7 +641,9 @@ Sim.prototype.hits = function(){
     if (invuln(d)) continue;
     if (!overlap(ab, hbox(d))) continue;
     if (inCounter(d) && !m.grab && !m.iai) { a.hitDone = true; this.triggerCounter(d, a); continue; }
-    if (m.hane) { const two = a.hane2 && a.haneN > 0; a.haneN++; todo.push([a, d, two ? MV.haneX : m]); continue; } // 二度とも当てたら大きい硬直
+    if (m.hane) { const two = a.hane2 && a.haneN > 0; a.haneN++;
+      if (two) { a.sjOK = true; todo.push([a, d, Object.assign({}, MV.haneX, { hs: Math.max(1, MV.hane.s + MV.hane.a - a.mvf + MV.shokujin.s + SJ.K + SJ.tight) })]); } // 二度当て: 最速の食甚がちょうど当たる硬直
+      else todo.push([a, d, m]); continue; } // 二度とも当てたら大きい硬直
     todo.push([a, d, m]);
   }
   // 相打ちも両方当てる（同じFに決めるので順番に依らない）
@@ -781,7 +824,7 @@ Sim.prototype.hash = function(){
   return h;
 };
 
-const API = { HANE, GROW, curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
+const API = { ECL, ECLN, SHOKI, FUKU, SJ, HANE, GROW, curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 else root.IssenAction = API;
 })(typeof window !== 'undefined' ? window : globalThis);

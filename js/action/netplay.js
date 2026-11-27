@@ -18,7 +18,7 @@
 const CD = ['', 'n', 'l', 'r', 'u', 'd'], VD = [undefined, 'h', 'u', 'd', 'n'];
 function encode(i){
   if (!i) return 0;
-  let c = (i.L ? 1 : 0) | (i.R ? 2 : 0) | (i.U ? 4 : 0) | (i.D ? 8 : 0) | (i.A ? 16 : 0) | (i.J ? 32 : 0) | (i.G ? 64 : 0) | (i.S ? 128 : 0) | (i.F ? 256 : 0);
+  let c = (i.L ? 1 : 0) | (i.R ? 2 : 0) | (i.U ? 4 : 0) | (i.D ? 8 : 0) | (i.A ? 16 : 0) | (i.J ? 32 : 0) | (i.G ? 64 : 0) | (i.S ? 128 : 0) | (i.F ? 256 : 0) | (i.H ? 1 << 18 : 0);
   const ci = i.C ? CD.indexOf(i.C) : 0, vi = i.V ? VD.indexOf(i.V) : 0;
   const ki = i.K ? CD.indexOf(i.K) : 0;
   return c | ((ci > 0 ? ci : 0) << 9) | ((vi > 0 ? vi : 0) << 12) | ((ki > 0 ? ki : 0) << 15);
@@ -31,6 +31,7 @@ function decode(c){
   if (ci) i.C = CD[ci];
   if (vi) i.V = VD[vi];
   const ki = (c >> 15) & 7; if (ki) i.K = CD[ki];
+  if (c & (1 << 18)) i.H = 1; // 技を押し続けている（溜め）
   return i;
 }
 // 見込み: 押しっぱなしはそのまま、一瞬だけの入力（斬の向き・ダッシュ）は続かないものとする

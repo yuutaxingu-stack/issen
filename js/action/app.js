@@ -113,6 +113,7 @@ function readHuman(pi){
   const i = { L: km ? k(km.L) : false, R: km ? k(km.R) : false, U: km ? k(km.U) : false, D: km ? k(km.D) : false,
     A: (km && k(km.A)) || !!pd.btn.A, J: (km && k(km.J)) || !!pd.btn.J, G: (km && k(km.G)) || !!pd.btn.G };
   i.S = i.A; // 技ボタンは向きなしでも刀の技
+  i.H = i.A || !!pd.wz; // 技を押し続けている（初虧・復円の溜め）
   // キーボード: 同じ向きを素早く二回押すとダッシュ
   if (km) {
     const kl = k(km.L), kr = k(km.R);
@@ -398,6 +399,10 @@ function onEvent(e){
     SND.play('bloom'); /* 段階が上がるときのカットインはなし（2026-11-26 ユーザー指定）、止まらない */ for (const q of STORM) { q.x = Math.random(); q.y = Math.random(); }
     FX.grow[e.p] = 0; FX.shake = 6 + e.stage * 3; FX.pflash = 6 + e.stage * 2; }
   else if (e.t === 'start' && OUKA_MV[e.mv]) oukaStart(e);
+  else if (e.t === 'sj') { // 食甚: 自分と相手を結ぶ線が、画面の端から端まで走る
+    FX.ouka.push({ k: 'sjline', x0: e.x0 / FP, y0: e.y0 / FP + 50, x1: e.x1 / FP, y1: e.y1 / FP + 50, t: 0, life: 26 }); FX.pflash = 5; }
+  else if (e.t === 'fukuen') { FX.ouka.push({ k: 'eclring', x: e.x / FP, y: e.y / FP + 60, t: 0, life: 40, r: 220 });  }
+  else if (e.t === 'charged') { const p = sim.p[e.p]; FX.ouka.push({ k: 'eclring', x: p.x / FP, y: p.y / FP + 60, t: 0, life: 16, r: 70 }); }
   else if (e.t === 'hane') { const p = sim.p[e.p], x = p.x / FP, y = p.y / FP + 50; for (let k = 0; k < 14; k++) { const a = rnd() * Math.PI * 2, v = 1 + rnd() * 3; FX.parts.push({ x, y: y + (rnd() - 0.5) * 50, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 30 + rnd() * 20, t: 0, col: k % 4 ? '#141414' : '#e9e9ee', r: 3 + rnd() * 2.5, petal: true, rot: rnd() * 6 }); } }
   else if (e.t === 'fallBurst') { const x = e.x / FP, y = e.y / FP; for (const d of [1, -1]) for (let k = 0; k < 40; k++) FX.parts.push({ x, y: y + 10 + rnd() * 40, vx: d * (2 + rnd() * 9), vy: 1 + rnd() * 4, life: 50 + rnd() * 30, t: 0, col: k % 3 ? SAKURA[k % 3] : CRIM[k % 3], r: 3 + rnd() * 3, petal: true, rot: rnd() * 6 });
     FX.ouka.push({ k: 'ring', x, y: y + 4, t: 0, life: 34, r: 420, flat: true }); FX.shake = 16; FX.pflash = 9; SND.play('drum'); SND.play('kotoChord'); }
@@ -687,6 +692,16 @@ function drawOukaFx(){
       g.addColorStop(0, `rgba(${c},0)`); g.addColorStop(0.5, `rgba(${c},${0.45 * fade})`); g.addColorStop(1, `rgba(${c},0)`);
       cx.fillStyle = g; cx.fillRect(x - w, y0 - h, w * 2, h);
       cx.fillStyle = `rgba(255,245,248,${0.6 * fade})`; cx.fillRect(x - 3 * cam.z, y0 - h, 6 * cam.z, h);
+    } else if (o.k === 'sjline') { // 食甚の線: 白い芯と黒い縁。線の向きに画面の端から端まで
+      const ax = wx(o.x0), ay = wy(o.y0), bx = wx(o.x1), by = wy(o.y1); let dx = bx - ax, dy = by - ay; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      const E = (W + H) * 1.2, p0 = [ax - dx * E, ay - dy * E], p1 = [ax + dx * E, ay + dy * E], gr = Math.min(1, o.t / 3);
+      const q0 = [ax + (p0[0] - ax) * gr, ay + (p0[1] - ay) * gr], q1 = [ax + (p1[0] - ax) * gr, ay + (p1[1] - ay) * gr];
+      cx.lineCap = 'butt'; cx.strokeStyle = `rgba(10,10,12,${0.85 * fade})`; cx.lineWidth = (14 * fade + 3) * cam.z; cx.beginPath(); cx.moveTo(q0[0], q0[1]); cx.lineTo(q1[0], q1[1]); cx.stroke();
+      cx.strokeStyle = `rgba(255,255,255,${fade})`; cx.lineWidth = (4 * fade + 1) * cam.z; cx.beginPath(); cx.moveTo(q0[0], q0[1]); cx.lineTo(q1[0], q1[1]); cx.stroke();
+    } else if (o.k === 'eclring') { // 復円: 欠けた日が満ちる白黒の輪
+      const x = wx(o.x), y = wy(o.y), R = o.r * ease * cam.z;
+      cx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`; cx.lineWidth = 4 * fade * cam.z + 1; cx.beginPath(); cx.arc(x, y, R, 0, Math.PI * 2); cx.stroke();
+      cx.fillStyle = `rgba(10,10,12,${0.5 * fade})`; cx.beginPath(); cx.arc(x + R * 0.25 * (1 - ease), y, R * 0.8, 0, Math.PI * 2); cx.fill();
     } else if (o.k === 'ring') { // 輪
       const x = wx(o.x), y = wy(o.y), R = o.r * ease * cam.z;
       cx.strokeStyle = `rgba(255,190,210,${0.9 * fade})`; cx.lineWidth = 5 * fade * cam.z + 1;
@@ -952,7 +967,7 @@ function drawHud(){
     bar(x, top + 20, bw, 12, p.hp / A.HP_MAX, red ? '#f2e6d8' : INK, right);
     bar(x, top + 36, bw * 0.8 + 0, 5, p.gd / A.GD_MAX, p.gd <= 2000 ? COL[0].main : '#3d5a6c', right);
     cx.font = `500 11px ${UIF}`; cx.fillStyle = red ? '#f2e6d8' : '#3b3d33';
-    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : p.kit === 'yata' ? '　八咫' + (p.haneUsed && !p.ground ? '' : '　羽跳◆') : ''), right ? W - m : m, top + 56);
+    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : p.kit === 'yata' ? '　八咫　横 ' + A.ECLN[p.ecl] + (p.ecl === 2 ? ' ' + '●'.repeat(Math.floor(p.fuku * 5 / A.FUKU.max)) + '○'.repeat(5 - Math.floor(p.fuku * 5 / A.FUKU.max)) : '') + (p.haneUsed && !p.ground ? '' : '　羽跳◆') : ''), right ? W - m : m, top + 56);
   }
   const left = sim.sd ? Math.max(0, Math.ceil((A.C.sdF - (sim.frame - sim.sdStart)) / 60)) : Math.max(0, Math.ceil((A.C.roundF - sim.frame) / 60));
   cx.textAlign = 'center'; cx.font = `30px ${DISPLAY}`; cx.fillStyle = red ? '#ffe2d4' : INK;
@@ -1278,7 +1293,7 @@ function setupMenu(){
   $('ed_small').onclick = () => editScale(1 / 1.12); $('ed_big').onclick = () => editScale(1.12);
   $('ed_reset').onclick = () => { BLAY = null; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); };
   $('ed_ok').onclick = () => endEdit(true); $('ed_cancel').onclick = () => endEdit(false);
-  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : k.id === 'yata' ? '　羽跳（作りかけ）' : '')]);
+  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : k.id === 'yata' ? '　羽跳・初虧/食甚/復円（作りかけ）' : '')]);
   for (const [id, i] of [['kt0', 0], ['kt1', 1], ['a_kit', 0]]) { const el = $(id);
     const opts = KOPT.slice();
     opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });
@@ -1386,7 +1401,7 @@ let TUNE = {}; try { TUNE = JSON.parse(localStorage.getItem(TUNE_KEY) || '{}') |
 try { if (localStorage.getItem(TUNE_KEY + '-ver') !== '2') { for (const id in TUNE) { const t = TUNE[id], m = MV[id]; if (!m) continue; const a = t.a != null ? t.a : m.a;
   if (t.hit != null) t.hit += a - 1; if (t.blk != null) t.blk += a - 1; } localStorage.setItem(TUNE_KEY, JSON.stringify(TUNE)); localStorage.setItem(TUNE_KEY + '-ver', '2'); } } catch (e) {}
 const ORIG = {}; for (const id in MV) { const m = MV[id]; ORIG[id] = { s: m.s, a: m.a, r: m.r, hit: m.hit, blk: m.blk, hs: m.hs, bs: m.bs, total: m.total, dmg: m.dmg, gd: m.gd, kb: m.kb ? m.kb.slice() : null, kd: m.kd, dfall: m.dfall, box: m.box ? m.box.slice() : null, boxes: m.boxes ? m.boxes.map(b => b.slice()) : null }; }
-const TF = [ // [鍵, 名前, 単位の説明, 刻み]
+const TF0 = [ // [鍵, 名前, 単位の説明, 刻み]
   ['s', '発生', 'F', 1], ['a', '持続', 'F', 1], ['r', '硬直', 'F', 1],
   ['hit', 'ヒット時の硬直差', 'F', 1], ['blk', 'ガード時の硬直差', 'F', 1], // 持続のどこで当てても同じ
   ['kd', '当たった相手のダウン', [[-1, 'いつも通り（高く飛べばダウン）'], [1, '必ずダウン'], [0, 'ダウンしない']]],
@@ -1395,18 +1410,26 @@ const TF = [ // [鍵, 名前, 単位の説明, 刻み]
   ['kbx', '吹っ飛び 横', '', 50], ['kby', '吹っ飛び 縦', '', 50],
   ['bw', '判定の幅', '%', 10], ['bh', '判定の高さ', '%', 10], ['bx', '判定 前へずらす', 'px', 5], ['by', '判定 上へずらす', 'px', 5],
 ];
+// 技ごとの特別な数（八咫）。[鍵, 名前, 単位, 刻み, 入れ物, 中の名前]
+const TX = { hane: [['hsp', '跳ぶ速さ（1Fに進む距離）', 'px', 2, A.HANE, 'sp', 100], ['hd1', '一度目に跳ぶ長さ', 'F', 1, A.HANE, 'd1'], ['hgap', '二度目までの間', 'F', 1, A.HANE, 'gap'], ['hd2', '二度目に跳ぶ長さ', 'F', 1, A.HANE, 'd2'], ['hwin', '二度目の向きの受付', 'F', 1, A.HANE, 'win']],
+  shoki: [['smax', '溜めの最大', 'F', 1, A.SHOKI, 'max'], ['sd0', '踏み込み（溜めなし）', 'px', 5, A.SHOKI, 'd0'], ['sdp', '溜め1Fで伸びる', 'px', 1, A.SHOKI, 'dPer']],
+  fukuen: [['fmax', '溜めきるまで', 'F', 5, A.FUKU, 'max']],
+  shokujin: [['sjt', '羽跳の二度当ての後の余裕', 'F', 1, A.SJ, 'tight']] };
+const TXO = new Map(); for (const id in TX) for (const f of TX[id]) if (!TXO.has(f[4])) TXO.set(f[4], Object.assign({}, f[4]));
+const txVal = f => f[6] ? f[4][f[5]] / f[6] : f[4][f[5]];
 function tuneBase(id){ // 元の値（調整画面に出す形）
   const o = ORIG[id];
   return { s: o.s, a: o.a, r: o.r, hit: o.hs != null ? o.hs - o.r : 0, blk: o.bs - o.r, // 硬直差 = 相手の硬直 − 自分の残りの硬直（持続のどこで当てても同じ）
     kd: o.kb ? (o.kd === 1 || o.kd === true ? 1 : o.kd === 0 ? 0 : -1) : null, dfall: o.kb ? (o.dfall ? 1 : 0) : null,
     dmg: typeof o.dmg === 'number' ? o.dmg / 100 : null, gd: typeof o.gd === 'number' ? o.gd / 100 : null,
-    kbx: o.kb ? o.kb[0] : null, kby: o.kb ? o.kb[1] : null, bw: 100, bh: 100, bx: 0, by: 0 };
+    kbx: o.kb ? o.kb[0] : null, kby: o.kb ? o.kb[1] : null, bw: 100, bh: 100, bx: 0, by: 0,
+    ...Object.fromEntries((TX[id] || []).map(f => [f[0], f[6] ? TXO.get(f[4])[f[5]] / f[6] : TXO.get(f[4])[f[5]]])) };
 }
 function tuneVal(id, k){ const t = TUNE[id]; return t && t[k] != null ? t[k] : tuneBase(id)[k]; }
 function restoreMV(){ for (const id in ORIG) { const m = MV[id], o = ORIG[id]; Object.assign(m, { s: o.s, a: o.a, r: o.r, hit: o.hit, blk: o.blk, hs: o.hs, bs: o.bs, total: o.total, dmg: o.dmg, gd: o.gd, kd: o.kd, dfall: o.dfall });
   if (o.kb) m.kb = o.kb.slice(); if (o.box) m.box = o.box.slice(); if (o.boxes) m.boxes = o.boxes.map(b => b.slice()); } }
 function applyTune(){
-  restoreMV();
+  restoreMV(); for (const [o, v] of TXO) Object.assign(o, v);
   if (!GOD || GAME.mode !== 'train') return;
   for (const id in TUNE) { const m = MV[id], o = ORIG[id]; if (!m || !o) continue; const v = k => tuneVal(id, k);
     m.s = Math.max(1, v('s')); m.a = Math.max(1, v('a')); m.r = Math.max(0, v('r'));
@@ -1420,7 +1443,10 @@ function applyTune(){
     const bw = v('bw'), bh = v('bh'), bx = v('bx'), by = v('by');
     const tf = b => { const cx0 = b[0] + b[2] / 2, cy0 = b[1] + b[3] / 2, w = Math.round(b[2] * bw / 100), h = Math.round(b[3] * bh / 100); return [Math.round(cx0 - w / 2 + bx), Math.round(cy0 - h / 2 + by), w, h]; };
     if (o.boxes) m.boxes = o.boxes.map(tf); if (o.box) m.box = tf(o.box);
+    for (const f of TX[id] || []) { const q = v(f[0]); if (q != null) f[4][f[5]] = Math.max(0, Math.round(f[6] ? q * f[6] : q)); }
   }
+  // 羽跳の持続は 一度目＋間＋二度目
+  if (GOD && GAME.mode === 'train') for (const id of ['hane', 'haneX']) { const m = MV[id]; m.a = A.HANE.d1 + A.HANE.gap + A.HANE.d2; m.total = m.s + m.a - 1 + m.r; }
 }
 function saveTune(){ try { localStorage.setItem(TUNE_KEY, JSON.stringify(TUNE)); } catch (e) {} applyTune(); }
 let TSEL = 'jab1';
@@ -1431,7 +1457,7 @@ function tuneOpen(on){
   sel.value = TSEL; tuneRender();
 }
 function tuneRender(){
-  const id = TSEL, base = tuneBase(id), t = TUNE[id] || {};
+  const id = TSEL, base = tuneBase(id), t = TUNE[id] || {}, TF = TF0.concat(TX[id] || []);
   $('tn_rows').innerHTML = TF.filter(([k]) => base[k] != null).map(([k, n, u, st]) => {
     const v = tuneVal(id, k), ch = t[k] != null && t[k] !== base[k];
     if (Array.isArray(u)) return `<div class="tr${ch ? ' ch' : ''}"><span class="tn">${n}</span><select data-k="${k}">${u.map(([q, lb]) => `<option value="${q}"${q === v ? ' selected' : ''}>${lb}</option>`).join('')}</select><span class="tb">元 ${(u.find(x => x[0] === base[k]) || [0, ''])[1].replace(/（.*）/, '')}</span></div>`;
@@ -1450,7 +1476,7 @@ function setupTune(){
   $('tn_rows').addEventListener('change', e => { const i = e.target.closest('input[data-k],select[data-k]'); if (i) { tuneSet(i.dataset.k, +i.value); i.blur && i.blur(); } });
   $('tn_reset').onclick = () => { delete TUNE[TSEL]; saveTune(); tuneRender(); };
   $('tn_all').onclick = () => { const b = $('tn_all'); if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'もう一度押すと全部戻す'; setTimeout(() => { b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; }, 2500); return; } TUNE = {}; saveTune(); tuneRender(); b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; };
-  $('tn_out').onclick = () => { const lines = Object.keys(TUNE).map(id => MV[id].n + '（' + id + '）: ' + Object.entries(TUNE[id]).map(([k, v]) => (TF.find(f => f[0] === k) || [k, k])[1] + ' ' + tuneBase(id)[k] + '→' + v).join('、'));
+  $('tn_out').onclick = () => { const lines = Object.keys(TUNE).map(id => MV[id].n + '（' + id + '）: ' + Object.entries(TUNE[id]).map(([k, v]) => (TF0.concat(TX[id] || []).find(f => f[0] === k) || [k, k])[1] + ' ' + tuneBase(id)[k] + '→' + v).join('、'));
     const txt = lines.length ? '新・一閃 技の調整\n' + lines.join('\n') + '\n' + JSON.stringify(TUNE) : '（変えた技はありません）';
     $('tn_text').value = txt; $('tn_text').hidden = false; $('tn_text').select();
     try { navigator.clipboard.writeText(txt).then(() => { $('tn_out').textContent = '写しました'; setTimeout(() => { $('tn_out').textContent = '書き出す'; }, 2000); }); } catch (e) {} };

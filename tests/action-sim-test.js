@@ -235,18 +235,37 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
 
 // 八咫・羽跳: 2回まっすぐ跳ぶ（2回目は向きを入れたときだけ）、空中では一度だけ、2回当てで大きい硬直、三段→上斬り→羽跳がつながる
 { const mk = d => { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
-  const s = mk(500); s.step([I({ K: 'u' }), I()]); for (let k = 0; k < 18; k++) s.step([I(k > 8 ? { R: 1 } : {}), I()]);
-  const y1 = s.p[0].y; for (let k = 0; k < 9; k++) s.step([I(), I()]);
-  ok(y1 > 150 * A.FP && s.p[0].x > 750 * A.FP && Math.abs(s.p[0].y - y1) < 10 * A.FP, '羽跳: 上へ跳んでから右へまっすぐ (' + (s.p[0].x / 100 | 0) + ',' + (y1 / 100 | 0) + ')');
+  const s = mk(500); s.step([I({ K: 'u' }), I()]); for (let k = 0; k < 20; k++) s.step([I(k > 12 ? { R: 1 } : {}), I()]);
+  const y1 = s.p[0].y; for (let k = 0; k < 12; k++) s.step([I(), I()]);
+  ok(y1 > 250 * A.FP && s.p[0].x > 850 * A.FP && Math.abs(s.p[0].y - y1) < 10 * A.FP, '羽跳: 上へ跳んでから右へまっすぐ (' + (s.p[0].x / 100 | 0) + ',' + (y1 / 100 | 0) + ')');
   let st = ''; for (let k = 0; k < 40 && s.p[0].st !== 'fall'; k++) s.step([I(), I()]); ok(s.p[0].st === 'fall', '羽跳の後は無防備落下');
   s.step([I({ K: 'u' }), I()]); ok(s.p[0].mv !== 'hane' || s.p[0].st !== 'atk', '空中で二度は出ない');
   const t = mk(500); t.step([I({ K: 'u' }), I()]); for (let k = 0; k < 30; k++) t.step([I(), I()]);
   ok(t.p[0].x === 600 * A.FP && !t.p[0].hane2, '向きを入れなければ一度で終わる');
   const c = mk(55), ev = []; const go = (inp, n) => { c.step([I(inp), I()]); ev.push(...drain(c)); for (let k = 0; k < n; k++) { c.step([I(), I()]); ev.push(...drain(c)); } };
   go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'u' }, 11); c.step([I({ K: 'u' }), I()]);
-  for (let k = 0; k < 54; k++) { const dx = c.p[1].x - c.p[0].x, dy = c.p[1].y - c.p[0].y; c.step([I({ U: dy > 0 ? 1 : 0, D: dy < -3000 ? 1 : 0, R: dx > 2000 ? 1 : 0, L: dx < -2000 ? 1 : 0 }), I()]); ev.push(...drain(c)); }
+  const aim = () => { const dx = c.p[1].x - c.p[0].x, dy = c.p[1].y - c.p[0].y, q = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); const D = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]][(q + 8) % 8]; return { R: D[0] > 0 ? 1 : 0, L: D[0] < 0 ? 1 : 0, U: D[1] > 0 ? 1 : 0, D: D[1] < 0 ? 1 : 0 }; };
+  for (let k = 0; k < 54; k++) { c.step([I(c.p[0].st === 'atk' ? aim() : {}), I()]); ev.push(...drain(c)); }
   const hs = ev.filter(e => e.t === 'hit'); const last = hs[hs.length - 1];
   ok(hs.length === 5 && last.mv === 'haneX' && last.combo === 5, '弱斬り→弱斬り→上斬り→羽跳→羽跳 が5連撃、2回目は大きい硬直 ' + hs.map(e => e.mv + '#' + e.combo).join(' '));
-  ok(A.MV.haneX.hs >= 50, '二度当ての硬直 ' + A.MV.haneX.hs + 'F'); }
+}
+// 八咫の横＋技: 初虧→食甚→復円と変わる。初虧は溜めで伸びる・弱斬りからつながる。食甚は羽跳の二度当てから最速でちょうど確定。復円を溜めきると初虧に戻る
+{ const mk = d => { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
+  const dist = hold => { const s = mk(1200); s.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < 120 && s.p[0].st === 'atk'; k++) s.step([I(k < hold ? { H: 1 } : {}), I()]); return { d: (s.p[0].x - 60000) / 100 | 0, e: s.p[0].ecl }; };
+  const d0 = dist(0), d1 = dist(40); ok(d1.d > d0.d + 150 && d0.e === 1, '初虧: 溜めると踏み込みが伸びる (' + d0.d + 'px → ' + d1.d + 'px)、使うと次は食甚');
+  const j = mk(55), ev = []; j.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 8; k++) { j.step([I(), I()]); ev.push(...drain(j)); } j.step([I({ K: 'r' }), I()]); for (let k = 0; k < 30; k++) { j.step([I(), I()]); ev.push(...drain(j)); }
+  ok(ev.filter(e => e.t === 'hit').map(e => e.mv + e.combo).join() === 'jab11,shoki2', '弱斬り→初虧がつながる');
+  const sj = late => { const c = mk(55); c.p[0].ecl = 1; const go = (inp, n) => { c.step([I(inp), I()]); for (let k = 0; k < n; k++) c.step([I(), I()]); };
+    go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'u' }, 11); c.step([I({ K: 'u' }), I()]); const ev = []; let at = -1;
+    const aim = () => { const dx = c.p[1].x - c.p[0].x, dy = c.p[1].y - c.p[0].y, q = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); const D = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]][(q + 8) % 8]; return { R: D[0] > 0 ? 1 : 0, L: D[0] < 0 ? 1 : 0, U: D[1] > 0 ? 1 : 0, D: D[1] < 0 ? 1 : 0 }; };
+    for (let k = 0; k < 120; k++) { let inp = c.p[0].st === 'atk' && c.p[0].mv === 'hane' && c.p[0].mvf < 29 ? aim() : {};
+      if (at < 0 && c.p[0].mv === 'hane' && c.p[0].mvf >= 28) at = k; if (at >= 0 && k === at + 1 + late) inp = { K: 'r' };
+      c.step([I(inp), I()]); ev.push(...drain(c)); }
+    return ev.filter(e => e.t === 'hit').map(e => e.mv + '#' + e.combo); };
+  const a = sj(0), b = sj(1);
+  ok(a.join(' ').includes('haneX#5 shokujin#6') && !b.join(' ').includes('shokujin#6'), '食甚: 羽跳の二度当てから最速ならつながり、1F遅れるとつながらない (' + a.slice(-2).join(' ') + ' / ' + b.slice(-1) + ')');
+  const f = mk(1200); f.p[0].ecl = 2; f.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < 50; k++) f.step([I({ H: 1 }), I()]); for (let k = 0; k < 20; k++) f.step([I(), I()]);
+  const half = f.p[0].ecl; f.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < 60; k++) f.step([I({ H: 1 }), I()]);
+  ok(half === 2 && f.p[0].ecl === 0, '復円: 途中で離しても溜めは残り、溜めきると初虧に戻る'); }
 
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

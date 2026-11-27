@@ -1278,16 +1278,26 @@ function banSync(){
   if(ban.hidden===on){ ban.hidden=!on; st.hidden=on; if(!on) gSize(); }
   ban.classList.toggle('wait',GA.phase==='wait');
   if(!on){ banStop(); return; }
+  if(BAN) banSize();
   if(!BAN&&KREADY){ const k=KMAP[curBox().pick]; if(k){ banSize(); BAN=zRun(document.getElementById('g_banc'),k,{ban:true}); } }
 }
 function openGacha(tab){ banStop(); gachaEl.hidden=false; uiCache=''; GA.box=null; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ banStop(); gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
-const GOD_N=10;   // 運営アカウントの「十振り引く」
-function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.floor(WALLET.coins/PULLCOST), busy=gBusy();
+const GOD_N=1000; // 運営アカウントが一度に引ける数
+const PULLMAX=1000; // 一度に引ける数の上限（サーバーの pull_gacha と同じ）
+let GCNT=10;        // 「回数」で選んだ数
+function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.min(PULLMAX,Math.floor(WALLET.coins/PULLCOST)), busy=gBusy();
   const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='<b>一振り</b><small>'+(GOD?'無料':PULLCOST+'銭')+'</small>';
   const p10=document.getElementById('g_pull10'); p10.disabled=busy||n<10; p10.innerHTML='<b>十振り</b><small>'+(GOD?'無料':10*PULLCOST+'銭')+'</small>';
   const all=document.getElementById('g_all'); all.hidden=GOD; all.disabled=busy||n<2;
   all.innerHTML='<b>全部</b><small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>';
+  // 回数を選ぶ: 1回から、引ける数（銭・上限1000）まで
+  const cb=document.getElementById('g_cntb'), cp=document.getElementById('g_cnt'), cr=document.getElementById('g_cntr'), mx=Math.max(1,n);
+  cb.disabled=busy||n<1; if(n<1) cp.hidden=true; cb.classList.toggle('on',!cp.hidden); document.getElementById('g_pull').classList.toggle('cnt',!cp.hidden);
+  GCNT=Math.max(1,Math.min(mx,GCNT)); cr.max=mx; cr.value=GCNT; cr.disabled=busy;
+  document.getElementById('g_cntv').textContent=GCNT;
+  cp.querySelectorAll('button[data-d]').forEach(b=>{ const d=+b.dataset.d; b.disabled=busy||(d<0?GCNT<=1:GCNT>=mx); });
+  const go=document.getElementById('g_cntgo'); go.disabled=busy||n<1; go.innerHTML='<b>'+GCNT+'振り引く</b><small>'+(GOD?'無料':GCNT*PULLCOST+'銭')+'</small>';
   renderBox();
   const pk=document.getElementById('g_pick'); if(pk){ pk.hidden=!GOD; if(GOD&&pk.options.length<2) fillPick(pk); pk.disabled=busy; } }
 // ピックアップ: 選んだ刀が必ず出る（運営アカウントだけ。サーバーでも確かめる）
@@ -1296,7 +1306,7 @@ function setTab(t){ document.querySelectorAll('.gtabs button').forEach(b=>b.clas
   document.getElementById('g_pull').hidden=t!=='pull'; document.getElementById('g_book').hidden=t!=='book'; if(t==='book') renderBook(); else gSize(); }
 function doPull(n){
   if(gBusy()) return;
-  const msg=document.getElementById('g_msg'); n=GOD?Math.min(n,GOD_N):Math.min(n,Math.floor(WALLET.coins/PULLCOST));
+  const msg=document.getElementById('g_msg'); n=GOD?Math.min(n,GOD_N):Math.min(n,PULLMAX,Math.floor(WALLET.coins/PULLCOST));
   if(n<1){ msg.textContent='銭が足りません。勝負に勝って銭を集めてください。'; return; }
   msg.textContent=''; ensureAudio();
   if(ACCT){ // ログイン中: くじはサーバーが引く
@@ -1714,6 +1724,10 @@ document.getElementById('g_skip').addEventListener('click',skipAhead);
 document.querySelectorAll('.gtabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 document.getElementById('g_pull1').addEventListener('click',()=>doPull(1));
 document.getElementById('g_pull10').addEventListener('click',()=>doPull(10));
+document.getElementById('g_cntb').addEventListener('click',()=>{ const cp=document.getElementById('g_cnt'); cp.hidden=!cp.hidden; refreshCoins(); });
+document.getElementById('g_cntr').addEventListener('input',e=>{ GCNT=+e.target.value; refreshCoins(); });
+document.querySelectorAll('#g_cnt button[data-d]').forEach(b=>b.addEventListener('click',()=>{ GCNT+=+b.dataset.d; refreshCoins(); }));
+document.getElementById('g_cntgo').addEventListener('click',()=>doPull(GCNT));
 document.getElementById('g_ban').addEventListener('click',e=>{ if(e.target.closest('#g_bd')||gBusy()) return; banStop(); banSync(); }); // 触ると抜き直す
 document.getElementById('g_bd').addEventListener('click',()=>{ const k=KMAP[curBox().pick]; if(k) zetsuZoom(k,()=>{ banStop(); banSync(); }); });
 document.getElementById('g_all').addEventListener('click',()=>doPull(Infinity));

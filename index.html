@@ -53,7 +53,13 @@
           <div class="gres" id="g_res" hidden><span class="gt" id="g_rt"></span><span class="gm" id="g_rm"></span><span class="gy" id="g_ry"></span><p id="g_rl"></p><p class="gd" id="g_rdup"></p><div class="gbatch" id="g_batch" hidden></div><span class="gtap" id="g_tap">触れて閉じる</span></div>
         </div>
         <select id="g_pick" class="gpick" hidden aria-label="ピックアップする刀"></select>
-        <div class="gact"><button type="button" id="g_pull1" class="gpull"><b>一振り</b><small>10銭</small></button><button type="button" id="g_pull10" class="gpull"><b>十振り</b><small>100銭</small></button><button type="button" id="g_all" class="gpull sec"><b>全部</b><small></small></button></div>
+        <div class="gact"><button type="button" id="g_pull1" class="gpull"><b>一振り</b><small>10銭</small></button><button type="button" id="g_pull10" class="gpull"><b>十振り</b><small>100銭</small></button><button type="button" id="g_all" class="gpull sec"><b>全部</b><small></small></button><button type="button" id="g_cntb" class="gpull sec"><b>回数</b><small>自分で選ぶ</small></button></div>
+        <div class="gcnt" id="g_cnt" hidden>
+          <button type="button" data-d="-10">−10</button><button type="button" data-d="-1">−</button>
+          <label class="gcn"><input type="range" id="g_cntr" min="1" max="10" value="1" aria-label="引く回数"><span><b id="g_cntv">1</b>回</span></label>
+          <button type="button" data-d="1">＋</button><button type="button" data-d="10">＋10</button>
+          <button type="button" id="g_cntgo" class="gpull"><b>引く</b><small></small></button>
+        </div>
         <p class="gnote" id="g_msg"></p>
         <details class="grate"><summary>出る確率と玉鋼</summary><p class="gnote"><span id="g_rate">出る確率　並 59.5%・上 28%・極 10%・幻 2%・絶 0.5%</span>。絶は箱ごとの目玉で、その箱でしか出ません。持っている刀が出たら玉鋼になります（並5・上10・極25・幻100・絶300）。玉鋼は刀帳で、まだ持っていない刀を鍛えるのに使えます（並50・上110・極300・幻1500・絶6000）。</p></details>
       </div>

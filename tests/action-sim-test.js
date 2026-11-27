@@ -151,4 +151,14 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   const s = mk(); s.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 11; k++) s.step([I(), I()]); s.step([I({ K: 'u' }), I()]);
   let mv = new Set(); for (let k = 0; k < 40; k++) { s.step([I(), I()]); if (s.p[0].mv) mv.add(s.p[0].mv); } ok(mv.has('rise') && !mv.has('jab2'), '弱斬り中に弾くと、斬りの続きでなく技が出る ' + [...mv]); }
 
+// 天桜を当てたら、使った側が着地して動けるのが相手より先（確定反撃を受けない）
+{ const FREE = ['idle', 'walk', 'crouch', 'air', 'guard', 'dash'];
+  for (const [stage, mv] of [[0, 'ten'], [1, 'tenK'], [2, 'tenM'], [3, 'tenR']]) for (const hp of [10000, 6000, 3000]) {
+    const s = new A.Sim({ training: true, kits: ['ouka', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 660 * A.FP; s.p[1].hp = hp;
+    if (stage) { s.plant(s.p[0]); s.p[0].tree.stage = stage; s.p[0].tree.x = 200 * A.FP; }
+    s.step([I({ U: 1, A: 1, S: 1 }), I()]); let hit = false, a = -1, d = -1, used = null;
+    for (let f = 1; f < 400 && (a < 0 || d < 0); f++) { s.step([I(), I()]); for (const e of s.ev) if (e.t === 'hit' && e.by === 0) { hit = true; used = used || e.mv; } s.ev = [];
+      if (!hit) continue; if (a < 0 && FREE.includes(s.p[0].st) && s.p[0].ground && !s.hitstop) a = f; if (d < 0 && FREE.includes(s.p[1].st) && !s.hitstop) d = f; }
+    ok(used === mv && d > a, `${mv} 相手の体力${hp / 100}: 使った側が先に動ける（${d - a}F 早い）`); } }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

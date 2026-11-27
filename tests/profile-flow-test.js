@@ -88,7 +88,7 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   sql("update public.profiles set name = '風見' where id = :'id'", { id: USERS[A] });
   sql("insert into public.saves (id, owned, rec) values (:'id', '{\"mumei\":1,\"nichirin\":1}', '{\"nichirin\":{\"一閃\":2}}')", { id: USERS[A] });
   sql("insert into public.saves (id, owned) values (:'id', '{\"mumei\":1,\"ouka\":1}')", { id: USERS[B] });
-  sql("insert into public.saves (id, owned) values (:'id', '{\"mumei\":1,\"ouka\":3}')", { id: USERS[G] });
+  sql("insert into public.saves (id, owned) values (:'id', '{\"mumei\":1,\"ouka\":3}') on conflict (id) do nothing", { id: USERS[G] });
   sql("insert into public.friendships (a, b, requester, status) values (least(:'x'::uuid, :'y'::uuid), greatest(:'x'::uuid, :'y'::uuid), :'x', 'accepted')", { x: USERS[A], y: USERS[B] });
   sql("update public.notices set deleted = true");
   notice('update', '第一弾の箱', '箱ガチャを始めました。');

@@ -123,8 +123,9 @@ select pg_temp.expect_err($$select public.god_post_notice('other', '題', '')$$,
 select public.god_post_notice('special', '八咫、近日', '日食の刀', 'yata') > 0;
 select pg_temp.expect_err($$select public.god_post_notice('special', '題', '')$$, '刀を選んで');
 select (public.list_notices() -> 0 ->> 'art') = 'yata' as special_art;
-reset role; delete from public.notices where art = 'yata'; set role authenticated;
-select public.god_delete_notice((select max(id) from public.notices));
+reset role; delete from public.notices where art = 'yata'; select max(id) as nid from public.notices \gset
+set role authenticated;
+select public.god_delete_notice(:nid);
 reset role;
 set role anon; select pg_temp.as_('');
 select case when jsonb_array_length(public.list_notices()) = 1 and public.list_notices() -> 0 ->> 'kind' = 'maint' then 'OK ログインなしでも読める・消したものは出ない' else 'NG' end;
@@ -168,3 +169,19 @@ update public.saves set rec = rec || '{"ruri":{"明鏡止水":3,"一閃":1,"陽�
 select case when (select holder from public.crowns where title = 'top_kagero') = '11111111-1111-1111-1111-111111111111'
             and (select name from public.title_catalog where id = 'top_kagero') = '天下　陽炎' then 'OK 天下　陽炎は甲' else 'NG' end;
 
+\echo '--- 神様は全部を持つ（天下の持ち主は変えない）'
+select case when (select s.owned @> (select jsonb_object_agg(c.id, 1) from public.katana_catalog c) from public.saves s where s.id = '99999999-9999-9999-9999-999999999999')
+            and (select e.titles @> (select array_agg(id) from public.title_catalog) and e.plates @> (select array_agg(id) from public.plate_catalog) from public.profile_ext e where e.id = '99999999-9999-9999-9999-999999999999')
+  then 'OK 神様は刀・二つ名（隠しも）・背景を全部持つ' else 'NG' end;
+insert into public.katana_catalog (id, tier) values ('zz_test', '並');
+insert into public.title_catalog (id, name, note, ord) values ('zz_t', '試し', '', 999);
+select case when (select owned ? 'zz_test' from public.saves where id = '99999999-9999-9999-9999-999999999999')
+            and (select 'zz_t' = any(titles) from public.profile_ext where id = '99999999-9999-9999-9999-999999999999')
+  then 'OK 刀や二つ名を足すと神様にも入る' else 'NG' end;
+delete from public.katana_catalog where id = 'zz_test'; delete from public.title_catalog where id = 'zz_t';
+update public.saves set owned = owned - 'zz_test' where id = '99999999-9999-9999-9999-999999999999';
+update public.profile_ext set titles = array_remove(titles, 'zz_t') where id = '99999999-9999-9999-9999-999999999999';
+select case when (select holder from public.crowns where title = 'top_kagero') = '11111111-1111-1111-1111-111111111111'
+            and (select count(*) from public.crowns where holder = '99999999-9999-9999-9999-999999999999') = 0
+            and (select 'top_kagero' = any(titles) from public.profile_ext where id = '11111111-1111-1111-1111-111111111111')
+  then 'OK 神様が持っても天下の持ち主はそのまま' else 'NG' end;

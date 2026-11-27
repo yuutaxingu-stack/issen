@@ -290,7 +290,7 @@ begin
     return query select s.id from public.saves s where public.has_issen(s);
   elsif p_target = 'katana' then
     if not exists (select 1 from public.katana_catalog c where c.id = p_arg) then raise exception 'その刀はありません'; end if;
-    return query select s.id from public.saves s where coalesce((s.owned ->> p_arg)::numeric, 0) > 0;
+    return query select s.id from public.saves s where coalesce((s.owned ->> p_arg)::numeric, 0) > 0 and not public.is_god(s.id);   -- 神様は全部持っているので外す
   elsif p_target = 'login' then
     return query select pr.id from public.profiles pr
       where exists (select 1 from regexp_split_to_table(coalesce(p_arg, ''), '[,、，\s　]+') v
@@ -688,6 +688,40 @@ create trigger ratings_crowns after insert or update on public.ratings
 -- いまの一番の人に授ける（何度実行しても、持ち主が変わらなければ何も届かない）
 select public.crown_refresh_kinds(array['finish', 'finish_kat', 'wins', 'cpu', 'katana', 'rating']);
 
+-- ---------- 神様は全部を持つ（2026-11-27） ----------
+-- 神様（god_accounts）の saves.owned に全部の刀、profile_ext に全部の二つ名・背景の札を入れる。
+-- 刀・二つ名・背景を足したとき、神様を足したときにも自動で入る（下のトリガー）。
+-- 隠し二つ名「天下　〇〇」も持たせるが、神様は一番の判定から外してあるので、本当の一番の人からは取らない。
+-- 持っている刀の本数・銭・玉鋼・戦績・名乗っている二つ名はそのまま
+create or replace function public.god_fill() returns void
+language plpgsql security definer set search_path = '' as $$
+declare ks jsonb; ts text[]; ps text[];
+begin
+  select coalesce(jsonb_object_agg(c.id, 1), '{}') into ks from public.katana_catalog c;
+  select coalesce(array_agg(t.id order by t.ord, t.id), '{}') into ts from public.title_catalog t;
+  select coalesce(array_agg(p.id order by p.ord, p.id), '{}') into ps from public.plate_catalog p;
+  insert into public.saves (id) select g.id from public.god_accounts g on conflict (id) do nothing;
+  update public.saves s set owned = ks || s.owned, updated_at = now()
+  where s.id in (select g.id from public.god_accounts g) and not (s.owned @> ks);
+  insert into public.profile_ext (id) select g.id from public.god_accounts g on conflict (id) do nothing;
+  update public.profile_ext e set titles = ts, plates = ps, updated_at = now()
+  where e.id in (select g.id from public.god_accounts g) and (e.titles is distinct from ts or e.plates is distinct from ps);
+end;
+$$;
+create or replace function public.god_fill_trigger() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin perform public.god_fill(); return null; end;
+$$;
+drop trigger if exists god_fill_on_god on public.god_accounts;
+create trigger god_fill_on_god after insert on public.god_accounts for each statement execute function public.god_fill_trigger();
+drop trigger if exists god_fill_on_katana on public.katana_catalog;
+create trigger god_fill_on_katana after insert on public.katana_catalog for each statement execute function public.god_fill_trigger();
+drop trigger if exists god_fill_on_title on public.title_catalog;
+create trigger god_fill_on_title after insert on public.title_catalog for each statement execute function public.god_fill_trigger();
+drop trigger if exists god_fill_on_plate on public.plate_catalog;
+create trigger god_fill_on_plate after insert on public.plate_catalog for each statement execute function public.god_fill_trigger();
+select public.god_fill();
+
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.is_god(uuid), public.profile_json(uuid), public.has_issen(public.saves), public.god_targets(text, text),
@@ -697,7 +731,8 @@ revoke execute on function
   public.god_post_notice(text, text, text, text), public.god_delete_notice(bigint),
   public.auto_gift_check(public.saves), public.auto_gift_trigger(),
   public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text),
-  public.crown_values(text, text), public.crown_refresh(text), public.crown_refresh_kinds(text[]), public.crown_saves_trigger(), public.crown_rating_trigger()
+  public.crown_values(text, text), public.crown_refresh(text), public.crown_refresh_kinds(text[]), public.crown_saves_trigger(), public.crown_rating_trigger(),
+  public.god_fill(), public.god_fill_trigger()
   from public, anon, authenticated;
 grant execute on function
   public.get_profile(uuid), public.profile_tags(uuid[]), public.set_profile(text, text, text, text),

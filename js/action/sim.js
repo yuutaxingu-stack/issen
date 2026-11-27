@@ -18,6 +18,7 @@ const C = {
   gdRegen: 33,        // 1Fの回復量（約 毎秒20）
   stunF: 90,          // 気絶
   stunRecoverGd: 5000,// 気絶明けのガード
+  slideF: 30,         // ダッシュ中の守で滑る長さ（0.5秒）
   roundF: 7200,       // 120秒
   sdF: 3600,          // サドンデスの長さ
   toWin: 2,
@@ -122,7 +123,7 @@ function newPlayer(i){
     hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
-    stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
+    stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
 }
 
 function Sim(opts){
@@ -134,6 +135,7 @@ function Sim(opts){
 Sim.prototype.resetRound = function(){
   this.p = [newPlayer(0), newPlayer(1)];
   if (this.opts.kits) this.p.forEach((p, i) => { p.kit = this.opts.kits[i] || 'common'; });
+  if (this.opts.dashRoll) this.p.forEach((p, i) => { p.dashRoll = !!this.opts.dashRoll[i]; });
   this.frame = 0; this.hitstop = 0; this.sd = false; this.sdStart = 0;
   this.over = false; this.result = null; this.ev = []; this.pj = [];
   this.roundNo++;
@@ -250,7 +252,7 @@ Sim.prototype.think = function(p, o){
         if (p.buf.A) return this.startMove(p, 'grab');
         if (p.hEdge) return this.dodge(p, p.hEdge === p.face ? 'fwd' : 'back', p.hEdge);
         if (i.D && p.buf.G) return this.dodge(p, 'spot');
-        p.st = 'guard'; p.f = 0; return;
+        p.st = 'guard'; p.f = 0; p.slideF = C.slideF; return;
       }
       if (p.buf.J) {
         p.buf.J = 0;
@@ -264,7 +266,10 @@ Sim.prototype.think = function(p, o){
       return;
     case 'dash':
       if (canIai) return this.startMove(p, 'iai');
-      if (i.G && !oppStun) return this.dodge(p, 'fwd', p.face); // ダッシュ中の守は走る向きへ前方回避
+      if (i.G && !oppStun) { // ダッシュ中の守: 勢いを残したままシールド（設定で「前方回避」にもできる）
+        if (p.dashRoll) return this.dodge(p, 'fwd', p.face);
+        p.st = 'guard'; p.f = 0; p.slideV = p.vx; p.slideF = 0; return;
+      }
       if (p.buf.J) { p.buf.J = 0; p.st = 'jsq'; p.f = 0; return; }
       if (p.buf.A) { if (p.cb) return this.startMove(p, 'dashatk'); return this.groundAttack(p); } // 走りながら攻撃スティックでダッシュ斬り
       if (i.D) { p.st = 'crouch'; return; }
@@ -316,7 +321,10 @@ Sim.prototype.update = function(p, o){
   if (p.wallF > 0) p.wallF--;
   if (p.dropF > 0) p.dropF--;
   switch (p.st) {
-    case 'idle': case 'crouch': case 'guard': case 'unguard': case 'bstun': case 'hit': case 'land': case 'tech': case 'stun':
+    case 'guard':
+      if (p.slideF < C.slideF) { p.slideF++; p.vx = Math.trunc(p.slideV * (5 - Math.floor(p.slideF * 5 / C.slideF)) / 5); break; } // 0.1秒ごとに2割ずつ落ち、0.5秒で止まる
+      p.vx = toward(p.vx, 0, PH.gFric); break;
+    case 'idle': case 'crouch': case 'unguard': case 'bstun': case 'hit': case 'land': case 'tech': case 'stun':
       p.vx = toward(p.vx, 0, PH.gFric); break;
     case 'walk': p.vx = spd(p, h * PH.walk); break;
     case 'dash': p.f++; p.vx = spd(p, p.face * PH.dash); break;

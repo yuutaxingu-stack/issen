@@ -64,8 +64,8 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   ok(ad.first === 3 && ad.last === 22 && ad.total === 60, '方向空中回避 3〜22 全体60 ' + JSON.stringify(ad)); }
 // 18) 昇り斬りの後は無防備に落ちて、着地硬直20F
 { const s = sim(600); run(s, 1, () => I({ A: 1, U: 1 })); let st = new Set(); for (let k = 0; k < 200 && !(s.p[0].st === 'idle' && s.p[0].ground); k++) { s.step([I({ J: k % 2 }), I()]); st.add(s.p[0].st); } ok(st.has('fall') && st.has('land'), '昇り斬り→無防備落下→着地 ' + [...st]); }
-// 19) ダッシュ中に守で前方回避、前方回避の後は振り返る
-{ const s = sim(600); run(s, 1, () => I({ R: 1, F: 1 })); run(s, 3, () => I({ R: 1 })); run(s, 1, () => I({ R: 1, G: 1 })); ok(s.p[0].st === 'roll' && s.p[0].rk === 'fwd', 'ダッシュ中の守は前方回避'); run(s, 40); ok(s.p[0].face === -1, '前方回避の後は反対を向く'); }
+// 19) ダッシュ中に守で前方回避（設定オン）、前方回避の後は振り返る
+{ const s = sim(600); s.p[0].dashRoll = true; run(s, 1, () => I({ R: 1, F: 1 })); run(s, 3, () => I({ R: 1 })); run(s, 1, () => I({ R: 1, G: 1 })); ok(s.p[0].st === 'roll' && s.p[0].rk === 'fwd', 'ダッシュ中の守は前方回避'); run(s, 40); ok(s.p[0].face === -1, '前方回避の後は反対を向く'); }
 // 20) 飛ぶ斬撃: 18Fで出て、54F目に動ける。離れた相手に当たる
 { const s = sim(900); run(s, 1, () => I({ A: 1, R: 1 })); let born = 0, n = 1; while (s.p[0].st === 'atk') { if (!born && s.pj.length) born = s.frame; s.step([I(), I()]); n++; } ok(born === 18 && n === 53, '飛ぶ斬撃 発生18F・54F目に動ける (' + born + ',' + (n + 1) + ')');
 }
@@ -131,5 +131,14 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   d.hp = A.HP_MAX; a.combo = 0; s.applyHit(a, d, A.MV.jab1, snap()); ok(A.HP_MAX - d.hp === Math.floor(A.MV.jab1.dmg * 14 / 10), '落花は威力1.4倍 (' + (A.HP_MAX - d.hp) + ')');
   const g = new A.Sim({ training: true, kits: ['ouka', 'common'] }); g.plant(g.p[0]); g.p[0].tree.stage = 2; const x0 = g.p[0].x; for (let k = 0; k < 10; k++) g.step([I({ R: 1 }), I()]);
   ok(g.p[0].x - x0 === 10 * Math.trunc(A.PH.walk * 13 / 10), '満開は歩きが1.3倍'); }
+
+// ダッシュ中の守: 勢いを残したシールドで、0.1秒ごとに2割ずつ落ちて0.5秒で止まる。設定がオンなら前方回避
+{ const s = new A.Sim({ training: true }); s.p[0].x = 400 * A.FP; s.p[1].x = 1400 * A.FP;
+  s.step([I({ R: 1, F: true }), I()]); for (let k = 0; k < 10; k++) s.step([I({ R: 1 }), I()]);
+  const v0 = s.p[0].vx; s.step([I({ R: 1, G: 1 }), I()]); ok(s.p[0].st === 'guard', 'ダッシュ中の守でシールド (' + s.p[0].st + ')');
+  const vs = [s.p[0].vx]; for (let k = 0; k < 31; k++) { s.step([I({ G: 1 }), I()]); vs.push(s.p[0].vx); }
+  ok(v0 > 0 && vs[0] === v0 && vs[6] === Math.trunc(v0 * 4 / 5) && vs[12] === Math.trunc(v0 * 3 / 5) && vs[24] === Math.trunc(v0 / 5) && vs[30] === 0, '0.1秒ごとに2割落ちて0.5秒で止まる (' + [0, 6, 12, 24, 30].map(k => vs[k]).join(',') + ')');
+  const r = new A.Sim({ training: true, dashRoll: [true, false] }); r.p[0].x = 400 * A.FP; r.step([I({ R: 1, F: true }), I()]); for (let k = 0; k < 10; k++) r.step([I({ R: 1 }), I()]);
+  r.step([I({ R: 1, G: 1 }), I()]); ok(r.p[0].st === 'roll', '設定オンならダッシュ中の守で前方回避 (' + r.p[0].st + ')'); }
 
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

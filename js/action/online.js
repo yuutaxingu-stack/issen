@@ -42,7 +42,7 @@
     if (row.data.status !== 'playing') return cover('この対戦はもう終わっています', '', true);
     st.oppId = ME === 0 ? row.data.p1 : row.data.p0;
     const k = AP.myKat();
-    st.mine = { name: N.profile ? N.profile.name : 'あなた', kit: k.kit, kat: k.id, mei: k.mei, tier: k.tier };
+    st.mine = { name: N.profile ? N.profile.name : 'あなた', kit: k.kit, kat: k.id, mei: k.mei, tier: k.tier, roll: k.dashRoll ? 1 : 0 };
     st.ch = N.sb.channel('match:' + MATCH, { config: { private: true, broadcast: { self: false, ack: false } } });
     st.ch.on('broadcast', { event: 'm' }, ({ payload }) => recv(payload));
     st.ch.subscribe(s => {
@@ -126,9 +126,10 @@
     const h = st.hello || {}, kits = [], names = [];
     kits[ME] = st.mine.kit; kits[OP] = h.kit === 'ouka' ? 'ouka' : 'common';
     names[ME] = st.mine.name; names[OP] = String(h.name || N.nameOf(st.oppId)).slice(0, 10);
+    const roll = []; roll[ME] = !!st.mine.roll; roll[OP] = !!h.roll; // ダッシュ中の守の設定は、それぞれの人のもの
     const off = ME === 1 ? st.off : 0;
     cover(null);
-    AP.onlineStart({ me: ME, kits, names, kat: st.mine.kat, startAt, now: () => performance.now() + off, delay: 2,
+    AP.onlineStart({ me: ME, kits, names, dashRoll: roll, kat: st.mine.kat, startAt, now: () => performance.now() + off, delay: 2,
       onLocal, onOver: report, onExit: why => leave(why) });
   }
 

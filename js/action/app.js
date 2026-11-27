@@ -40,7 +40,7 @@ function viewAt(sx, sy){
 }
 
 /* ---------- 設定 ---------- */
-const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false };
+const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false }; // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('issen-action-opt') || '{}')); } catch (e) {}
 function saveOpt(){ try { localStorage.setItem('issen-action-opt', JSON.stringify(OPT)); } catch (e) {} }
 const DUMMY = [['stand', '立つだけ'], ['guard', '守り続ける'], ['jump', '跳び回る'], ['mash', '暴れる']];
@@ -257,6 +257,7 @@ const KITS = [(SNAP.equip && owns(SNAP.equip[0])) ? SNAP.equip[0] : 'mumei', (SN
 try { const k = JSON.parse(localStorage.getItem('issen-action-kit2') || 'null'); if (Array.isArray(k)) k.forEach((v, i) => { if (owns(v)) KITS[i] = v; }); } catch (e) {}
 function saveKits(){ try { localStorage.setItem('issen-action-kit2', JSON.stringify(KITS)); } catch (e) {} }
 const kitOf = id => id === 'ouka' && owns('ouka') ? 'ouka' : 'common'; // 桜華の技は、ガチャなどで手に入れた人だけ
+const rollFor = mode => [!!OPT.dashRoll, mode === 'vs' ? !!OPT.dashRoll : false];
 const kitsFor = mode => mode === 'vs' ? [kitOf(KITS[0], mode), kitOf(KITS[1], mode)] : [kitOf(KITS[0], mode), 'common'];
 function recordWin(r){ // 勝った刀の戦績と銭
   const i = r.winner; if (i < 0 || GAME.mode === 'train' || (GAME.mode === 'cpu' && i !== 0)) return;
@@ -268,7 +269,7 @@ function recordWin(r){ // 勝った刀の戦績と銭
 }
 function startMode(mode){
   GAME.mode = mode; GAME.log = []; GAME.n = 1; GAME.t = 0; GAME.coins = 0;
-  sim = new A.Sim(mode === 'train' ? { training: true, kits: kitsFor(mode) } : { toWin: mode === 'cpu' ? 1 : 2, kits: kitsFor(mode) });
+  sim = new A.Sim(mode === 'train' ? { training: true, kits: kitsFor(mode), dashRoll: rollFor(mode) } : { toWin: mode === 'cpu' ? 1 : 2, kits: kitsFor(mode), dashRoll: rollFor(mode) });
   if (mode === 'cpu') cpuReset(1);
   GAME.phase = mode === 'train' ? 'fight' : 'intro';
   GAME.zin = mode !== 'train' && sim.p.some(p => p.kit === 'ouka') ? 110 : 0; // 絶の持ち主がいれば立ち合いの前に抜刀のカットイン
@@ -329,7 +330,7 @@ function afterFinish(){
   GAME.log.push({ name: r.name, tier: r.tier, winner: r.winner });
   recordWin(r);
   if (GAME.mode === 'cpu') {
-    if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu') }); cpuReset(GAME.n); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
+    if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu'), dashRoll: rollFor('cpu') }); cpuReset(GAME.n); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
     if (r.winner < 0) { resetRound(); GAME.phase = 'intro'; GAME.t = 0; return; } // 引き分けは同じ相手ともう一度
     const rec = GAME.n - 1;
     if (rec > GAME.best) { GAME.best = rec; try { localStorage.setItem('issen-action-cpu-v1', JSON.stringify({ best: rec })); } catch (e) {} }
@@ -1084,6 +1085,8 @@ function setupBar(){
   sel.value = OPT.dummy; sel.addEventListener('change', () => { OPT.dummy = sel.value; saveOpt(); sel.blur(); });
   const fr = document.getElementById('a_frames'); fr.checked = OPT.frames; fr.addEventListener('change', () => { OPT.frames = fr.checked; saveOpt(); });
   const bx = document.getElementById('a_boxes'); bx.checked = OPT.boxes; bx.addEventListener('change', () => { OPT.boxes = bx.checked; saveOpt(); });
+  for (const id of ['a_droll', 'mn_droll']) { const el = document.getElementById(id); el.checked = !!OPT.dashRoll;
+    el.addEventListener('change', () => { OPT.dashRoll = el.checked; saveOpt(); ['a_droll', 'mn_droll'].forEach(q => { document.getElementById(q).checked = OPT.dashRoll; }); for (const p of sim.p) if (GAME.mode === 'train' || GAME.mode === 'vs' || p.i === 0) p.dashRoll = OPT.dashRoll; el.blur(); }); }
   const rf = document.getElementById('a_refill'); rf.checked = OPT.refill; rf.addEventListener('change', () => { OPT.refill = rf.checked; saveOpt(); });
   document.getElementById('a_reset').addEventListener('click', e => { resetRound(); e.target.blur(); });
   document.getElementById('a_help').addEventListener('click', () => { document.getElementById('help').hidden = false; });
@@ -1153,7 +1156,7 @@ const FRAME_MS = 1000 / 60;
          onLocal(f, code) 自分の入力を送る, onOver(log, wins) 決着を知らせる, onExit() 戻る } */
 function onlineStart(o){
   GAME.mode = 'online'; GAME.log = []; GAME.coins = 0; GAME.n = 1;
-  sim = new A.Sim({ toWin: 2, kits: o.kits });
+  sim = new A.Sim({ toWin: 2, kits: o.kits, dashRoll: o.dashRoll || [false, false] });
   const zin = sim.p.some(p => p.kit === 'ouka') ? 110 : 0;
   ON = Object.assign({ L: { ph: 'intro', t: 0, zin, log: [] }, played: new Map(), hashes: {}, round: sim.roundNo, msg: '', done: false, wait: 0 }, o);
   ON.np = NPL.NetPlay({ me: o.me, delay: o.delay == null ? 2 : o.delay, maxRoll: 12, save: onSave, load: onLoad, step: onStep });
@@ -1235,6 +1238,6 @@ resize(); setupBar(); setupMenu();
 
 const DBG = { pause: false };
 window.__action = { onlineStart, onlineEnd, get ON(){ return ON; },
-  myKat(){ const k = SNAP.owned.find(q => q.id === KITS[0]) || SNAP.owned[0]; return { id: k.id, mei: k.mei, tier: k.tier, kit: kitOf(k.id, 'online') }; }, step: () => stepOnce(), get sim(){ return sim; }, GAME, startMode, CPU, FX, OPT, resetRound, DBG, recordTrail, draw, cam, get W(){ return W; }, get GROUND(){ return GROUND; } };
+  myKat(){ const k = SNAP.owned.find(q => q.id === KITS[0]) || SNAP.owned[0]; return { id: k.id, mei: k.mei, tier: k.tier, kit: kitOf(k.id, 'online'), dashRoll: !!OPT.dashRoll }; }, step: () => stepOnce(), get sim(){ return sim; }, GAME, startMode, CPU, FX, OPT, resetRound, DBG, recordTrail, draw, cam, get W(){ return W; }, get GROUND(){ return GROUND; } };
 requestAnimationFrame(t => { lastT = t; requestAnimationFrame(tick); });
 })();

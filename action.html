@@ -80,6 +80,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
 #tune .tr{display:grid;grid-template-columns:1fr 34px 70px 34px 22px 58px;gap:4px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(239,232,214,.08)}
 #tune .tr.ch .tn{color:#f3a294}#tune .tr input{width:100%;box-sizing:border-box;font:inherit;text-align:center;background:#2a2d24;color:#efe8d6;border:1px solid rgba(239,232,214,.3);border-radius:3px;padding:3px 2px}
 #tune .tr button{padding:3px 0}#tune .tu{font-size:11px;color:#a39d8a}#tune .tb{font-size:11px;color:#8d8775;text-align:right}
+#tune .tr select{grid-column:2/6;margin:0;padding:3px}
 #tune #tn_sum{font-size:12px;color:#c9c2ae;margin:8px 0}
 #tune .tacts{display:flex;gap:6px;flex-wrap:wrap}#tune textarea{width:100%;height:120px;margin-top:8px;font:12px ui-monospace,monospace;background:#2a2d24;color:#efe8d6;border:1px solid rgba(239,232,214,.3)}
 </style>
@@ -155,16 +156,16 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
 </div></div>
 <div id="rot">横向きにしてください</div>
 <script src="js/katana-image.js"></script>
-<script src="js/action/katlook-data.js?v=1795788506"></script>
-<script src="js/action/pose.js?v=1795788506"></script>
-<script src="js/action/boxes.js?v=1795788506"></script>
-<script src="js/action/sim.js?v=1795788506"></script>
-<script src="js/action/netplay.js?v=1795788506"></script>
-<script src="js/action/app.js?v=1795788506"></script>
+<script src="js/action/katlook-data.js?v=1795790355"></script>
+<script src="js/action/pose.js?v=1795790355"></script>
+<script src="js/action/boxes.js?v=1795790355"></script>
+<script src="js/action/sim.js?v=1795790355"></script>
+<script src="js/action/netplay.js?v=1795790355"></script>
+<script src="js/action/app.js?v=1795790355"></script>
 <script src="js/online-config.js"></script>
-<script src="js/no-link.js?v=1795788506"></script>
-<script src="js/net.js?v=1795788506"></script>
-<script src="js/action/online.js?v=1795788506"></script>
+<script src="js/no-link.js?v=1795790355"></script>
+<script src="js/net.js?v=1795790355"></script>
+<script src="js/action/online.js?v=1795790355"></script>
 <script>/* 招かれた人だけ: ログインしていなければタイトルへ（ネット対戦は online.js が確かめる） */
 (function(){var N=window.IssenNet;if(!N||!N.configured()||/[?&]match=/.test(location.search))return;N.init().then(function(){if(!N.user)location.replace('index.html');});})();</script>
 <script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>

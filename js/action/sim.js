@@ -39,7 +39,7 @@ const MV = {
   side:  { n:'踏み込み斬り', k:'g', s:14, a:4, r:22, dmg:700, gd:1800, hs:28, blk:-8, kb:[950,560], box:[8,38,100,64], arc:[150,-35], lunge:[2,14,900] },
   ftilt: { n:'横斬り', k:'g', s:8, a:3, r:18, dmg:600, gd:900, hs:22, blk:-6, kb:[620,240], box:[8,40,86,52], arc:[60,-30] },
   sideA: { n:'踏み込み斬り（空中）', k:'a', s:12, a:4, r:18, land:14, dmg:600, gd:1500, hs:24, kb:[850,500], box:[8,30,100,70], arc:[150,-35], lunge:[2,12,850], hover:1 },
-  rise:  { n:'昇り斬り', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], box:[-24,40,76,120], arc:[-60,95], rise:1, after:'fall' },
+  rise:  { n:'昇り斬り', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], box:[-24,40,76,120], arc:[-60,95], rise:1, after:'fall', dfall:1 },
   sweep: { n:'足払い', k:'g', s:12, a:5, r:24, dmg:600, gd:1200, hs:30, blk:-12, kb:[420,650], kd:1, box:[4,0,112,26], arc:[-20,-5], crouch:1 },
   plunge:{ n:'落とし', k:'a', s:8, a:90, r:1, land:22, dmg:800, gd:1400, hs:28, kb:[350,800], kd:1, box:[-26,-30,52,84], arc:[-90,-90], plunge:1, ext:20, pad:12 },
   shot:  { n:'飛ぶ斬撃', k:'g', s:18, a:1, r:35, noBox:1, shot:1, arc:[150,-30] },
@@ -62,9 +62,9 @@ const MV = {
   petal: { n:'花嵐', k:'p', s:1, a:1, r:0, dmg:400, gd:800, hs:14, blk:-4, kb:[220,0], flinch:1 },
   petalS:{ n:'花嵐（落花）', k:'p', s:1, a:1, r:0, dmg:200, gd:400, hs:10, blk:-2, kb:[120,0], flinch:1 },
   // 天桜を当てたら、天桜を使った側が着地して動けるまで相手は落ちてこない（確定反撃を受けない。2026-11-27）
-  ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:60, kb:[150,1750], arc:[-60,95], rise:1, after:'fall', pose:'rise' },
-  tenK:  { n:'天桜（開花）', k:'a', s:5, a:12, r:12, land:20, dmg:600, gd:1000, hs:86, kb:[150,2300], arc:[-60,95], rise:1, riseV:2300, after:'fall', pose:'rise' },
-  tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:86, kb:[150,2300], arc:[-60,95], rise:1, riseV:2300, after:'fall', pose:'rise', aura:[-75,0,150,160] },
+  ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:60, kb:[150,1750], arc:[-60,95], rise:1, after:'fall', dfall:1, pose:'rise' },
+  tenK:  { n:'天桜（開花）', k:'a', s:5, a:12, r:12, land:20, dmg:600, gd:1000, hs:86, kb:[150,2300], arc:[-60,95], rise:1, riseV:2300, after:'fall', dfall:1, pose:'rise' },
+  tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:86, kb:[150,2300], arc:[-60,95], rise:1, riseV:2300, after:'fall', dfall:1, pose:'rise', aura:[-75,0,150,160] },
   tenR:  { n:'天桜（落花）', k:'a', s:5, a:12, r:6, land:20, dmg:700, gd:1200, hs:54, kb:[150,1850], arc:[-60,95], rise:1, riseV:2300, pose:'rise', aura:[-75,0,150,160], next:'tenFall' },
   tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
   petalG:{ n:'天桜（落花・着地の花）', k:'p', s:1, a:1, r:0, dmg:250, gd:500, hs:12, blk:-2, kb:[160,0], flinch:1 },
@@ -121,7 +121,7 @@ function newPlayer(i){
   return { i, x: (i ? 1000 : 600) * FP, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, ground: true, plat: -1,
     st: 'idle', f: 0, mv: null, mvf: 0, hitDone: false, chainReq: false, chargeF: 0, power: 0,
     jumps: 1, adUsed: false, ff: false, dropF: 0,
-    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false,
+    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
     stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
@@ -393,7 +393,7 @@ Sim.prototype.update = function(p, o){
   // 当たった・守った後の固まり
   if (p.st === 'hit' || p.st === 'bstun' || p.st === 'tumble') {
     if (p.hs > 0) p.hs--;
-    if (p.hs <= 0) { if (p.st === 'tumble' || !p.ground) { p.st = 'air'; } else p.st = 'idle'; }
+    if (p.hs <= 0) { if (p.st === 'tumble' || !p.ground) { p.st = p.dfall && !p.ground ? 'fall' : 'air'; } else p.st = 'idle'; p.dfall = false; } // dfall: 昇り斬り・天桜を食らった側も無防備落下
   }
   if (p.st === 'unguard' || p.st === 'land' || p.st === 'tech') {
     p.f--; if (p.f <= 0) p.st = 'idle';
@@ -451,16 +451,18 @@ Sim.prototype.land = function(p, y, plat){
     if (m.landBurst) this.fallBurst(p);
     if (m.k === 'a') { p.st = 'land'; p.f = m.land; this.ev.push({ t: 'land', p: p.i, lag: m.land }); }
   } else if (p.st === 'tumble') {
-    if (p.hs > 8 || p.kd || vy < -900) {
-      if (p.lastG <= C.techWin) {
+    if (p.dfall && !p.kd) { p.st = 'land'; p.f = 20; p.hs = 0; } // 無防備落下のまま着地: 受け身は取れず、落ちた側と同じ着地の硬直
+    else if (!p.nokd && (p.hs > 8 || p.kd || vy < -900)) { // nokd: ダウンしない技
+      if (p.lastG <= C.techWin && !p.dfall) {
         const h = horiz(p);
         if (h) { p.st = 'roll'; p.f = 3; p.rollDir = h; p.rk = h === p.face ? 'fwd' : 'back'; } else { p.st = 'tech'; p.f = 20; }
         this.ev.push({ t: 'tech', p: p.i, x: p.x, y: p.y });
       } else { p.st = 'down'; p.f = C.downF; p.downT = 0; p.vx = Math.trunc(p.vx / 3); this.ev.push({ t: 'down', p: p.i, x: p.x, y: p.y }); }
       p.kd = false; p.hs = 0;
     } else { p.st = 'land'; p.f = 4; p.hs = 0; }
+    p.nokd = false; p.dfall = false;
   } else if (p.st === 'adodge') { p.st = 'land'; p.f = DG[p.ak].land; }
-  else if (p.st === 'fall') { p.st = 'land'; p.f = 20; }
+  else if (p.st === 'fall') { p.st = 'land'; p.f = 20; p.dfall = false; }
   else if (p.st === 'air') { p.st = 'land'; p.f = C.landF; }
   else if (p.st === 'stun' || p.st === 'hit') { /* そのまま続く */ }
 };
@@ -574,6 +576,8 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   const ev = this.ev;
   const dir = pj ? sgn(pj.vx) : (sgn(d.x - a.x) || a.face);
   const mvRem = pj ? null : m.total - a.mvf;
+  // 持続の早いうちに当てても、持続の終わりに当てたのと同じ硬直差になるよう、相手の硬直を延ばす（残りの持続のぶん）
+  const late = (pj || m.plunge) ? 0 : Math.max(0, m.s + m.a - 1 - a.mvf);
   const pw = a.power || 0;
   let dmgBase = Array.isArray(m.dmg) ? m.dmg[0] + Math.floor((m.dmg[1] - m.dmg[0]) * pw / 100) : m.dmg;
   if (pj && pj.dm) dmgBase = Math.floor(dmgBase * pj.dm / 100); // 花嵐: 遠くまで飛ぶほど重い
@@ -595,9 +599,9 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
     }
     if (m.grab) { /* 投げる */ }
     else {
-      d.st = 'bstun'; d.hs = m.bs; d.vx = dir * 520;
+      d.st = 'bstun'; d.hs = m.bs + late; d.vx = dir * 520;
       this.hitstop = m.dmg >= 700 || Array.isArray(m.dmg) ? 7 : 4;
-      ev.push({ t: 'block', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, adv: mvRem == null ? null : m.bs - mvRem, gd: gdBase, shot: !!pj });
+      ev.push({ t: 'block', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, adv: mvRem == null ? null : m.bs + late - mvRem, gd: gdBase, shot: !!pj });
       return;
     }
   }
@@ -637,12 +641,12 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
     } else if (ky > 0 || !d.ground) {
       d.st = 'tumble'; d.ground = false; d.plat = -1; d.vx = dir * kx; d.vy = ky > 0 ? ky : m.kb[1] < 0 ? ky : Math.max(300, d.vy); d.ff = false;
       if (d.y === 0 && d.vy < 0) { d.vy = 0; }
-      d.kd = !!m.kd;
+      d.kd = m.kd === 1 || m.kd === true;
     } else if (m.kb[1] < 0) { // 地上の相手に叩きつけ
       d.st = 'tumble'; d.ground = false; d.plat = -1; d.vy = 500; d.vx = dir * 200; d.kd = true;
     } else { d.st = 'hit'; d.vx = dir * kx; }
-    d.hs = m.hs; d.s1Used = false; if (d.st === 'tumble') d.jumps = 1;
-    const adv = (d.st === 'hit' && mvRem != null) ? m.hs - mvRem : null;
+    d.hs = m.hs + late; d.s1Used = false; d.nokd = m.kd === 0; d.dfall = !!m.dfall && d.st === 'tumble'; if (d.st === 'tumble') d.jumps = 1;
+    const adv = (d.st === 'hit' && mvRem != null) ? m.hs + late - mvRem : null;
     ev.push({ t: 'hit', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, dmg, combo: a.combo, adv, counter: a.combo === 1 && a.comboFirst.counter });
   }
   this.hitstop = dmg >= 700 ? 8 : 4;

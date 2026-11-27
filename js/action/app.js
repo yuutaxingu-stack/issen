@@ -1369,22 +1369,28 @@ function onlineEnd(){ ON = null; }
 const GOD = SNAP.coins === -1;
 const TUNE_KEY = 'issen-action-tune-v1';
 let TUNE = {}; try { TUNE = JSON.parse(localStorage.getItem(TUNE_KEY) || '{}') || {}; } catch (e) { TUNE = {}; }
-const ORIG = {}; for (const id in MV) { const m = MV[id]; ORIG[id] = { s: m.s, a: m.a, r: m.r, hit: m.hit, blk: m.blk, hs: m.hs, bs: m.bs, total: m.total, dmg: m.dmg, gd: m.gd, kb: m.kb ? m.kb.slice() : null, box: m.box ? m.box.slice() : null, boxes: m.boxes ? m.boxes.map(b => b.slice()) : null }; }
+// 2026-11-27: 硬直差を「持続の1F目で当てた値」から「どこで当てても同じ値」に変えたので、覚えている値を読み替える
+try { if (localStorage.getItem(TUNE_KEY + '-ver') !== '2') { for (const id in TUNE) { const t = TUNE[id], m = MV[id]; if (!m) continue; const a = t.a != null ? t.a : m.a;
+  if (t.hit != null) t.hit += a - 1; if (t.blk != null) t.blk += a - 1; } localStorage.setItem(TUNE_KEY, JSON.stringify(TUNE)); localStorage.setItem(TUNE_KEY + '-ver', '2'); } } catch (e) {}
+const ORIG = {}; for (const id in MV) { const m = MV[id]; ORIG[id] = { s: m.s, a: m.a, r: m.r, hit: m.hit, blk: m.blk, hs: m.hs, bs: m.bs, total: m.total, dmg: m.dmg, gd: m.gd, kb: m.kb ? m.kb.slice() : null, kd: m.kd, dfall: m.dfall, box: m.box ? m.box.slice() : null, boxes: m.boxes ? m.boxes.map(b => b.slice()) : null }; }
 const TF = [ // [鍵, 名前, 単位の説明, 刻み]
   ['s', '発生', 'F', 1], ['a', '持続', 'F', 1], ['r', '硬直', 'F', 1],
-  ['hit', 'ヒット時の硬直差', 'F', 1], ['blk', 'ガード時の硬直差', 'F', 1],
+  ['hit', 'ヒット時の硬直差', 'F', 1], ['blk', 'ガード時の硬直差', 'F', 1], // 持続のどこで当てても同じ
+  ['kd', '当たった相手のダウン', [[-1, 'いつも通り（高く飛べばダウン）'], [1, '必ずダウン'], [0, 'ダウンしない']]],
+  ['dfall', '当たった相手の無防備落下', [[1, 'する（受け身も取れない）'], [0, 'しない']]],
   ['dmg', 'ダメージ（体力）', '', 0.5], ['gd', 'ガード削り', '', 1],
   ['kbx', '吹っ飛び 横', '', 50], ['kby', '吹っ飛び 縦', '', 50],
   ['bw', '判定の幅', '%', 10], ['bh', '判定の高さ', '%', 10], ['bx', '判定 前へずらす', 'px', 5], ['by', '判定 上へずらす', 'px', 5],
 ];
 function tuneBase(id){ // 元の値（調整画面に出す形）
-  const o = ORIG[id], span = o.a - 1 + o.r;
-  return { s: o.s, a: o.a, r: o.r, hit: o.hit != null ? o.hit : (o.hs != null ? o.hs - span : 0), blk: o.blk != null ? o.blk : o.bs - span,
+  const o = ORIG[id];
+  return { s: o.s, a: o.a, r: o.r, hit: o.hs != null ? o.hs - o.r : 0, blk: o.bs - o.r, // 硬直差 = 相手の硬直 − 自分の残りの硬直（持続のどこで当てても同じ）
+    kd: o.kb ? (o.kd === 1 || o.kd === true ? 1 : o.kd === 0 ? 0 : -1) : null, dfall: o.kb ? (o.dfall ? 1 : 0) : null,
     dmg: typeof o.dmg === 'number' ? o.dmg / 100 : null, gd: typeof o.gd === 'number' ? o.gd / 100 : null,
     kbx: o.kb ? o.kb[0] : null, kby: o.kb ? o.kb[1] : null, bw: 100, bh: 100, bx: 0, by: 0 };
 }
 function tuneVal(id, k){ const t = TUNE[id]; return t && t[k] != null ? t[k] : tuneBase(id)[k]; }
-function restoreMV(){ for (const id in ORIG) { const m = MV[id], o = ORIG[id]; Object.assign(m, { s: o.s, a: o.a, r: o.r, hit: o.hit, blk: o.blk, hs: o.hs, bs: o.bs, total: o.total, dmg: o.dmg, gd: o.gd });
+function restoreMV(){ for (const id in ORIG) { const m = MV[id], o = ORIG[id]; Object.assign(m, { s: o.s, a: o.a, r: o.r, hit: o.hit, blk: o.blk, hs: o.hs, bs: o.bs, total: o.total, dmg: o.dmg, gd: o.gd, kd: o.kd, dfall: o.dfall });
   if (o.kb) m.kb = o.kb.slice(); if (o.box) m.box = o.box.slice(); if (o.boxes) m.boxes = o.boxes.map(b => b.slice()); } }
 function applyTune(){
   restoreMV();
@@ -1392,8 +1398,9 @@ function applyTune(){
   for (const id in TUNE) { const m = MV[id], o = ORIG[id]; if (!m || !o) continue; const v = k => tuneVal(id, k);
     m.s = Math.max(1, v('s')); m.a = Math.max(1, v('a')); m.r = Math.max(0, v('r'));
     const span = m.a - 1 + m.r; m.total = m.s + span;
-    m.hit = v('hit'); m.hs = Math.max(1, m.hit + span);
-    m.blk = v('blk'); m.bs = Math.max(1, m.blk + span);
+    m.hs = Math.max(1, v('hit') + m.r); m.hit = m.hs - span;
+    m.bs = Math.max(1, v('blk') + m.r); m.blk = m.bs - span;
+    if (o.kb) { const k = v('kd'); m.kd = k === 1 ? 1 : k === 0 ? 0 : undefined; m.dfall = v('dfall') ? 1 : 0; }
     if (typeof o.dmg === 'number') m.dmg = Math.round(v('dmg') * 100);
     if (typeof o.gd === 'number') m.gd = Math.round(v('gd') * 100);
     if (o.kb) m.kb = [v('kbx'), v('kby')];
@@ -1414,9 +1421,10 @@ function tuneRender(){
   const id = TSEL, base = tuneBase(id), t = TUNE[id] || {};
   $('tn_rows').innerHTML = TF.filter(([k]) => base[k] != null).map(([k, n, u, st]) => {
     const v = tuneVal(id, k), ch = t[k] != null && t[k] !== base[k];
+    if (Array.isArray(u)) return `<div class="tr${ch ? ' ch' : ''}"><span class="tn">${n}</span><select data-k="${k}">${u.map(([q, lb]) => `<option value="${q}"${q === v ? ' selected' : ''}>${lb}</option>`).join('')}</select><span class="tb">元 ${(u.find(x => x[0] === base[k]) || [0, ''])[1].replace(/（.*）/, '')}</span></div>`;
     return `<div class="tr${ch ? ' ch' : ''}"><span class="tn">${n}</span><button type="button" data-k="${k}" data-d="-${st}">−</button><input data-k="${k}" type="number" step="${st}" value="${v}"><button type="button" data-k="${k}" data-d="${st}">＋</button><span class="tu">${u}</span><span class="tb">元 ${base[k]}</span></div>`;
   }).join('');
-  const m = MV[id]; $('tn_sum').textContent = `全体 ${m.total}F（${m.total + 1}F目に動ける）　ヒット硬直 ${m.hs}F　ガード硬直 ${m.bs}F`;
+  const m = MV[id]; $('tn_sum').textContent = `全体 ${m.total}F（${m.total + 1}F目に動ける）　相手の硬直 ヒット ${m.hs}F・ガード ${m.bs}F（持続の終わりで当てたとき。早く当てるほど長くなり、硬直差は同じ）`;
 }
 function tuneSet(k, v){ const id = TSEL, base = tuneBase(id); if (!isFinite(v)) return; if (k === 's' || k === 'a') v = Math.max(1, Math.round(v)); if (k === 'r') v = Math.max(0, Math.round(v)); if (k === 'bw' || k === 'bh') v = Math.max(10, v);
   TUNE[id] = TUNE[id] || {}; if (v === base[k]) delete TUNE[id][k]; else TUNE[id][k] = v; if (!Object.keys(TUNE[id]).length) delete TUNE[id]; saveTune(); tuneRender(); }
@@ -1426,7 +1434,7 @@ function setupTune(){
   $('tn_close').onclick = () => tuneOpen(false);
   $('tn_mv').onchange = e => { TSEL = e.target.value; tuneRender(); e.target.blur(); };
   $('tn_rows').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; tuneSet(b.dataset.k, Math.round((tuneVal(TSEL, b.dataset.k) + +b.dataset.d) * 100) / 100); });
-  $('tn_rows').addEventListener('change', e => { const i = e.target.closest('input[data-k]'); if (i) tuneSet(i.dataset.k, +i.value); });
+  $('tn_rows').addEventListener('change', e => { const i = e.target.closest('input[data-k],select[data-k]'); if (i) { tuneSet(i.dataset.k, +i.value); i.blur && i.blur(); } });
   $('tn_reset').onclick = () => { delete TUNE[TSEL]; saveTune(); tuneRender(); };
   $('tn_all').onclick = () => { const b = $('tn_all'); if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'もう一度押すと全部戻す'; setTimeout(() => { b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; }, 2500); return; } TUNE = {}; saveTune(); tuneRender(); b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; };
   $('tn_out').onclick = () => { const lines = Object.keys(TUNE).map(id => MV[id].n + '（' + id + '）: ' + Object.entries(TUNE[id]).map(([k, v]) => (TF.find(f => f[0] === k) || [k, k])[1] + ' ' + tuneBase(id)[k] + '→' + v).join('、'));

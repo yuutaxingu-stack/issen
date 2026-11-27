@@ -9,14 +9,14 @@ function run(s, n, f0, f1){ for (let k = 0; k < n; k++) s.step([f0 ? f0(k, s) : 
 function drain(s){ const e = s.ev; s.ev = []; return e; }
 
 // 1) 弱斬り一段目: ヒットで+6、ガードで-2
-{ const s = sim(60); run(s, 1, () => I({ A: 1 })); run(s, 30); const h = drain(s).find(e => e.t === 'hit'); ok(h && h.adv === 6, '弱斬りヒット +6F (' + (h && h.adv) + ')'); }
-{ const s = sim(60); run(s, 2, null, () => I({ G: 1 })); run(s, 1, () => I({ A: 1 }), () => I({ G: 1 })); run(s, 30, null, () => I({ G: 1 })); const h = drain(s).find(e => e.t === 'block'); ok(h && h.adv === -2, '弱斬りガード -2F (' + (h && h.adv) + ')'); }
+{ const s = sim(60); run(s, 1, () => I({ A: 1 })); run(s, 30); const h = drain(s).find(e => e.t === 'hit'); ok(h && h.adv === 8, '弱斬りヒット +8F（持続の1F目に当てても終わりと同じ） (' + (h && h.adv) + ')'); }
+{ const s = sim(60); run(s, 2, null, () => I({ G: 1 })); run(s, 1, () => I({ A: 1 }), () => I({ G: 1 })); run(s, 30, null, () => I({ G: 1 })); const h = drain(s).find(e => e.t === 'block'); ok(h && h.adv === 0, '弱斬りガード ±0F（持続の1F目でも終わりと同じ） (' + (h && h.adv) + ')'); }
 // 2) 実際の有利Fを動かして確かめる: 当てた側と当てられた側が何F目に動けるか
 { const s = sim(60); let a0 = null, a1 = null;
   run(s, 1, () => I({ A: 1 }));
   let hit = false;
   for (let k = 2; k < 60; k++) { s.step([I(), I()]); if (drain(s).some(e => e.t === 'hit')) hit = true; if (!hit) continue; if (a0 == null && ['idle', 'walk'].includes(s.p[0].st) && s.hitstop === 0) a0 = s.frame; if (a1 == null && s.p[1].st === 'idle' && s.hitstop === 0) a1 = s.frame; }
-  ok(a1 - a0 === 6, '動けるようになる差 = 6F (' + (a1 - a0) + ')'); }
+  ok(a1 - a0 === 8, '動けるようになる差 = 8F (' + (a1 - a0) + ')'); }
 // 3) 全体フレーム: 弱斬りは17F
 { const s = sim(400); run(s, 1, () => I({ A: 1 })); let n = 1; while (s.p[0].st === 'atk') { s.step([I(), I()]); n++; } ok(n === 17 && A.MV.jab1.total === 17, '弱斬り 全体17F（18F目に動ける） n=' + n); }
 // 4) ガードを削りきると気絶、守が居合になって一本
@@ -186,5 +186,24 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   const t = new A.Sim({ toWin: 2 }); t.p[0].x = 600 * A.FP; t.p[1].x = 670 * A.FP; t.p[1].hp = 300; let ko2 = false;
   for (let k = 0; k < 600 && !ko2; k++) { t.step([I(k % 12 === 0 ? { A: 1, C: 'n' } : {}), I()]); ko2 = !!t.over; }
   ok(ko2, '稽古でなければ倒れる'); }
+
+// 持続のどこで当てても硬直差は同じ
+{ const adv = d => { const s = sim(d); run(s, 1, () => I({ A: 1 })); run(s, 30); const h = drain(s).find(e => e.t === 'hit'); return h && h.adv; };
+  const near = adv(50), far = adv(105); ok(near === far && near === 8, '近く(早い持続)でも遠く(遅い持続)でも同じ有利 ' + near + ' / ' + far); }
+// 昇り斬り・天桜を当てると相手も無防備落下し、着地して動けるのは当てた側が先（確定反撃を取られない）
+for (const kit of ['common', 'ouka']) { const s = new A.Sim({ training: true, kits: [kit, 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 640 * A.FP;
+  s.step([I({ K: 'u' }), I()]); let fell = false, hit = false, freeA = -1, freeD = -1;
+  for (let k = 0; k < 300; k++) { s.step([I(), I({ G: k > 20 && k % 2 ? 1 : 0 })]); for (const e of drain(s)) if (e.t === 'hit') hit = true; if (s.p[1].st === 'fall' || (hit && s.p[1].st === 'land')) fell = true;
+    const free = q => ['idle', 'walk', 'crouch', 'guard', 'tech', 'roll'].includes(q.st) && q.ground; // 受け身を取ろうとしても取れない
+    if (freeA < 0 && k > 5 && free(s.p[0])) freeA = k; if (freeD < 0 && hit && k > 5 && free(s.p[1])) freeD = k; }
+  ok(hit && fell && freeA >= 0 && freeA <= freeD, (kit === 'ouka' ? '天桜' : '昇り斬り') + 'を当てると相手も無防備落下・先に動けるのは当てた側 (当てた側 ' + freeA + 'F / 食らった側 ' + freeD + 'F)'); }
+{ const s = sim(400); s.p[1].y = 300 * A.FP; s.p[1].ground = false; s.p[1].st = 'air'; s.p[1].x = s.p[0].x + 30 * A.FP;
+  s.applyHit(s.p[0], s.p[1], A.MV.ten, { dst: 'air', dground: false }); let fell = false, down = false;
+  for (let k = 0; k < 300; k++) { s.step([I(), I()]); if (s.p[1].st === 'fall') fell = true; if (s.p[1].st === 'down') down = true; }
+  ok(fell, '天桜を食らった側も無防備落下'); 
+  const t = sim(400); t.p[1].y = 300 * A.FP; t.p[1].ground = false; t.p[1].st = 'air'; const m = Object.assign({}, A.MV.ten, { dfall: 0, kd: 0 });
+  t.applyHit(t.p[0], t.p[1], m, { dst: 'air', dground: false }); let f2 = false, d2 = false;
+  for (let k = 0; k < 300; k++) { t.step([I(), I()]); if (t.p[1].st === 'fall') f2 = true; if (t.p[1].st === 'down') d2 = true; }
+  ok(!f2 && !d2, '無防備落下・ダウンを切ると、どちらにもならない'); }
 
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

@@ -700,18 +700,23 @@ function drawBody(c,x,gy,h,face,J,o){
   poly([[J.hip[0]-0.05,J.hip[1]-0.02],[J.hip[0]+0.05,J.hip[1]-0.045]],o.mono||o.col,lw*1.35);
   const s2=[J.hip[0]+0.11,J.hip[1]-0.04]; let dx=0.36, dy=-0.12; const dl=Math.hypot(dx,dy); dx/=dl; dy/=dl;
   const s1=[s2[0]-dx*0.56,s2[1]-dy*0.56];
-  poly([s1,s2],o.mono||'#1d1512',lw*1.1);
   const KD=o.kat&&o.kat.canvas?o.kat:null; const kimg=KD?(o.mono?KD.pale:KD.canvas):(o.mono?KIMG_PALE:(KIMG.complete&&KIMG.naturalWidth?KIMG:null));
   const KL=0.78*h, KT=KL*KIMG_H/KIMG_W*0.9, kk=KL/KIMG_W;
+  const SY=sayaOf(o.kat), simg=SY?(o.mono?SY.p:SY.c):null;   // 絶の刀は、その刀の鞘の絵を腰に差す
+  const sayaAt=(m,full)=>{ const q=M(m); c.save(); c.translate(q[0],q[1]); c.rotate(Math.atan2(-dy,-dx*face)); c.scale(1,face);
+    if(full) c.drawImage(simg,-KIMG_TSUBA*kk,-KT/2,KL,KT); else { const sx=KIMG_TSUBA+14; c.drawImage(simg,sx,0,KIMG_W-sx,KIMG_H,14*kk,-KT/2,(KIMG_W-sx)*kk,KT); } c.restore(); };
+  if(!simg) poly([s1,s2],o.mono||'#1d1512',lw*1.1);
   if(!J.blade){
     const g=(o.glint||0)*0.05; const m=[s2[0]+dx*g,s2[1]+dy*g];
     if(g>0) poly([s2,m],o.mono||'#ffffff',lw*0.8);
-    if(kimg){ const q=M(m); c.save(); c.translate(q[0],q[1]); c.rotate(Math.atan2(-dy,-dx*face)); c.scale(1,face);
+    if(simg) sayaAt(m,true);
+    else if(kimg){ const q=M(m); c.save(); c.translate(q[0],q[1]); c.rotate(Math.atan2(-dy,-dx*face)); c.scale(1,face);
       c.drawImage(kimg,0,0,KIMG_TSUBA+14,KIMG_H,-KIMG_TSUBA*kk,-KT/2,(KIMG_TSUBA+14)*kk,KT); c.restore(); }
     else { poly([[m[0]-dy*0.03,m[1]+dx*0.03],[m[0]+dy*0.03,m[1]-dx*0.03]],o.mono||'#8a7436',lw*0.9); poly([m,[m[0]+dx*0.12,m[1]+dy*0.12]],o.mono||'#3b302a',lw*1.05); }
     if(g>0&&!o.mono){ const q=M(s2); const r=h*0.05*o.glint; const gg=c.createRadialGradient(q[0],q[1],0,q[0],q[1],r);
       gg.addColorStop(0,'rgba(255,255,255,'+(0.9*o.glint)+')'); gg.addColorStop(1,'rgba(255,255,255,0)'); c.fillStyle=gg; c.beginPath(); c.arc(q[0],q[1],r,0,7); c.fill(); }
   } else {
+    if(simg) sayaAt(s2,false);   // 抜いた後は鞘だけが腰に残る
     const a=J.bAng, ca=Math.cos(a), sa=Math.sin(a), hf=J.hF;
     if(kimg){ const q=M(hf); c.save(); c.translate(q[0],q[1]); c.rotate(Math.atan2(sa,ca*face)); c.scale(1,face); c.drawImage(kimg,-KL*0.167,-KT/2,KL,KT); c.restore(); }
     else { const tip=[hf[0]+ca*0.56,hf[1]+sa*0.56]; poly([hf,tip],o.mono||'#eef2f5',lw*0.55); }
@@ -1613,6 +1618,11 @@ const ZART={
     bg:['#3a3a40','#121215','#020203'],hot:[255,255,255],deep:[210,210,220],pale:[255,255,255],void:[2,2,3],band:'#060608',seal:['#0a0a0c','#f4f4f6'],mark:'#ffffff',
     tint:['rgba(255,255,255,.18)','rgba(255,255,255,.55)'],parts:'feather',sun:'eclipse',
     tag:['#050506','#f6f6f8','#e8e8ee'],big:[250,250,255],tintc:'#ffffff',cls:'z-yata'}};
+// 絶の刀の鞘の絵（キャンバスと薄い色）。絵の向きは刀の絵にそろえる（up の絵は上下を返す）
+function sayaOf(k){ if(!k||k.tier!=='絶'||!ZART[k.id]) return null; const T=zArt(k.id); if(T.SC) return T.SC;
+  if(!(T.S.complete&&T.S.naturalWidth)) return null;
+  const cv=document.createElement('canvas'); cv.width=KIMG_W; cv.height=KIMG_H; const x=cv.getContext('2d'); if(T.up){ x.translate(0,KIMG_H); x.scale(1,-1); } x.drawImage(T.S,0,0,KIMG_W,KIMG_H);
+  T.SC={c:cv,p:tintCanvas(cv,PALE)}; return T.SC; }
 function zTheme(k){ return ZART[k&&k.id]||ZART.ouka; }  // 絶の刀の色と舞うもの（ZART にない絶は桜華の色）
 function zArt(id){ const a=ZART[id]||ZART.ouka; if(!a.S){ a.S=new Image(); a.S.src=a.saya; a.B=new Image(); a.B.src=a.src; } return a; }
 function zArtHd(a){ if(!a.H){ a.H=new Image(); a.H.src=a.hd; } return a.H; }

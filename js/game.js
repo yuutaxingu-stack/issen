@@ -824,9 +824,11 @@ function drawHUD(c,now,vw){
     c.beginPath(); c.roundRect(L?x0-6:x0-bw2+6,y-sz*0.68,bw2,sz*1.36+sz*0.55,8); c.fill(); c.restore();
     if(G.mode==='online'&&zetsuOf(i)){ // 絶の刀の持ち主の印
       const zs=sz*0.95, zx=L?x0-6+bw2+6:x0+6-bw2-6-zs, zy=y-zs*0.5; c.save();
-      const zg=c.createLinearGradient(zx,zy,zx+zs,zy+zs); zg.addColorStop(0,'#c4142e'); zg.addColorStop(1,'#4a0710');
-      c.shadowColor='rgba(220,20,50,0.8)'; c.shadowBlur=10+Math.sin(performance.now()/300)*4; c.fillStyle=zg; c.fillRect(zx,zy,zs,zs); c.restore();
-      txt(c,'絶',zx+zs/2,zy+zs/2,zs*0.72,DISPLAY,'#f6dada','center'); }
+      const ZW=katOf(i).tier==='絶'&&zt(katOf(i)).parts==='feather'; // 持っている絶の色（八咫は黒地に白）
+      const zg=c.createLinearGradient(zx,zy,zx+zs,zy+zs); zg.addColorStop(0,ZW?'#2a2a30':'#c4142e'); zg.addColorStop(1,ZW?'#020203':'#4a0710');
+      c.shadowColor=ZW?'rgba(255,255,255,0.8)':'rgba(220,20,50,0.8)'; c.shadowBlur=10+Math.sin(performance.now()/300)*4; c.fillStyle=zg; c.fillRect(zx,zy,zs,zs);
+      if(ZW){ c.shadowBlur=0; c.strokeStyle='#f2f2f6'; c.lineWidth=1; c.strokeRect(zx+0.5,zy+0.5,zs-1,zs-1); } c.restore();
+      txt(c,'絶',zx+zs/2,zy+zs/2,zs*0.72,DISPLAY,ZW?'#fbfbfd':'#f6dada','center'); }
     txt(c,label,L?x0+lw/2-sz*0.1:x0-lw/2+sz*0.1,y,named?sz*0.6:sz,named?UIF:DISPLAY,COL[i].main,'center');
     for(let k=0;k<tw;k++){ const cx=L?x0+lw+sz*0.05+k*sz*0.62:x0-lw-sz*0.05-k*sz*0.62; c.beginPath(); c.arc(cx,y,sz*0.2,0,7);
       if(k<p.score){ c.fillStyle=COL[i].main; c.fill(); } else { c.strokeStyle=COL[i].main; c.lineWidth=1.5; c.stroke(); } }
@@ -1086,7 +1088,7 @@ function drawZetsuField(c,now,zf){
   if(!bgCache[key+'s']) bgCache[key+'s']=mk(false); if(!bgCache[key+'n']) bgCache[key+'n']=mk(true);
   c.save(); c.globalAlpha=zf.b; c.drawImage(bgCache[key+'s'],0,0,VW,VH);
   if(zf.f>0){ c.globalAlpha=zf.b*zf.f; c.drawImage(bgCache[key+'n'],0,0,VW,VH);
-    const pulse=0.5+0.5*Math.sin(now/520); const vg=c.createRadialGradient(VW/2,VH*0.5,Math.min(VW,VH)*0.32,VW/2,VH*0.5,Math.max(VW,VH)*0.75); vg.addColorStop(0,'rgba(40,0,6,0)'); vg.addColorStop(1,'rgba(30,0,4,'+(0.5+0.15*pulse)+')'); c.fillStyle=vg; c.fillRect(0,0,VW,VH); }
+    const pulse=0.5+0.5*Math.sin(now/520); const vg=c.createRadialGradient(VW/2,VH*0.5,Math.min(VW,VH)*0.32,VW/2,VH*0.5,Math.max(VW,VH)*0.75); vg.addColorStop(0,FE?'rgba(0,0,0,0)':'rgba(40,0,6,0)'); vg.addColorStop(1,(FE?'rgba(0,0,0,':'rgba(30,0,4,')+(0.5+0.15*pulse)+')'); c.fillStyle=vg; c.fillRect(0,0,VW,VH); }
   c.restore();
 }
 // 散り続ける花びら（画面の座標。昼は薄紅、落花の夜は紅と黒が吹き荒れる）
@@ -1131,10 +1133,11 @@ function drawMutualBurst(c,now){
   const fx=G.fx; if(!fx||!fx.mutual||fx.kind==='issen') return; const ht={iai:320,counterWin:300,just:480}[fx.kind]; if(!ht) return;
   const e=Math.min(fxE(fx,now),fx.dur); if(e<ht) return; const t=clamp((e-ht)/900);
   const x=fx.kind==='iai'?sideX(fx.sL):VW/2, y=GY-0.58*FH, r=mulberry32(13);
-  c.save(); c.fillStyle='rgba(150,28,20,'+(0.85*(1-t))+')';
+  const FE=ZFS.b>0.5&&ZFS.t&&ZFS.t.parts==='feather'; // 八咫の戦場では赤でなく、白い円相と墨の飛沫
+  c.save(); c.fillStyle=FE?'rgba(6,6,8,'+(0.85*(1-t))+')':'rgba(150,28,20,'+(0.85*(1-t))+')';
   for(let i=0;i<26;i++){ const an=r()*Math.PI*2, d=FH*(0.2+r()*1.4)*ease(t), s=FH*(0.02+r()*0.07)*(1-t*0.5); c.beginPath(); c.ellipse(x+Math.cos(an)*d,y+Math.sin(an)*d*0.6,s*1.6,s,an,0,7); c.fill(); }
   c.restore();
-  c.save(); c.globalAlpha=0.8*(1-t); enso(c,x,y,FH*(0.5+0.6*ease(t)),'rgba(200,40,30,0.9)',31); c.restore();
+  c.save(); c.globalAlpha=0.8*(1-t); if(FE){ c.shadowColor='rgba(255,255,255,0.9)'; c.shadowBlur=18; } enso(c,x,y,FH*(0.5+0.6*ease(t)),FE?'rgba(248,248,252,0.95)':'rgba(200,40,30,0.9)',31); c.restore();
 }
 function drawIssenFx(c,now){
   const fx=G.fx; if(!fx||fx.kind!=='issen') return; const e=Math.min(fxE(fx,now),fx.dur);

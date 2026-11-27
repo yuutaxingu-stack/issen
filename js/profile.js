@@ -209,7 +209,7 @@
       x.clearRect(0, 0, c.width, c.height);
       if (!k || !k.canvas) { setTimeout(drawKats, 300); return; }
       const w = c.width, h = w * k.canvas.height / k.canvas.width;
-      x.drawImage(k.canvas, 0, (c.height - h) / 2, w, h);
+      x.save(); x.translate(0, c.height); x.scale(1, -1); x.drawImage(k.canvas, 0, (c.height - h) / 2, w, h); x.restore();
     });
   }
 

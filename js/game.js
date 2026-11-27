@@ -958,7 +958,7 @@ function drawTitle(c,now){
   brushStroke(c,-kw*0.58,kh*1.5,kw*0.46,kh*1.25,kh*1.1,'rgba(4,4,3,0.55)',7);
   // 刀（描き替えず、光と影だけ）
   if(KIMG.complete&&KIMG.naturalWidth){
-    const TK=KREADY?katOf(0).canvas:KIMG; c.save(); c.shadowColor=Z?'rgba(255,30,60,0.8)':'rgba(0,0,0,0.85)'; c.shadowBlur=18; c.shadowOffsetY=6; c.drawImage(TK,-kw/2,-kh/2,kw,kh); c.restore();
+    const TK=KREADY?katOf(0).canvas:KIMG; c.save(); c.shadowColor=Z?'rgba(255,30,60,0.8)':'rgba(0,0,0,0.85)'; c.shadowBlur=18; c.shadowOffsetY=6; c.scale(1,-1); c.drawImage(TK,-kw/2,-kh/2,kw,kh); c.restore();
     const T=5200, k=(now%T)/T;
     if(k<0.42){ const u=ease(k/0.42), B0=262, sx=B0+(KIMG_W-B0)*u, gw=KIMG_W*0.09, a=0.85*Math.sin(Math.PI*u);
       if(!SHINE){ SHINE=document.createElement('canvas'); SHINE.width=KIMG_W; SHINE.height=KIMG_H; }
@@ -967,7 +967,7 @@ function drawTitle(c,now){
       x.globalCompositeOperation='source-in';
       const g=x.createLinearGradient(sx-gw,0,sx+gw,0); g.addColorStop(0,'rgba(255,250,235,0)'); g.addColorStop(0.5,'rgba(255,250,235,'+a+')'); g.addColorStop(1,'rgba(255,250,235,0)');
       x.fillStyle=g; x.fillRect(0,0,KIMG_W,KIMG_H);
-      c.save(); c.globalCompositeOperation='lighter'; c.drawImage(SHINE,-kw/2,-kh/2,kw,kh); c.restore(); }
+      c.save(); c.globalCompositeOperation='lighter'; c.scale(1,-1); c.drawImage(SHINE,-kw/2,-kh/2,kw,kh); c.restore(); }
   }
   c.restore();
   // 縦書きの題字
@@ -1380,7 +1380,8 @@ function showSummary(){
   document.getElementById('g_tap').textContent='触れて閉じる';
   f.hidden=false; GA.phase='shown'; refreshCoins();
 }
-function drawKatanaAt(c,img,cx,cy,kw){ const kh=kw*KIMG_H/KIMG_W; c.drawImage(img,cx-kw/2,cy-kh/2,kw,kh); }
+// 刀は刃を上・峰を下に見せる
+function drawKatanaAt(c,img,cx,cy,kw){ const kh=kw*KIMG_H/KIMG_W; c.save(); c.translate(cx,cy); c.scale(1,-1); c.drawImage(img,-kw/2,-kh/2,kw,kh); c.restore(); }
 function gLoop(){
   GA.raf=requestAnimationFrame(gLoop);
   banSync();
@@ -1615,13 +1616,13 @@ function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
   if(ZST){ ZST.stop(); ZST=null; }
   c.hidden=!k; zw.hidden=!k; if(!k) return;
-  ZST=zRun(c,k,{flip:true});
+  ZST=zRun(c,k,{});
   c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
 }
 /* 絶の抜刀の舞台を canvas に描き続ける。刀帳の頁と、ガチャのピックアップの看板（o.ban）で使う
    場面は 1040x420 で描き、canvas の幅に合わせる（縦が余れば闇と花びらが広がり、足りなければ上下を切る）
    看板では刀を右へ寄せて小さくし、左を題字のために空ける。大きな「絶」と落款は描かない */
-function zRun(c,k,o){
+function zRun(c,k,o){ o=Object.assign({flip:true},o||{});
   const T=zArt(o.art||k.id), ZHD=zArtHd(T), ZSAYA=T.S, FE=T.parts==='feather';
   const W=1040, H=420, x=c.getContext('2d');
   const P=[]; for(let i=0;i<(FE?120:190);i++) P.push({x:Math.random()*W,y:Math.random()*H,v:(FE?14:20)+Math.random()*(FE?36:50),s:FE?7+Math.random()*9:3+Math.random()*8,r:Math.random()*6,w:Math.random()*6,d:Math.random()<(FE?.72:.3),

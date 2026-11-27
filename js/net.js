@@ -30,6 +30,7 @@
   function jp(err){
     const m = String((err && (err.message || err.msg || err.error_description)) || err || '');
     const code = err && (err.code || err.error_code);
+    if (/招待コードが違う|Database error saving new user/i.test(m)) return '招待コードが違うか、もう使われています';
     if (/Invalid login credentials/i.test(m)) return 'ログインIDかパスワードが違います';
     if (/already registered|already exists|User already/i.test(m)) return 'そのログインIDはもう使われています';
     if (/Password should be at least/i.test(m)) return 'パスワードは6文字以上にしてください';
@@ -50,7 +51,10 @@
     });
   }
 
-  N.init = async function(){
+  // 何度呼んでも一度だけつなぐ（action.html はログインの確かめとネット対戦の両方から呼ぶ）
+  let initP = null;
+  N.init = function(){ return initP || (initP = initOnce()); };
+  async function initOnce(){
     if (!N.configured()) { N.ready = true; emit(); return; }
     try {
       await loadLib();
@@ -65,7 +69,7 @@
       await applySession(data.session, 'INITIAL');
     } catch (e) { N.error = jp(e); }
     N.ready = true; emit();
-  };
+  }
 
   async function applySession(session, ev){
     const uid = session && session.user ? session.user.id : null;
@@ -94,8 +98,11 @@
   const emailOf = login => login + '@' + (C.emailDomain || 'players.issen.app');
   const LOGIN_RE = /^[a-z0-9_]{3,16}$/;
 
-  N.signUp = async function(login, password, name){
-    login = String(login || '').trim().toLowerCase(); name = String(name || '').trim();
+  // 招待コード: 8文字。小文字・空白・ハイフンは直す
+  N.normInvite = c => String(c || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  N.signUp = async function(login, password, name, invite){
+    login = String(login || '').trim().toLowerCase(); name = String(name || '').trim(); invite = N.normInvite(invite);
+    if (!invite) throw new Error('招待コードを入れてください（招いてくれた人からもらえます）');
     if (!LOGIN_RE.test(login)) throw new Error('ログインIDは英小文字・数字・_ で3〜16文字にしてください');
     if (String(password || '').length < 6) throw new Error('パスワードは6文字以上にしてください');
     if (name.length < 1 || name.length > 10) throw new Error('名前は1〜10文字にしてください');
@@ -103,7 +110,10 @@
     const av = await N.sb.rpc('login_available', { p_login: login });
     if (av.error) throw new Error(jp(av.error));
     if (!av.data) throw new Error('そのログインIDはもう使われています');
-    const { data, error } = await N.sb.auth.signUp({ email: emailOf(login), password, options: { data: { login, name } } });
+    const iv = await N.sb.rpc('invite_ok', { p_code: invite });
+    if (iv.error) throw new Error(jp(iv.error));
+    if (!iv.data) throw new Error('招待コードが違うか、もう使われています');
+    const { data, error } = await N.sb.auth.signUp({ email: emailOf(login), password, options: { data: { login, name, invite } } });
     if (error) throw new Error(jp(error));
     if (!data.session) throw new Error('登録はできましたが、ログインできませんでした（Supabase の「Confirm email」をオフにしてください）');
   };
@@ -113,6 +123,23 @@
     if (!login || !password) throw new Error('ログインIDとパスワードを入れてください');
     const { error } = await N.sb.auth.signInWithPassword({ email: emailOf(login), password });
     if (error) throw new Error(jp(error));
+  };
+
+  /* ---------- 招待コード（神様だけ） ---------- */
+  N.inviteCreate = async function(memo, n){
+    const { data, error } = await N.sb.rpc('invite_create', { p_memo: String(memo || '').trim(), p_n: n || 1 });
+    if (error) throw new Error(jp(error));
+    return (data || []).map(r => typeof r === 'string' ? r : r.invite_create);
+  };
+  N.inviteList = async function(){
+    const { data, error } = await N.sb.rpc('invite_list');
+    if (error) throw new Error(jp(error));
+    return data || [];
+  };
+  N.inviteRevoke = async function(code){
+    const { data, error } = await N.sb.rpc('invite_revoke', { p_code: code });
+    if (error) throw new Error(jp(error));
+    return !!data;
   };
 
   N.signOut = async function(){ teardown(); N.user = null; emit(); await N.sb.auth.signOut(); };

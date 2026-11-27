@@ -135,8 +135,10 @@
     <section id="o_wait" hidden><p class="gnote">つないでいます…</p></section>
     <section id="o_off" hidden><p class="gnote">オンライン対戦は準備中です。CPU戦・二人対戦・刀ガチャはいつも通り遊べます。</p></section>
     <section id="o_auth" hidden>
+      <p class="ogate" id="o_gate" hidden>一閃は、招かれた人だけが遊べます。<br>ログインするか、「はじめて」から招待コードで登録してください。</p>
       <div class="gtabs otabs"><button type="button" data-tab="in" class="on">ログイン</button><button type="button" data-tab="up">はじめて</button></div>
       <form id="o_aform" class="oform" autocomplete="on">
+        <label id="o_invrow" hidden>招待コード（招いてくれた人からもらう）<input id="o_invite" maxlength="12" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="8文字の英数字"></label>
         <label>ログインID<input id="o_login" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="16" placeholder="英小文字・数字・_ で3〜16文字"></label>
         <label>パスワード<input id="o_pass" type="password" name="password" autocomplete="current-password" maxlength="72" placeholder="6文字以上"></label>
         <label id="o_namerow" hidden>名前（相手に見えます）<input id="o_name" maxlength="10" placeholder="1〜10文字"></label>
@@ -151,6 +153,16 @@
         <div class="oid">あなたのID <b id="o_mycode"></b> <button type="button" class="obtn" id="o_copy">写す</button></div>
         <div class="olog"><span id="o_mylogin"></span> <button type="button" class="olink" id="o_logout">ログアウト</button></div>
         <p class="osave" id="o_save" hidden></p>
+      </div>
+      <div id="o_god" hidden>
+        <h3>招待コード（神様だけ）</h3>
+        <p class="gnote">コードを持つ人だけが新しく登録できます。1つのコードは1人だけ、1回使うと無効になります。渡す相手の名前をメモしておくと、誰に渡したものか分かります。</p>
+        <form id="o_iform" class="oadd oinv">
+          <input id="o_imemo" maxlength="20" placeholder="メモ（誰に渡すか・任意）">
+          <button type="submit" class="obtn pri">発行する</button>
+        </form>
+        <p class="omsg" id="o_imsg"></p>
+        <ul class="olist oinvl" id="o_ilist"></ul>
       </div>
       <form id="o_fform" class="oadd">
         <input id="o_fcode" maxlength="6" autocapitalize="characters" spellcheck="false" placeholder="相手のID（6文字）">

@@ -89,12 +89,12 @@ select case when (select count(*) from public.mail where to_id = '22222222-2222-
             and (select count(*) from public.mail where to_id = '33333333-3333-3333-3333-333333333333' and gifts -> 'titles' ? 'issen') = 1
   then 'OK 乙に一通だけ自動で届き、手で送られた丙には重ねない' else 'NG' end;
 
-\echo '--- 絶の刀（桜華）で一閃を決めると「桜花一閃」が届き、受け取ると名乗り替える'
+\echo '--- 絶の刀（桜華）で一閃を決めると「桜華一閃」が届き、受け取ると名乗り替える'
 update public.saves set rec = '{"mumei":{"一閃":2},"ouka":{"一閃":1}}' where id = '22222222-2222-2222-2222-222222222222';
 select pg_temp.as_('22222222-2222-2222-2222-222222222222');
-select case when (select count(*) from public.mail where to_id = auth.uid() and gifts -> 'titles' ? 'issen_ouka') = 1 then 'OK 桜花一閃が届いた' else 'NG' end;
+select case when (select count(*) from public.mail where to_id = auth.uid() and gifts -> 'titles' ? 'issen_ouka') = 1 then 'OK 桜華一閃が届いた' else 'NG' end;
 select public.claim_mail() ->> 'n';
-select case when (public.get_profile(null) ->> 'title_name') = '桜花一閃' and (public.get_profile(null) ->> 'title_style') = 'zetsu' then 'OK 桜花一閃を名乗る（絶の見た目）' else 'NG ' || public.get_profile(null)::text end;
+select case when (public.get_profile(null) ->> 'title_name') = '桜華一閃' and (public.get_profile(null) ->> 'title_style') = 'zetsu' then 'OK 桜華一閃を名乗る（絶の見た目）' else 'NG ' || public.get_profile(null)::text end;
 reset role;
 
 \echo '--- 運営へ: 不具合報告・改善依頼'
@@ -131,9 +131,10 @@ reset role;
 reset role;
 insert into public.crowns (title, kind, arg) values
   ('top_meikyo', 'finish', '明鏡止水'), ('top_issen', 'finish', '一閃'), ('top_wins', 'wins', null),
-  ('top_cpu', 'cpu', null), ('top_katana', 'katana', null), ('top_rating', 'rating', null);
+  ('top_cpu', 'cpu', null), ('top_katana', 'katana', null), ('top_rating', 'rating', null),
+  ('top_issen_ouka', 'finish_kat', 'ouka:一閃'), ('top_kagero', 'finish', '陽炎');
 update public.saves set rec = rec || '{"ruri":{"明鏡止水":3,"一閃":1}}' where id = '11111111-1111-1111-1111-111111111111';
-update public.saves set rec = rec || '{"ouka":{"明鏡止水":2}}' where id = '22222222-2222-2222-2222-222222222222';
+update public.saves set rec = rec || '{"ouka":{"明鏡止水":2,"一閃":1}}' where id = '22222222-2222-2222-2222-222222222222';
 select case when (select holder from public.crowns where title = 'top_meikyo') = '11111111-1111-1111-1111-111111111111'
             and (select 'top_meikyo' = any(titles) from public.profile_ext where id = '11111111-1111-1111-1111-111111111111')
             and exists (select 1 from public.mail where to_id = '11111111-1111-1111-1111-111111111111' and subject = '隠し二つ名「天下　明鏡止水」')
@@ -142,9 +143,9 @@ select pg_temp.as_('11111111-1111-1111-1111-111111111111');
 select public.set_profile('', null, 'top_meikyo', null) ->> 'title_name';
 reset role;
 \echo '--- 乙が並んでも甲のまま、抜いたら乙へ移る'
-update public.saves set rec = rec || '{"ouka":{"明鏡止水":3}}' where id = '22222222-2222-2222-2222-222222222222';
+update public.saves set rec = rec || '{"ouka":{"明鏡止水":3,"一閃":1}}' where id = '22222222-2222-2222-2222-222222222222';
 select case when (select holder from public.crowns where title = 'top_meikyo') = '11111111-1111-1111-1111-111111111111' then 'OK 並びは今の持ち主' else 'NG' end;
-update public.saves set rec = rec || '{"ouka":{"明鏡止水":4}}' where id = '22222222-2222-2222-2222-222222222222';
+update public.saves set rec = rec || '{"ouka":{"明鏡止水":4,"一閃":1}}' where id = '22222222-2222-2222-2222-222222222222';
 select case when (select holder from public.crowns where title = 'top_meikyo') = '22222222-2222-2222-2222-222222222222'
             and not (select 'top_meikyo' = any(titles) from public.profile_ext where id = '11111111-1111-1111-1111-111111111111')
             and (select title from public.profile_ext where id = '11111111-1111-1111-1111-111111111111') is distinct from 'top_meikyo'
@@ -154,6 +155,12 @@ select case when (select holder from public.crowns where title = 'top_meikyo') =
 select case when (select count(*) from public.crowns where holder = '99999999-9999-9999-9999-999999999999') = 0 then 'OK 神様は数えない' else 'NG' end;
 select pg_temp.as_('99999999-9999-9999-9999-999999999999');
 select case when not exists (select 1 from jsonb_array_elements(public.god_info() -> 'titles') t where t ->> 'id' like 'top_%')
-            and jsonb_array_length(public.god_info() -> 'crowns') = 6 then 'OK 神様の画面: 隠し二つ名は手で送れず、持ち主の一覧が見える' else 'NG' end;
+            and jsonb_array_length(public.god_info() -> 'crowns') = 8 then 'OK 神様の画面: 隠し二つ名は手で送れず、持ち主の一覧が見える' else 'NG' end;
 reset role;
+\echo '--- 天下　桜華一閃（桜華で一閃）・天下　陽炎'
+select case when (select holder from public.crowns where title = 'top_issen_ouka') = '22222222-2222-2222-2222-222222222222'
+  then 'OK 天下　桜華一閃は乙（桜華で一閃1回）' else 'NG ' || coalesce((select holder::text from public.crowns where title = 'top_issen_ouka'), 'なし') end;
+update public.saves set rec = rec || '{"ruri":{"明鏡止水":3,"一閃":1,"陽炎":5}}' where id = '11111111-1111-1111-1111-111111111111';
+select case when (select holder from public.crowns where title = 'top_kagero') = '11111111-1111-1111-1111-111111111111'
+            and (select name from public.title_catalog where id = 'top_kagero') = '天下　陽炎' then 'OK 天下　陽炎は甲' else 'NG' end;
 

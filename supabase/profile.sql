@@ -79,7 +79,7 @@ revoke all on public.title_catalog, public.plate_catalog, public.profile_ext, pu
 alter table public.title_catalog add column if not exists style text not null default '';
 insert into public.title_catalog (id, name, note, style, ord) values
   ('issen', '一閃', '後のない刹那に、明鏡止水を決めた者', '', 2),
-  ('issen_ouka', '桜花一閃', '絶の一振り「桜華」で、一閃を決めた者', 'zetsu', 1)
+  ('issen_ouka', '桜華一閃', '絶の一振り「桜華」で、一閃を決めた者', 'zetsu', 1)
 on conflict (id) do update set name = excluded.name, note = excluded.note, style = excluded.style, ord = excluded.ord;
 
 insert into public.plate_catalog (id, name, note, free, ord) values
@@ -405,8 +405,8 @@ alter table public.auto_gifts_given enable row level security;
 revoke all on public.auto_gifts, public.auto_gifts_given from anon, authenticated;
 
 insert into public.auto_gifts (id, cond, arg, gifts, subject, body, ord) values
-  ('issen_ouka_title', 'issen_with', 'ouka', '{"titles":["issen_ouka"]}', '桜花一閃の誉れ',
-   E'絶の一振り「桜華」で、後のない刹那に明鏡止水を決めた者へ。\n二つ名「桜花一閃」を贈ります。名乗りの画面で名乗れます。', 0),
+  ('issen_ouka_title', 'issen_with', 'ouka', '{"titles":["issen_ouka"]}', '桜華一閃の誉れ',
+   E'絶の一振り「桜華」で、後のない刹那に明鏡止水を決めた者へ。\n二つ名「桜華一閃」を贈ります。名乗りの画面で名乗れます。', 0),
   ('issen_title', 'issen', null, '{"titles":["issen"]}', '一閃の誉れ',
    E'後のない刹那に、明鏡止水を決めた者へ。\n二つ名を贈ります。名乗りの画面で名乗れます。', 1),
   ('ouka_plate', 'katana', 'ouka', '{"plates":["ouka"]}', '桜華の札',
@@ -533,13 +533,30 @@ $$;
 -- ---------- 隠し二つ名（一番の人だけが持つ。記録を抜かれたら移る）（2026-11-27） ----------
 -- 決着の回数で一番を取るものは「天下　〇〇」（全角の空白）と名付ける（ユーザー指定）
 -- 二つ名そのものは title_catalog に hidden = true で入れる（手に入れるまで、条件も名前も一覧に出さない）
--- kind: 'finish' = arg の決着を出した回数 / 'wins' = 勝ちの合計 / 'cpu' = CPU戦の最高の勝ち抜き
+-- kind: 'finish' = arg の決着を出した回数 / 'finish_kat' = arg「刀id:決着」の刀でその決着を出した回数 / 'wins' = 勝ちの合計 / 'cpu' = CPU戦の最高の勝ち抜き
 --       'katana' = 刀帳の種類 / 'rating' = 戦闘力（オンライン対戦を1回以上した人）
 -- 一番が並んだときは、今の持ち主がそのまま持つ（抜いたときだけ移る）。神様は数えない
 alter table public.title_catalog add column if not exists hidden boolean not null default false;
 insert into public.title_catalog (id, name, note, style, ord, hidden) values
   ('top_meikyo',  '天下　明鏡止水', '明鏡止水を、誰よりも多く決めた者', 'crown', 10, true),
   ('top_issen',   '天下　一閃',     '一閃を、誰よりも多く決めた者',     'crown', 11, true),
+  ('top_issen_ouka', '天下　桜華一閃', '絶の一振り「桜華」で、一閃を誰よりも多く決めた者', 'crown', 9, true),
+  ('top_hayate', '天下　疾風', '疾風を、誰よりも多く決めた者', 'crown', 30, true),
+  ('top_sennosen', '天下　先の先', '先の先を、誰よりも多く決めた者', 'crown', 31, true),
+  ('top_sukiugachi', '天下　隙穿ち', '隙穿ちを、誰よりも多く決めた者', 'crown', 32, true),
+  ('top_kagero', '天下　陽炎', '陽炎を、誰よりも多く決めた者', 'crown', 33, true),
+  ('top_ninotachi', '天下　二の太刀', '二の太刀を、誰よりも多く決めた者', 'crown', 34, true),
+  ('top_todome', '天下　止め', '止めを、誰よりも多く決めた者', 'crown', 35, true),
+  ('top_shichukatsu', '天下　死中活', '死中活を、誰よりも多く決めた者', 'crown', 36, true),
+  ('top_ruten', '天下　流転', '流転を、誰よりも多く決めた者', 'crown', 37, true),
+  ('top_kamihitoe', '天下　紙一重', '紙一重を、誰よりも多く決めた者', 'crown', 38, true),
+  ('top_kagamigaeshi', '天下　鏡返し', '鏡返しを、誰よりも多く決めた者', 'crown', 39, true),
+  ('top_kirifuse', '天下　斬り伏せ', '斬り伏せを、誰よりも多く決めた者', 'crown', 40, true),
+  ('top_haisui', '天下　背水', '背水を、誰よりも多く決めた者', 'crown', 41, true),
+  ('top_rakka', '天下　落花', '落花を、誰よりも多く決めた者', 'crown', 42, true),
+  ('top_setsuna', '天下　刹那', '刹那を、誰よりも多く決めた者', 'crown', 43, true),
+  ('top_hyakka', '天下　百花', '百花を、誰よりも多く決めた者', 'crown', 44, true),
+  ('top_sange', '天下　散華', '散華を、誰よりも多く決めた者', 'crown', 45, true),
   ('top_wins',    '剣聖',           '誰よりも多く勝った者',             'crown', 12, true),
   ('top_cpu',     '無双',           'CPU戦で、誰よりも多く勝ち抜いた者', 'crown', 13, true),
   ('top_katana',  '刀狩り',         '誰よりも多くの刀を刀帳に記した者', 'crown', 14, true),
@@ -548,17 +565,21 @@ on conflict (id) do update set name = excluded.name, note = excluded.note, style
 
 create table if not exists public.crowns (
   title text primary key references public.title_catalog(id) on delete cascade,
-  kind text not null check (kind in ('finish', 'wins', 'cpu', 'katana', 'rating')),
+  kind text not null,
   arg text,
   holder uuid references public.profiles(id) on delete set null,
   value numeric not null default 0,
   since timestamptz
 );
+alter table public.crowns drop constraint if exists crowns_kind_check;
+alter table public.crowns add constraint crowns_kind_check check (kind in ('finish', 'finish_kat', 'wins', 'cpu', 'katana', 'rating'));
 alter table public.crowns enable row level security;
 revoke all on public.crowns from anon, authenticated;
 insert into public.crowns (title, kind, arg) values
   ('top_meikyo', 'finish', '明鏡止水'), ('top_issen', 'finish', '一閃'), ('top_wins', 'wins', null),
-  ('top_cpu', 'cpu', null), ('top_katana', 'katana', null), ('top_rating', 'rating', null)
+  ('top_cpu', 'cpu', null), ('top_katana', 'katana', null), ('top_rating', 'rating', null),
+  ('top_issen_ouka', 'finish_kat', 'ouka:一閃'),
+  ('top_hayate', 'finish', '疾風'), ('top_sennosen', 'finish', '先の先'), ('top_sukiugachi', 'finish', '隙穿ち'), ('top_kagero', 'finish', '陽炎'), ('top_ninotachi', 'finish', '二の太刀'), ('top_todome', 'finish', '止め'), ('top_shichukatsu', 'finish', '死中活'), ('top_ruten', 'finish', '流転'), ('top_kamihitoe', 'finish', '紙一重'), ('top_kagamigaeshi', 'finish', '鏡返し'), ('top_kirifuse', 'finish', '斬り伏せ'), ('top_haisui', 'finish', '背水'), ('top_rakka', 'finish', '落花'), ('top_setsuna', 'finish', '刹那'), ('top_hyakka', 'finish', '百花'), ('top_sange', 'finish', '散華')
 on conflict (title) do update set kind = excluded.kind, arg = excluded.arg;
 
 -- 一人ひとりの値（神様は数えない）
@@ -568,6 +589,8 @@ language sql stable security definer set search_path = '' as $$
     case p_kind
       when 'finish' then coalesce((select sum(case when jsonb_typeof(r.value -> p_arg) = 'number' then (r.value ->> p_arg)::numeric else 0 end)
                                    from jsonb_each(s.rec) r where jsonb_typeof(r.value) = 'object'), 0)
+      when 'finish_kat' then coalesce(case when jsonb_typeof(s.rec -> split_part(p_arg, ':', 1) -> split_part(p_arg, ':', 2)) = 'number'
+                                      then (s.rec -> split_part(p_arg, ':', 1) ->> split_part(p_arg, ':', 2))::numeric end, 0)
       when 'wins' then coalesce((select sum((f.value)::text::numeric) from jsonb_each(s.rec) r, jsonb_each(r.value) f
                                  where jsonb_typeof(r.value) = 'object' and jsonb_typeof(f.value) = 'number'), 0)
       when 'cpu' then s.cpu_best::numeric
@@ -636,7 +659,7 @@ $$;
 create or replace function public.crown_saves_trigger() returns trigger
 language plpgsql security definer set search_path = '' as $$
 begin
-  perform public.crown_refresh_kinds(array['finish', 'wins', 'cpu', 'katana']);
+  perform public.crown_refresh_kinds(array['finish', 'finish_kat', 'wins', 'cpu', 'katana']);
   return null;
 end;
 $$;
@@ -656,7 +679,7 @@ create trigger ratings_crowns after insert or update on public.ratings
   for each statement execute function public.crown_rating_trigger();
 
 -- いまの一番の人に授ける（何度実行しても、持ち主が変わらなければ何も届かない）
-select public.crown_refresh_kinds(array['finish', 'wins', 'cpu', 'katana', 'rating']);
+select public.crown_refresh_kinds(array['finish', 'finish_kat', 'wins', 'cpu', 'katana', 'rating']);
 
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function

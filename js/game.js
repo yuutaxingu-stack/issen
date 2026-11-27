@@ -1520,13 +1520,15 @@ function renderBook(){
       const h=document.createElement('h3'); h.className='gbh'; h.innerHTML=(bx?boxName(bx):hb)+'の箱<small>'+ks.filter(x=>ARM.owned[x.id]).length+' / '+ks.length+'</small>'; grid.appendChild(h); }
     const b=document.createElement('button'); b.type='button'; b.className='gcard t'+TORD[k.tier]+(own?'':' unk');
     const cvs=document.createElement('canvas'); cvs.width=420; cvs.height=Math.round(420*KIMG_H/KIMG_W)+8;
-    const x=cvs.getContext('2d'); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,4,420,420*KIMG_H/KIMG_W);
+    const x=cvs.getContext('2d'); if(KREADY) drawUp(x,own?k.canvas:k.shadow,0,4,420,420*KIMG_H/KIMG_W);
     const eq=[0,1].filter(i=>ARM.equip[i]===k.id).map(i=>'<i style="background:'+COL[i].main+'">'+COL[i].name+'</i>').join('');
     b.innerHTML='<span class="ct" style="background:'+KTIER(k.tier)+KTXT(k.tier)+'">'+k.tier+'</span><span class="cm">'+(own?k.mei:'？？？')+'</span><span class="ce">'+eq+'</span>';
     b.insertBefore(cvs,b.firstChild);
     b.addEventListener('click',()=>openDetail(k));
     grid.appendChild(b); });
 }
+// 刀帳では刃を上・峰を下に飾る（絵は刃が下なので上下を返して描く）
+function drawUp(x,img,dx,dy,dw,dh){ x.save(); x.translate(0,dy*2+dh); x.scale(1,-1); x.drawImage(img,dx,dy,dw,dh); x.restore(); }
 let DETAIL=null;
 // 絶の刀帳: 鞘から刃が抜け、赤黒い闇に桜が舞い続ける専用の頁
 /* 絶の刀ごとの絵と色。saya=鞘に納めた姿、hd/sayaHd=大きく見る用、src=抜き身（KATANA に入る前でも描けるように）
@@ -1556,7 +1558,7 @@ function zTint(src,T){ // 赤黒く沈めた絵（一度だけ作る）。八咫
   const g=t.createLinearGradient(0,0,0,c.height); g.addColorStop(0,T.tint[1]); g.addColorStop(.35,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,.5)'); t.fillStyle=g; t.fillRect(0,0,c.width,c.height);
   ZTINT.set(key,c); return c;
 }
-function drawManga(x,W,H,rt,k,T){
+function drawManga(x,W,H,rt,k,T,flip){
   T=T||ZART.ouka; const SV=T.S&&T.S.complete&&T.S.naturalWidth?T.S:null, KB=zBlade(k,T); if(!KB) return;
   if(rt>=ZPEND) return;
   const ee=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),4);
@@ -1591,7 +1593,7 @@ function drawManga(x,W,H,rt,k,T){
     x.strokeStyle='#fff3f5'; x.lineWidth=2.5; x.beginPath(); x.moveTo(x0,y0); x.lineTo(xe,ye); x.stroke(); x.restore(); }
   x.restore();
   function path(poly){ x.beginPath(); poly.forEach(([px,py],i)=>i?x.lineTo(px,py):x.moveTo(px,py)); x.closePath(); }
-  function img(src,sx,sw,dx,dy,dw,rot){ const dh=dw*KIMG_H/sw; x.save(); x.translate(dx,dy); x.rotate(rot||0); x.drawImage(src,sx*src.width/KIMG_W,0,sw*src.width/KIMG_W,src.height,-dw/2,-dh/2,dw,dh); x.restore(); }
+  function img(src,sx,sw,dx,dy,dw,rot){ const dh=dw*KIMG_H/sw; x.save(); x.translate(dx,dy); x.rotate(rot||0); if(flip) x.scale(1,-1); x.drawImage(src,sx*src.width/KIMG_W,0,sw*src.width/KIMG_W,src.height,-dw/2,-dh/2,dw,dh); x.restore(); }
   function glow(cx,cy,r,a){ const g=x.createRadialGradient(cx,cy,0,cx,cy,r); g.addColorStop(0,rgba(T.pale,a)); g.addColorStop(.18,rgba(T.hot,a*0.7)); g.addColorStop(1,rgba(T.deep,0)); x.globalCompositeOperation='lighter'; x.fillStyle=g; x.fillRect(cx-r,cy-r,r*2,r*2); x.globalCompositeOperation='source-over'; }
   function streaks(y0,y1,n,seed,lt,sp){ let s=seed; const r=()=>(s=(s*16807)%2147483647)/2147483647; x.fillStyle=rgba(T.deep,.35);
     for(let i=0;i<n;i++){ const y=y0+r()*(y1-y0), len=80+r()*260, xx=((r()*W*1.5-lt*sp)%(W*1.5)+W*1.5)%(W*1.5)-W*0.25; x.fillRect(xx,y,len,1); } }
@@ -1613,7 +1615,7 @@ function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
   if(ZST){ ZST.stop(); ZST=null; }
   c.hidden=!k; zw.hidden=!k; if(!k) return;
-  ZST=zRun(c,k,{});
+  ZST=zRun(c,k,{flip:true});
   c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
 }
 /* 絶の抜刀の舞台を canvas に描き続ける。刀帳の頁と、ガチャのピックアップの看板（o.ban）で使う
@@ -1646,7 +1648,7 @@ function zRun(c,k,o){
     const bx=kx0-pull+(cxF-(kx0-bladeI))*settle; // 刀（柄の左端）の位置
     const KB=zBlade(k,T);
     if(KB&&ZSAYA.complete&&ZSAYA.naturalWidth){
-      x.save(); x.translate(W/2,ky+bob); x.rotate(-0.1*(t<Cd?1:1-settle)-0.07*settle); x.translate(-W/2,-kh/2);
+      x.save(); x.translate(W/2,ky+bob); x.rotate(-0.1*(t<Cd?1:1-settle)-0.07*settle); if(o.flip) x.scale(1,-1); x.translate(-W/2,-kh/2);
       if(t<B){ // 鞘に納まった姿
         x.globalAlpha=eo(t/A); x.shadowColor=rgba(T.hot,.7); x.shadowBlur=18+10*Math.sin(t*8); x.drawImage(ZSAYA,kx0,0,kw,kh);
         if(t>A){ x.globalAlpha=1; x.save(); x.beginPath(); x.rect(0,-50,kx0+mouthI*sc,kh+100); x.clip(); x.shadowBlur=0; x.drawImage(KB,bx,0,kw,kh); x.restore(); }
@@ -1672,7 +1674,7 @@ function zRun(c,k,o){
       if(FE) drawFeather(x,p); else { x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':p.c; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); } }
     // 落款
     if(!o.ban){ x.save(); x.fillStyle=T.seal[0]; x.fillRect(W-82,H-92,58,58); if(FE){ x.strokeStyle='rgba(255,255,255,.8)'; x.lineWidth=2; x.strokeRect(W-82,H-92,58,58); } x.fillStyle=T.seal[1]; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore(); }
-    drawManga(x,W,H,rt,k,T);
+    drawManga(x,W,H,rt,k,T,o.flip);
     ZS.raf=requestAnimationFrame(frame);
   };
   ZS.raf=requestAnimationFrame(frame);
@@ -1742,7 +1744,7 @@ function zetsuZoom(k,again){
   const st=v.querySelector('.zzst'), im=v.querySelector('img');
   const S={z:1,x:0,y:0}, pts=new Map(); let pinch=null, lastTap=0;
   const apply=()=>{ const r=st.getBoundingClientRect(), bw=im.offsetWidth*S.z, bh=im.offsetHeight*S.z, mx=Math.max(0,(bw-r.width)/2), my=Math.max(0,(bh-r.height)/2);
-    S.x=Math.max(-mx,Math.min(mx,S.x)); S.y=Math.max(-my,Math.min(my,S.y)); im.style.transform='translate('+S.x+'px,'+S.y+'px) scale('+S.z+')'; };
+    S.x=Math.max(-mx,Math.min(mx,S.x)); S.y=Math.max(-my,Math.min(my,S.y)); im.style.transform='translate('+S.x+'px,'+S.y+'px) scale('+S.z+','+(-S.z)+')'; };
   const zoomAt=(nz,cx,cy)=>{ const r=st.getBoundingClientRect(); nz=Math.max(1,Math.min(8,nz)); const ox=cx-r.left-r.width/2, oy=cy-r.top-r.height/2;
     S.x=ox-(ox-S.x)*nz/S.z; S.y=oy-(oy-S.y)*nz/S.z; S.z=nz; apply(); };
   const ZA=zArt(k.id), show=w=>{ im.src=w==='saya'?ZA.sayaHd:ZA.hd; S.z=1; S.x=S.y=0; apply(); v.querySelectorAll('[data-z]').forEach(b=>b.classList.toggle('on',b.dataset.z===w)); };
@@ -1761,7 +1763,7 @@ function zetsuZoom(k,again){
 function openDetail(k){
   DETAIL=k; FORGEARM=0; const own=!!ARM.owned[k.id]; const d=document.getElementById('g_detail'); d.hidden=false; d.querySelector('.gdsheet').className='gdsheet t'+TORD[k.tier]+(own?'':' unk');
   zetsuStage(k.tier==='絶'&&own?k:null);
-  const cvs=document.getElementById('gd_img'); const x=cvs.getContext('2d'); x.clearRect(0,0,cvs.width,cvs.height); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,0,cvs.width,cvs.width*KIMG_H/KIMG_W);
+  const cvs=document.getElementById('gd_img'); const x=cvs.getContext('2d'); x.clearRect(0,0,cvs.width,cvs.height); if(KREADY) drawUp(x,own?k.canvas:k.shadow,0,0,cvs.width,cvs.width*KIMG_H/KIMG_W);
   document.getElementById('gd_t').textContent=k.tier; document.getElementById('gd_t').style.background=KTIER(k.tier); document.getElementById('gd_t').style.color=k.tier==='絶'?'#f2d2d2':'';
   document.getElementById('gd_m').textContent=k.mei; document.getElementById('gd_y').textContent=k.yomi+'　・　'+(own?(ARM.owned[k.id]||0)+'振り所持':'まだ持っていない');
   document.getElementById('gd_l').textContent=own?k.lore:'まだ見ぬ一振り。姿は鍛えあがるまでわからない。';

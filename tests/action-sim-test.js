@@ -206,4 +206,10 @@ for (const kit of ['common', 'ouka']) { const s = new A.Sim({ training: true, ki
   for (let k = 0; k < 300; k++) { t.step([I(), I()]); if (t.p[1].st === 'fall') f2 = true; if (t.p[1].st === 'down') d2 = true; }
   ok(!f2 && !d2, '無防備落下・ダウンを切ると、どちらにもならない'); }
 
+// 無防備落下＋必ずダウンの技は、空中で硬直が切れても着地で必ずダウン（受け身も取れない）
+{ const t = sim(400); t.p[1].y = 300 * A.FP; t.p[1].ground = false; t.p[1].st = 'air'; const m = Object.assign({}, A.MV.rise, { kd: 1, hs: 10 });
+  t.applyHit(t.p[0], t.p[1], m, { dst: 'air', dground: false }); let f = false, d = false;
+  for (let k = 0; k < 300; k++) { t.step([I(), I({ G: k % 2 })]); if (t.p[1].st === 'fall') f = true; if (t.p[1].st === 'down') d = true; }
+  ok(f && d, '無防備落下中に「必ずダウン」なら着地で必ずダウン'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

@@ -393,7 +393,7 @@ Sim.prototype.update = function(p, o){
   // 当たった・守った後の固まり
   if (p.st === 'hit' || p.st === 'bstun' || p.st === 'tumble') {
     if (p.hs > 0) p.hs--;
-    if (p.hs <= 0) { if (p.st === 'tumble' || !p.ground) { p.st = p.dfall && !p.ground ? 'fall' : 'air'; } else p.st = 'idle'; p.dfall = false; } // dfall: 昇り斬り・天桜を食らった側も無防備落下
+    if (p.hs <= 0) { if (p.st === 'tumble' || !p.ground) { const df = p.dfall && !p.ground; p.st = df ? 'fall' : 'air'; if (!df) p.kd = false; } else p.st = 'idle'; p.dfall = false; } // dfall: 昇り斬り・天桜を食らった側も無防備落下
   }
   if (p.st === 'unguard' || p.st === 'land' || p.st === 'tech') {
     p.f--; if (p.f <= 0) p.st = 'idle';
@@ -462,7 +462,10 @@ Sim.prototype.land = function(p, y, plat){
     } else { p.st = 'land'; p.f = 4; p.hs = 0; }
     p.nokd = false; p.dfall = false;
   } else if (p.st === 'adodge') { p.st = 'land'; p.f = DG[p.ak].land; }
-  else if (p.st === 'fall') { p.st = 'land'; p.f = 20; p.dfall = false; }
+  else if (p.st === 'fall') {
+    if (p.kd) { p.st = 'down'; p.f = C.downF; p.downT = 0; p.vx = Math.trunc(p.vx / 3); p.hs = 0; this.ev.push({ t: 'down', p: p.i, x: p.x, y: p.y }); } // 「必ずダウン」の技で無防備落下: 受け身なしで必ずダウン
+    else { p.st = 'land'; p.f = 20; }
+    p.dfall = false; p.kd = false; }
   else if (p.st === 'air') { p.st = 'land'; p.f = C.landF; }
   else if (p.st === 'stun' || p.st === 'hit') { /* そのまま続く */ }
 };

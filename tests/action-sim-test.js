@@ -193,10 +193,10 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 // 昇り斬り・天桜を当てると相手も無防備落下し、着地して動けるのは当てた側が先（確定反撃を取られない）
 for (const kit of ['common', 'ouka']) { const s = new A.Sim({ training: true, kits: [kit, 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = 640 * A.FP;
   s.step([I({ K: 'u' }), I()]); let fell = false, hit = false, freeA = -1, freeD = -1;
-  for (let k = 0; k < 300; k++) { s.step([I(), I({ G: k > 20 && k % 2 ? 1 : 0 })]); for (const e of drain(s)) if (e.t === 'hit') hit = true; if (s.p[1].st === 'fall' || (hit && s.p[1].st === 'land')) fell = true;
+  for (let k = 0; k < 300; k++) { s.step([I(), I({ G: k > 20 && k % 2 ? 1 : 0 })]); for (const e of drain(s)) if (e.t === 'hit') hit = true; if (s.p[1].st === 'fall' || (hit && (s.p[1].st === 'land' || s.p[1].st === 'down'))) fell = true; if (hit && s.p[1].st === 'down') s.dn = 1;
     const free = q => ['idle', 'walk', 'crouch', 'guard', 'tech', 'roll'].includes(q.st) && q.ground; // 受け身を取ろうとしても取れない
     if (freeA < 0 && k > 5 && free(s.p[0])) freeA = k; if (freeD < 0 && hit && k > 5 && free(s.p[1])) freeD = k; }
-  ok(hit && fell && freeA >= 0 && freeA <= freeD, (kit === 'ouka' ? '天桜' : '昇り斬り') + 'を当てると相手も無防備落下・先に動けるのは当てた側 (当てた側 ' + freeA + 'F / 食らった側 ' + freeD + 'F)'); }
+  ok(hit && fell && s.dn && freeA >= 0 && freeA <= freeD, (kit === 'ouka' ? '天桜' : '昇り斬り') + 'を当てると相手も無防備落下→ダウン・先に動けるのは当てた側 (当てた側 ' + freeA + 'F / 食らった側 ' + freeD + 'F)'); }
 { const s = sim(400); s.p[1].y = 300 * A.FP; s.p[1].ground = false; s.p[1].st = 'air'; s.p[1].x = s.p[0].x + 30 * A.FP;
   s.applyHit(s.p[0], s.p[1], A.MV.ten, { dst: 'air', dground: false }); let fell = false, down = false;
   for (let k = 0; k < 300; k++) { s.step([I(), I()]); if (s.p[1].st === 'fall') fell = true; if (s.p[1].st === 'down') down = true; }

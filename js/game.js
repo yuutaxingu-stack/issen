@@ -229,7 +229,20 @@ const KMAP={}; KATANA.forEach(k=>KMAP[k.id]=k);
 // 描いた絵がある刀（src）は、その絵を読み込んでから作り直す
 KATANA.forEach(k=>{ if(!k.src) return; k.img=new Image(); k.img.onload=()=>{ if(KREADY) try{ buildKatanas(); }catch(e){ console.error(e); } }; k.img.src=k.src; });
 const METAL={gold:null,silver:[198,204,214],copper:[206,122,82],black:[44,40,38]};
-const TIERRATE=[['並',59.5],['上',28],['極',10],['幻',2],['絶',0.5]];
+/* ガチャの箱。出た順に並べる（新しい箱ほど後ろ）。箱の刀は katana の box で決まる（書いていなければ b1 = 第一弾）
+   絶は箱ごとの目玉で、その箱の絶だけが出る。最新の箱は zNew%（ふつう0.3）、新しい箱が出たら古い箱は ZOLD%
+   第一弾はリリース記念で、次の箱が出るまで 0.5%。並は残り（100 − 上・極・幻 − 絶）
+   箱を足すとき: ここに1行、刀に box:'b2' を付け、node tools/katana-sql.js → save-data.sql を SQL Editor で実行 */
+const BOXES=[{id:'b1',mei:'第一弾',pick:'ouka',zNew:0.5,note:'リリース記念'}];
+const ZNEW=0.3, ZOLD=0.1;
+const TIERRATE=[['上',28],['極',10],['幻',2]];
+const boxOf=k=>k.box||'b1';
+const boxKats=b=>KATANA.filter(k=>boxOf(k)===b.id);
+function liveBoxes(){ return BOXES.filter(b=>boxKats(b).length); }
+function latestBox(){ const l=liveBoxes(); return l[l.length-1]; }
+function boxZ(b){ return b===latestBox()?(b.zNew!=null?b.zNew:ZNEW):ZOLD; }
+function boxRates(b){ const z=boxZ(b), has=t=>boxKats(b).some(k=>k.tier===t);
+  const r=[['並',100-TIERRATE.reduce((s,v)=>s+v[1],0)-z]].concat(TIERRATE,[['絶',z]]); return r.filter(([t])=>has(t)); }
 // 持っている刀が出たら玉鋼に変わる。玉鋼で好きな刀を鍛えられる（値段 ≒ その階級が出るまでの平均の銭 × 3）
 const STEEL={'並':5,'上':10,'極':25,'幻':100,'絶':300};
 const FORGE={'並':50,'上':110,'極':300,'幻':1500,'絶':6000};
@@ -274,9 +287,9 @@ function katOf(i){ if(G.mode==='online') return KMAP[i===NET.me?(NET.watch?NET.m
 function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x)],['上',lerp(0.12,0.45,x)],['極',lerp(0,0.22,x)],['幻',lerp(0,0.06,x)],['絶',lerp(0,0.015,x)]];
   let r=Math.random()*w.reduce((s,v)=>s+v[1],0), t='並'; for(const [k,v] of w){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
-function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&(NET.watch||i!==NET.me)) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0); }
-function rollKatana(){ let r=Math.random()*100, t='並'; for(const [k,v] of TIERRATE){ if((r-=v)<=0){ t=k; break; } }
-  const pool=KATANA.filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
+function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&(NET.watch||i!==NET.me)) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0,G.mode==='vs'?'vs':null); }
+function rollKatana(b){ const rt=boxRates(b); let r=Math.random()*rt.reduce((s,v)=>s+v[1],0), t=rt[0][0]; for(const [k,v] of rt){ if((r-=v)<=0){ t=k; break; } }
+  const pool=boxKats(b).filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
 
 /* ---------- 状態 ---------- */
 function mkPlayer(i){ return {i,side:i,state:'idle',start:0,end:0,counters:0,lastCancelAt:-1e9,mkStart:-1e9,counteredAt:null,resumeAt:0,score:0,J:clonePose('idle')}; }
@@ -300,6 +313,8 @@ const TOWIN=()=>G.mode==='cpu'?1:(G.mode==='online'&&NET.toWin)?NET.toWin:CFG.to
 
 /* コインと記録（ログインしていなければこの端末に、ログイン中はアカウントに保存） */
 const COIN={'並':3,'上':9,'極':24,'幻':60,'絶':150,'分':0};
+const VS_DIV=3; // 同じ端末の二人対戦は銭を3分の1に（一人で両方を操作する銭稼ぎ対策。サーバーは app_config.vs_coin_div）
+const vsCoin=c=>Math.ceil(c/VS_DIV);
 const WALLET={coins:0,best:0,steel:0};
 function loadGuestWallet(){ WALLET.coins=0; WALLET.best=0; WALLET.steel=0;
   try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){} }
@@ -322,14 +337,14 @@ function importAction(){
   let a; try{ a=JSON.parse(localStorage.getItem(AOUT)||'[]'); }catch(e){ a=[]; } if(!Array.isArray(a)||!a.length) return;
   const keep=[]; let n=0;
   for(const r of a){ if(!r||!FIN[r.f]||!KMAP[r.k]){ continue; } if(!!r.acct!==!!ACCT){ keep.push(r); continue; } if(!ARM.owned[r.k]) continue;
-    const coin=COIN[FIN[r.f].tier]||0; ARM.rec[r.k]=ARM.rec[r.k]||{}; ARM.rec[r.k][r.f]=(ARM.rec[r.k][r.f]||0)+1;
-    if(coin){ WALLET.coins+=coin; } if(ACCT) ACCT.win(r.f,r.k,coin); n++; }
+    let coin=COIN[FIN[r.f].tier]||0; if(r.m==='vs') coin=vsCoin(coin); ARM.rec[r.k]=ARM.rec[r.k]||{}; ARM.rec[r.k][r.f]=(ARM.rec[r.k][r.f]||0)+1;
+    if(coin){ WALLET.coins+=coin; } if(ACCT) ACCT.win(r.f,r.k,coin,r.m==='vs'?'vs':null); n++; }
   try{ localStorage.setItem(AOUT,JSON.stringify(keep)); }catch(e){}
   if(n){ saveArm(); saveWallet(); uiCache=''; }
 }
 setInterval(importAction,3000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) importAction(); });
 function useGuest(){ ACCT=null; GOD=false; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; setTimeout(importAction,0); if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
-window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT};
+window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT,KATANA,KMAP,TIER,arm:()=>ARM,isGod:()=>GOD};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
 function startMatch(mode,base){
@@ -468,6 +483,7 @@ function finish(W,L,name,kind){
   let coin=COIN[tier]||0;
   if(G.mode==='cpu'&&W.i!==0) coin=0;
   if(G.mode==='online'&&(NET.watch||W.i!==NET.me)) coin=0;
+  if(G.mode==='vs') coin=vsCoin(coin);
   if(coin){ WALLET.coins+=coin; RUN.coins+=coin; saveWallet(); }
   G.result={name,winner:W.i,coin};
   recordWin(W.i,name,coin);
@@ -1185,7 +1201,7 @@ window.addEventListener('keydown',e=>{
   else if(k&&(k[0]===0||G.mode==='vs')){ ensureAudio(); press(k[0],k[1]); }
   else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); advance(); }
 });
-document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')&&!e.target.closest('#online')&&!e.target.closest('#rank')&&!e.target.closest('#team')) e.preventDefault(); },{passive:false});
+document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')&&!e.target.closest('#online')&&!e.target.closest('#rank')&&!e.target.closest('#team')&&!e.target.closest('#pf')&&!e.target.closest('#pf_pop')) e.preventDefault(); },{passive:false});
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 
@@ -1213,7 +1229,7 @@ document.getElementById('g_back').addEventListener('click',()=>closeGacha());
 /* ---------- 刀ガチャと刀帳 ---------- */
 const gcv=document.getElementById('gc'), gctx=gcv.getContext('2d');
 // phase: idle 待ち / wait サーバー待ち / forge 鍛える槌 / draw 一振りずつの抜刀 / quick 持っている刀を素早く / item 一振りの札 / shown まとめ
-const GA={phase:'idle',t0:0,kat:null,batch:[],idx:-1,steel:0,back:0,forge:false,silent:false,raf:0,W:0,H:0,cued:{}};
+const GA={box:null,phase:'idle',t0:0,kat:null,batch:[],idx:-1,steel:0,back:0,forge:false,silent:false,raf:0,W:0,H:0,cued:{}};
 const gBusy=()=>!(GA.phase==='idle'||GA.phase==='shown');
 const TORD={'並':0,'上':1,'極':2,'幻':3,'絶':4};
 const TIERGLOW={'並':'rgba(236,230,214,','上':'rgba(120,180,255,','極':'rgba(245,196,70,','幻':null,'絶':null};
@@ -1236,12 +1252,53 @@ const tierFill=(t,a,now,off)=>t==='幻'?rainbow(a,now,off):t==='絶'?sakura(a,no
 // 幻は白→金→虹と化ける（昇格演出）
 function shownTier(k,e){ if(k.tier==='絶') return e<1000?'並':e<1700?'極':e<2600?'幻':'絶'; if(k.tier!=='幻') return e<TP[k.tier].d0*0.8&&k.tier!=='並'?'並':k.tier; return e<1000?'並':e<1700?'極':'幻'; }
 function gSize(){ const r=gcv.getBoundingClientRect(); GA.W=Math.max(200,r.width); GA.H=Math.max(120,r.height); gcv.width=Math.round(GA.W*DPR); gcv.height=Math.round(GA.H*DPR); }
-function openGacha(tab){ gachaEl.hidden=false; uiCache=''; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
-function closeGacha(){ gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
-const GOD_N=10;   // 運営アカウントの「十振り引く」
-function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.floor(WALLET.coins/PULLCOST), busy=gBusy();
-  const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='一振り引く　<small>'+(GOD?'無料':PULLCOST+'銭')+'</small>'; const all=document.getElementById('g_all'); all.disabled=busy||n<2;
-  all.innerHTML=GOD?'十振り引く　<small>銭は減りません</small>':'全部引く　<small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>';
+// 箱の選び札と目玉の絶。箱が一つのうちは札を出さず、目玉だけを見せる
+function curBox(){ const l=liveBoxes(); if(!GA.box||!l.includes(GA.box)) GA.box=l[l.length-1]; return GA.box; }
+function pct(v){ return (Math.round(v*10)/10)+'%'; }
+function boxName(b){ const f=KMAP[b.pick]; return b.mei+(f?'「'+f.mei+'」':''); }
+function renderBox(){ const el=document.getElementById('g_box'); if(!el) return; const b=curBox(), l=liveBoxes().slice().reverse(), f=KMAP[b.pick], z=boxZ(b), busy=gBusy();
+  const key=b.id+'|'+l.length+'|'+busy; if(el.dataset.k===key) return; el.dataset.k=key;
+  // 左の札: 新しい箱ほど上
+  el.innerHTML=l.map(x=>{ const fk=KMAP[x.pick]; return '<button type="button" class="gbx'+(x===b?' on':'')+'" data-box="'+x.id+'"'+(busy?' disabled':'')+'><span class="n">'+x.mei+'</span><span class="m">'+(fk?fk.mei:'？')+'</span><span class="z"><i>絶</i>'+pct(boxZ(x))+'</span>'+(x===latestBox()?'<em>新</em>':'')+'</button>'; }).join('');
+  el.querySelectorAll('button[data-box]').forEach(btn=>btn.addEventListener('click',()=>{ if(gBusy()) return; const nb=BOXES.find(x=>x.id===btn.dataset.box); if(nb===GA.box) return; GA.box=nb; banStop(); refreshCoins(); }));
+  // 看板の文字
+  document.getElementById('g_bk').textContent=b.mei+'　目玉';
+  document.getElementById('g_bm').textContent=f?f.mei:'？';
+  document.getElementById('g_bz').textContent=pct(z);
+  document.getElementById('g_bn').textContent=(b===latestBox()&&b.note&&b.zNew!=null&&b.zNew!==ZNEW)?b.note+'　次の箱が出るまで 絶 '+pct(z):b===latestBox()?'最新の箱　絶 '+pct(z):'前の箱　絶 '+pct(z)+'・玉鋼でも鍛えられます';
+  const rt=document.getElementById('g_rate'); if(rt) rt.textContent='出る確率（'+b.mei+'）　'+boxRates(b).map(([t,v])=>t+' '+pct(v)).join('・'); }
+/* 目玉の看板: 刀帳と同じ抜刀の舞台を、待っている間だけ動かす（開くたび・箱を替えるたびに抜き直す） */
+let BAN=null;
+function banStop(){ if(BAN){ BAN.stop(); BAN=null; } }
+function banSize(){ const c=document.getElementById('g_banc'), r=c.getBoundingClientRect(), d=Math.min(2,DPR||1);
+  const w=Math.max(2,Math.round(r.width*d)), h=Math.max(2,Math.round(r.height*d)); if(c.width!==w||c.height!==h){ c.width=w; c.height=h; } }
+function banSync(){
+  const on=!gachaEl.hidden&&!document.getElementById('g_pull').hidden&&(GA.phase==='idle'||GA.phase==='wait');
+  const ban=document.getElementById('g_ban'), st=document.getElementById('g_stage');
+  if(ban.hidden===on){ ban.hidden=!on; st.hidden=on; if(!on) gSize(); }
+  ban.classList.toggle('wait',GA.phase==='wait');
+  if(!on){ banStop(); return; }
+  if(BAN) banSize();
+  if(!BAN&&KREADY){ const k=KMAP[curBox().pick]; if(k){ banSize(); BAN=zRun(document.getElementById('g_banc'),k,{ban:true}); } }
+}
+function openGacha(tab){ banStop(); gachaEl.hidden=false; uiCache=''; GA.box=null; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
+function closeGacha(){ banStop(); gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
+const GOD_N=1000; // 運営アカウントが一度に引ける数
+const PULLMAX=1000; // 一度に引ける数の上限（サーバーの pull_gacha と同じ）
+let GCNT=10;        // 「回数」で選んだ数
+function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.min(PULLMAX,Math.floor(WALLET.coins/PULLCOST)), busy=gBusy();
+  const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='<b>一振り</b><small>'+(GOD?'無料':PULLCOST+'銭')+'</small>';
+  const p10=document.getElementById('g_pull10'); p10.disabled=busy||n<10; p10.innerHTML='<b>十振り</b><small>'+(GOD?'無料':10*PULLCOST+'銭')+'</small>';
+  const all=document.getElementById('g_all'); all.hidden=GOD; all.disabled=busy||n<2;
+  all.innerHTML='<b>全部</b><small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>';
+  // 回数を選ぶ: 1回から、引ける数（銭・上限1000）まで
+  const cb=document.getElementById('g_cntb'), cp=document.getElementById('g_cnt'), cr=document.getElementById('g_cntr'), mx=Math.max(1,n);
+  cb.disabled=busy||n<1; if(n<1) cp.hidden=true; cb.classList.toggle('on',!cp.hidden); document.getElementById('g_pull').classList.toggle('cnt',!cp.hidden);
+  GCNT=Math.max(1,Math.min(mx,GCNT)); cr.max=mx; cr.value=GCNT; cr.disabled=busy;
+  document.getElementById('g_cntv').textContent=GCNT;
+  cp.querySelectorAll('button[data-d]').forEach(b=>{ const d=+b.dataset.d; b.disabled=busy||(d<0?GCNT<=1:GCNT>=mx); });
+  const go=document.getElementById('g_cntgo'); go.disabled=busy||n<1; go.innerHTML='<b>'+GCNT+'振り引く</b><small>'+(GOD?'無料':GCNT*PULLCOST+'銭')+'</small>';
+  renderBox();
   const pk=document.getElementById('g_pick'); if(pk){ pk.hidden=!GOD; if(GOD&&pk.options.length<2) fillPick(pk); pk.disabled=busy; } }
 // ピックアップ: 選んだ刀が必ず出る（運営アカウントだけ。サーバーでも確かめる）
 function fillPick(pk){ pk.innerHTML='<option value="">ピックアップなし（ふつうのくじ）</option>'+['絶','幻','極','上','並'].map(t=>'<optgroup label="'+t+'">'+KATANA.filter(k=>k.tier===t).map(k=>'<option value="'+k.id+'">'+k.mei+'</option>').join('')+'</optgroup>').join(''); }
@@ -1249,18 +1306,18 @@ function setTab(t){ document.querySelectorAll('.gtabs button').forEach(b=>b.clas
   document.getElementById('g_pull').hidden=t!=='pull'; document.getElementById('g_book').hidden=t!=='book'; if(t==='book') renderBook(); else gSize(); }
 function doPull(n){
   if(gBusy()) return;
-  const msg=document.getElementById('g_msg'); n=GOD?Math.min(n,GOD_N):Math.min(n,Math.floor(WALLET.coins/PULLCOST));
+  const msg=document.getElementById('g_msg'); n=GOD?Math.min(n,GOD_N):Math.min(n,PULLMAX,Math.floor(WALLET.coins/PULLCOST));
   if(n<1){ msg.textContent='銭が足りません。勝負に勝って銭を集めてください。'; return; }
   msg.textContent=''; ensureAudio();
   if(ACCT){ // ログイン中: くじはサーバーが引く
     GA.phase='wait'; msg.textContent='引いています…'; refreshCoins();
-    ACCT.pull(n,GOD?(document.getElementById('g_pick').value||null):null).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
+    ACCT.pull(n,GOD?(document.getElementById('g_pick').value||null):null,curBox()===latestBox()?null:curBox().id).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
       startDraw(r.got.map(g=>{ const k=KMAP[g.id]||KMAP.mumei; return {k,isNew:!!g.new,steel:g.new?0:(g.steel!=null?g.steel:STEEL[k.tier])}; }),r.back||0); },
       e=>{ if(GA.phase==='wait') GA.phase='idle'; msg.textContent=e.message; refreshCoins(); });
     return;
   }
   const batch=[]; let back=0;
-  for(let i=0;i<n;i++){ WALLET.coins-=PULLCOST; const k=rollKatana(); const had=ARM.owned[k.id]||0; ARM.owned[k.id]=had+1; const st=had?STEEL[k.tier]:0; WALLET.steel=(WALLET.steel||0)+st; batch.push({k,isNew:!had,steel:st}); }
+  for(let i=0;i<n;i++){ WALLET.coins-=PULLCOST; const k=rollKatana(curBox()); const had=ARM.owned[k.id]||0; ARM.owned[k.id]=had+1; const st=had?STEEL[k.tier]:0; WALLET.steel=(WALLET.steel||0)+st; batch.push({k,isNew:!had,steel:st}); }
   saveWallet(); saveArm();
   startDraw(batch,back);
 }
@@ -1322,6 +1379,7 @@ function showSummary(){
 function drawKatanaAt(c,img,cx,cy,kw){ const kh=kw*KIMG_H/KIMG_W; c.drawImage(img,cx-kw/2,cy-kh/2,kw,kh); }
 function gLoop(){
   GA.raf=requestAnimationFrame(gLoop);
+  banSync();
   if(gachaEl.hidden||document.getElementById('g_pull').hidden) return;
   const c=gctx, W=GA.W, H=GA.H, now=performance.now(); c.setTransform(DPR,0,0,DPR,0,0);
   c.fillStyle='#0f100d'; c.fillRect(0,0,W,H);
@@ -1331,7 +1389,7 @@ function gLoop(){
     c.beginPath(); c.moveTo(m,cy-kh*0.2); c.lineTo(m+sayaL,cy-kh*0.12); c.quadraticCurveTo(m+sayaL+kh*0.3,cy,m+sayaL,cy+kh*0.14); c.lineTo(m,cy+kh*0.22); c.closePath(); c.fill(); c.stroke();
     c.fillStyle='rgba(233,226,207,0.08)'; c.fillRect(m+sayaL*0.2,cy-kh*0.16,sayaL*0.6,kh*0.05); c.restore(); };
   if(GA.phase==='idle'||GA.phase==='wait'){
-    const k=KMAP[ARM.equip[0]]||KMAP.mumei; if(KREADY){ c.save(); c.globalAlpha=0.5+0.1*Math.sin(now/700); c.beginPath(); c.rect(0,0,mouth0,H); c.clip(); drawKatanaAt(c,k.shadow,cx,cy,kw); c.restore(); }
+    const k=KMAP[curBox().pick]||KMAP[ARM.equip[0]]||KMAP.mumei; if(KREADY){ c.save(); c.globalAlpha=0.5+0.1*Math.sin(now/700); c.beginPath(); c.rect(0,0,mouth0,H); c.clip(); drawKatanaAt(c,k.shadow,cx,cy,kw); c.restore(); }
     drawSaya(mouth0,1);
     txt(c,'鞘に手をかける',cx,H*0.86,Math.max(11,H*0.055),UIF,'rgba(233,226,207,0.4)','center');
     return;
@@ -1452,7 +1510,10 @@ function renderBook(){
   const grid=document.getElementById('g_grid'); grid.innerHTML='';
   const got=KATANA.filter(k=>ARM.owned[k.id]).length;
   document.getElementById('g_count').innerHTML='集めた刀　'+got+' / '+KATANA.length+'<small>玉鋼 <b>'+(WALLET.steel||0)+'</b>　まだ持っていない刀に触れると、玉鋼で鍛えられます</small>';
-  KATANA.map((k,i)=>[k,i]).sort((a,b)=>TORD[a[0].tier]-TORD[b[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
+  const bord=k=>{ const i=BOXES.findIndex(b=>b.id===boxOf(k)); return i<0?999:i; }; let hb=null;
+  KATANA.map((k,i)=>[k,i]).sort((a,b)=>bord(b[0])-bord(a[0])||TORD[a[0].tier]-TORD[b[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
+    if(boxOf(k)!==hb){ hb=boxOf(k); const bx=BOXES.find(b=>b.id===hb), ks=KATANA.filter(x=>boxOf(x)===hb);
+      const h=document.createElement('h3'); h.className='gbh'; h.innerHTML=(bx?boxName(bx):hb)+'の箱<small>'+ks.filter(x=>ARM.owned[x.id]).length+' / '+ks.length+'</small>'; grid.appendChild(h); }
     const b=document.createElement('button'); b.type='button'; b.className='gcard t'+TORD[k.tier]+(own?'':' unk');
     const cvs=document.createElement('canvas'); cvs.width=420; cvs.height=Math.round(420*KIMG_H/KIMG_W)+8;
     const x=cvs.getContext('2d'); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,4,420,420*KIMG_H/KIMG_W);
@@ -1489,7 +1550,7 @@ function drawManga(x,W,H,rt,k){
   ];
   const split=ee((rt-ZSLASH)/0.5); // 斬線のあと、帯が上下に裂けて消える
   x.save();
-  if(rt<ZSLASH){ x.fillStyle='#050102'; x.fillRect(0,0,W,H); }
+  if(rt<ZSLASH){ x.fillStyle='#050102'; x.fillRect(-W,-H,W*3,H*3); }
   // 始まりの一筋（横一文字の細い紅）
   if(rt<0.5){ const a=ee(rt/0.12)*(1-ee((rt-0.25)/0.25)); x.fillStyle='rgba(220,30,55,'+a+')'; x.fillRect(W*0.5-W*0.5*ee(rt/0.15),H*0.5-1,W*ee(rt/0.15),2); }
   BANDS.forEach((b,bi)=>{ const lt=rt-b.at; if(lt<0) return;
@@ -1533,26 +1594,33 @@ function drawManga(x,W,H,rt,k){
 }
 function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
-  if(ZST){ cancelAnimationFrame(ZST.raf); ZST=null; }
+  if(ZST){ ZST.stop(); ZST=null; }
   c.hidden=!k; zw.hidden=!k; if(!k) return;
+  ZST=zRun(c,k,{});
+  c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
+}
+/* 絶の抜刀の舞台を canvas に描き続ける。刀帳の頁と、ガチャのピックアップの看板（o.ban）で使う
+   場面は 1040x420 で描き、canvas の幅に合わせる（縦が余れば闇と花びらが広がり、足りなければ上下を切る）
+   看板では刀を右へ寄せて小さくし、左を題字のために空ける。大きな「絶」と落款は描かない */
+function zRun(c,k,o){
   if(!ZHDreq){ ZHDreq=true; ZHD.src='assets/katana_ouka_hd.png'; }
-  const W=1040, H=420, x=c.getContext('2d'); // 描くのは1040x420、実際は2倍の細かさ
+  const W=1040, H=420, x=c.getContext('2d');
   const P=[]; for(let i=0;i<190;i++) P.push({x:Math.random()*W,y:Math.random()*H,v:20+Math.random()*50,s:3+Math.random()*8,r:Math.random()*6,w:Math.random()*6,d:Math.random()<.3,c:'rgba('+(170+Math.random()*60|0)+','+(14+Math.random()*40|0)+','+(36+Math.random()*30|0)+',.88)'});
   const t0=performance.now(); let last=t0;
-  ZST={raf:0,burst:0};
-  c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
+  const ZS={raf:0,burst:0,dead:false,stop(){ ZS.dead=true; cancelAnimationFrame(ZS.raf); }};
   const frame=now=>{
-    if(!ZST) return; const rt=(now-t0)/1000*(window.__zslow||1), dt=Math.min(.05,(now-last)/1000); last=now;
+    if(ZS.dead) return; const rt=(now-t0)/1000*(window.__zslow||1), dt=Math.min(.05,(now-last)/1000); last=now;
     const t=rt<ZSLASH?0:2.9+(rt-ZSLASH); // 斬線で帯が裂けると、その下に抜き身が据わっている
-    x.setTransform(c.width/W,0,0,c.height/H,0,0);
+    const sc0=c.width/W, oy=(c.height-H*sc0)/2, vy0=-oy/sc0, vy1=H+oy/sc0; // 見えている縦の範囲（場面の座標）
+    x.setTransform(sc0,0,0,sc0,0,oy);
     const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,'#5a0d18'); g.addColorStop(.55,'#250609'); g.addColorStop(1,'#070203');
-    x.fillStyle=g; x.fillRect(0,0,W,H);
+    x.fillStyle=g; x.fillRect(0,vy0,W,vy1-vy0);
     // 朱の月
     x.save(); x.globalAlpha=.55; x.fillStyle='#b3122a'; x.shadowColor='#ff2a44'; x.shadowBlur=40; x.beginPath(); x.arc(W*.78,H*.3,64,0,7); x.fill(); x.restore();
     // 大きな「絶」
-    x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore();
+    if(!o.ban){ x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore(); }
     // 抜刀: 鞘に納まった桜華が現れ → 鯉口を切り → 刃が鞘から滑り出て → 鞘が消え、抜き身が中央に据わる
-    const kw=W*0.9, sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.56, cxF=(W-kw)/2;
+    const kw=W*(o.ban?0.68:0.9), sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.56, cxF=o.ban?W*0.29:(W-kw)/2;
     const A=0.8, B=1.3, Cd=2.3, D=2.9; // 現れる / 鯉口 / 抜き終わり / 据わる
     const eo=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),3), eio=v=>{v=Math.max(0,Math.min(1,v)); return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
     let pull=0; if(t>A) pull=8*sc*eo((t-A)/(B-A)); if(t>B) pull=8*sc+(bladeI-8*sc)*eio((t-B)/(Cd-B));
@@ -1578,20 +1646,21 @@ function zetsuStage(k){
           x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(sx-60,kh*.25,120,kh*.3); x.globalCompositeOperation='source-over'; }
       }
       x.restore();
-      if(!ZST.burst&&t>Cd){ ZST.burst=1; for(const p of P){ p.x=W*.15+Math.random()*W*.7; p.y=ky+(Math.random()-.5)*60; p.v=-120+Math.random()*80; p.kx=(Math.random()-.5)*600; } }
+      if(!ZS.burst&&t>Cd){ ZS.burst=1; for(const p of P){ p.x=W*.15+Math.random()*W*.7; p.y=ky+(Math.random()-.5)*60; p.v=-120+Math.random()*80; p.kx=(Math.random()-.5)*600; } }
     }
     // 花びら
-    for(const p of P){ if(p.kx){ p.x+=p.kx*dt; p.kx*=0.96; if(Math.abs(p.kx)<5) p.kx=0; } if(p.v<20) p.v+=160*dt; p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>H+10){p.y=-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
+    for(const p of P){ if(p.kx){ p.x+=p.kx*dt; p.kx*=0.96; if(Math.abs(p.kx)<5) p.kx=0; } if(p.v<20) p.v+=160*dt; p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>vy1+10){p.y=vy0-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
       x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':p.c; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
     // 落款
-    x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore();
+    if(!o.ban){ x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore(); }
     drawManga(x,W,H,rt,k);
-    ZST.raf=requestAnimationFrame(frame);
+    ZS.raf=requestAnimationFrame(frame);
   };
-  ZST.raf=requestAnimationFrame(frame);
+  ZS.raf=requestAnimationFrame(frame);
+  return ZS;
 }
 /* 桜華を大きく見る: 指二本で拡大、なぞって動かす、二度触ると寄る/戻る */
-function zetsuZoom(k){
+function zetsuZoom(k,again){
   let v=document.getElementById('zzoom');
   if(!v){ v=document.createElement('div'); v.id='zzoom';
     v.innerHTML='<div class="zzst"><img alt="" draggable="false"></div><div class="zzbar"><button type="button" data-z="blade" class="on">抜き身</button><button type="button" data-z="saya">鞘</button><button type="button" data-z="again">抜刀をもう一度</button><button type="button" data-z="close">閉じる</button></div><p class="zzhint">指二本で拡大・なぞって動かす・二度触ると寄る</p>';
@@ -1604,7 +1673,7 @@ function zetsuZoom(k){
     S.x=ox-(ox-S.x)*nz/S.z; S.y=oy-(oy-S.y)*nz/S.z; S.z=nz; apply(); };
   const show=w=>{ im.src=w==='saya'?'assets/katana_ouka_saya_hd.png':'assets/katana_ouka_hd.png'; S.z=1; S.x=S.y=0; apply(); v.querySelectorAll('[data-z]').forEach(b=>b.classList.toggle('on',b.dataset.z===w)); };
   v.onclick=e=>{ const b=e.target.closest('[data-z]'); if(!b) return; const z=b.dataset.z;
-    if(z==='close'){ v.hidden=true; } else if(z==='again'){ v.hidden=true; zetsuStage(k); } else show(z); };
+    if(z==='close'){ v.hidden=true; } else if(z==='again'){ v.hidden=true; (again||zetsuStage)(k); } else show(z); };
   st.onpointerdown=e=>{ st.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pts.size===2){ const [a,b]=[...pts.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:S.z}; }
     else { const now=performance.now(); if(now-lastTap<300){ zoomAt(S.z>1.5?1:3,e.clientX,e.clientY); } lastTap=now; } };
@@ -1654,9 +1723,16 @@ document.getElementById('gd_forge').addEventListener('click',doForge);
 document.getElementById('g_skip').addEventListener('click',skipAhead);
 document.querySelectorAll('.gtabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 document.getElementById('g_pull1').addEventListener('click',()=>doPull(1));
+document.getElementById('g_pull10').addEventListener('click',()=>doPull(10));
+document.getElementById('g_cntb').addEventListener('click',()=>{ const cp=document.getElementById('g_cnt'); cp.hidden=!cp.hidden; refreshCoins(); });
+document.getElementById('g_cntr').addEventListener('input',e=>{ GCNT=+e.target.value; refreshCoins(); });
+document.querySelectorAll('#g_cnt button[data-d]').forEach(b=>b.addEventListener('click',()=>{ GCNT+=+b.dataset.d; refreshCoins(); }));
+document.getElementById('g_cntgo').addEventListener('click',()=>doPull(GCNT));
+document.getElementById('g_ban').addEventListener('click',e=>{ if(e.target.closest('#g_bd')||gBusy()) return; banStop(); banSync(); }); // 触ると抜き直す
+document.getElementById('g_bd').addEventListener('click',()=>{ const k=KMAP[curBox().pick]; if(k) zetsuZoom(k,()=>{ banStop(); banSync(); }); });
 document.getElementById('g_all').addEventListener('click',()=>doPull(Infinity));
 document.getElementById('g_res').addEventListener('click',()=>{ if(GA.phase==='item'){ nextItem(); return; } document.getElementById('g_res').hidden=true; GA.phase='idle'; refreshCoins(); });
-window.addEventListener('resize',()=>{ if(!gachaEl.hidden) gSize(); });
+window.addEventListener('resize',()=>{ if(!gachaEl.hidden){ gSize(); if(BAN) banSize(); } });
 
 /* ---------- 調整パネル ---------- */
 const panel=document.getElementById('panel'), rows=document.getElementById('rows');

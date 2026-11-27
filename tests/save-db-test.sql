@@ -58,6 +58,16 @@ do $$ begin perform public.forge_katana('fake'); raise exception 'NG'; exception
 do $$ begin perform public.forge_katana('mumei'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 無銘は鍛えない: %', sqlerrm; end $$;
 select 'forge2', public.forge_katana('yamabuki') ->> 'steel';
 do $$ begin update public.saves set steel = 999999; raise exception 'NG 直接書けた'; exception when insufficient_privilege then raise notice 'OK 玉鋼を直接は書けない'; end $$;
+-- 同じ端末の二人対戦（p_mode 'vs'）は銭3分の1、CPU戦・ネット対戦（なし）はそのまま
+do $$ declare a bigint; b bigint; c bigint; d bigint; begin
+  a := (public.get_save() ->> 'coins')::bigint;
+  b := (public.record_win('明鏡止水', 'mumei', 'vs') ->> 'gained')::bigint;
+  c := (public.record_win('疾風', 'mumei', 'vs') ->> 'gained')::bigint;
+  d := (public.record_win('明鏡止水', 'mumei') ->> 'gained')::bigint;
+  if b <> 20 or c <> 1 or d <> 60 then raise exception 'NG 二人対戦の銭: % % %', b, c, d; end if;
+  if (public.get_save() ->> 'coins')::bigint <> a + 81 then raise exception 'NG 所持の銭'; end if;
+  raise notice 'OK 二人対戦の銭は3分の1（幻 %・並 %）、ふつうは幻 %', b, c, d;
+end $$;
 -- 引っ越しで玉鋼も足す
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 select 'import steel', public.import_local('{"steel":77}') ->> 'steel';
@@ -91,3 +101,50 @@ do $$ begin
   perform public.zetsu_owners(); raise exception 'NG';
 exception when insufficient_privilege then raise notice 'OK ログインしていないと呼べない'; end $$;
 reset role;
+
+-- 箱（2026-11-27）: 第一弾だけのうちは絶0.5%。第二弾が出ると第一弾は0.1%、第二弾は0.3%。箱の刀しか出ない
+do $$ declare z numeric; n numeric; begin
+  select weight into z from public.box_rates('b1') where tier = '絶';
+  select weight into n from public.box_rates('b1') where tier = '並';
+  if z <> 0.5 or n <> 59.5 then raise exception 'NG 第一弾の割合 絶% 並%', z, n; end if;
+  if public.box_latest() <> 'b1' then raise exception 'NG 最新の箱'; end if;
+  raise notice 'OK 第一弾だけのうちは 絶 % ・並 %', z, n;
+end $$;
+begin;
+insert into public.gacha_boxes (id, ord, mei, pick) values ('b2', 2, '第二弾', 'test_z2');
+insert into public.katana_catalog (id, tier, box) values ('test_z2', '絶', 'b2'), ('test_n2', '並', 'b2'), ('test_j2', '上', 'b2');
+do $$ declare z1 numeric; z2 numeric; n2 numeric; c int; begin
+  select weight into z1 from public.box_rates('b1') where tier = '絶';
+  select weight into z2 from public.box_rates('b2') where tier = '絶';
+  select weight into n2 from public.box_rates('b2') where tier = '並';
+  select count(*) into c from public.box_rates('b2');
+  if public.box_latest() <> 'b2' or z1 <> 0.1 or z2 <> 0.3 or n2 <> 59.7 or c <> 3 then raise exception 'NG 第二弾の割合 % % % %', z1, z2, n2, c; end if;
+  raise notice 'OK 第二弾が出ると 第一弾の絶 % ・第二弾の絶 % ・第二弾の並 %（極・幻のない階級は外れる）', z1, z2, n2;
+end $$;
+update public.saves set coins = 1000000, owned = '{"mumei":1}' where id = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+create temp table p2 as select public.pull_gacha(1000) g union all select public.pull_gacha(1000, null, 'b1');
+reset role;
+do $$ declare bad int; old int; begin
+  select count(*) into bad from (select g from p2 limit 1) a, jsonb_array_elements(g->'got') x join public.katana_catalog c on c.id = x->>'id' where c.box <> 'b2';
+  select count(*) into old from (select g from p2 offset 1) a, jsonb_array_elements(g->'got') x join public.katana_catalog c on c.id = x->>'id' where c.box <> 'b1';
+  if bad > 0 or old > 0 then raise exception 'NG 箱の外の刀が出た % %', bad, old; end if;
+  if (select g->>'box' from p2 limit 1) <> 'b2' then raise exception 'NG 箱を渡さないと最新の箱'; end if;
+  raise notice 'OK 箱を渡さなければ最新の第二弾、b1 を渡せば第一弾の刀だけが出る';
+end $$;
+set role authenticated;
+do $$ begin perform public.pull_gacha(1, null, 'nobox'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 知らない箱は断る: %', sqlerrm; end $$;
+reset role;
+update public.saves set steel = 6000, owned = owned - 'test_z2' where id = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+do $$ begin if (public.forge_katana('test_z2') ->> 'steel')::int <> 0 then raise exception 'NG'; end if; raise notice 'OK 新しい箱の絶も玉鋼6000で鍛えられる'; end $$;
+reset role;
+rollback;
+-- 絶0.5%を大きく引いて確かめる（2万回で 100 前後）
+update public.saves set coins = 10000000 where id = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+create temp table p3 as select public.pull_gacha(1000) g from generate_series(1, 20);
+reset role;
+select 'zetsu in 20000 pulls (expect ~100)', count(*) from p3, jsonb_array_elements(g->'got') x join public.katana_catalog c on c.id = x->>'id' where c.tier = '絶';

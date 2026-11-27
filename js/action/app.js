@@ -272,8 +272,8 @@ const kitsFor = mode => mode === 'vs' ? [kitOf(KITS[0], mode), kitOf(KITS[1], mo
 function recordWin(r){ // 勝った刀の戦績と銭
   const i = r.winner; if (i < 0 || GAME.mode === 'train' || (GAME.mode === 'cpu' && i !== 0)) return;
   const id = KITS[i]; if (!owns(id)) return;
-  const coin = COIN[r.tier] || 0;
-  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); a.push({ f: r.name, k: id, acct: !!SNAP.acct, t: Date.now() }); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
+  const vs = GAME.mode === 'vs', coin = vs ? Math.ceil((COIN[r.tier] || 0) / 3) : COIN[r.tier] || 0; // 同じ端末の二人対戦は銭3分の1
+  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); const o = { f: r.name, k: id, acct: !!SNAP.acct, t: Date.now() }; if (vs) o.m = 'vs'; a.push(o); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
   GAME.coins = (GAME.coins || 0) + coin;
   if (coin) FX.texts.push({ s: '銭 +' + coin, x: 0, y: 0, t: 0, life: 110, screen: true });
 }

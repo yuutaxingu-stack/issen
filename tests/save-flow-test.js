@@ -97,6 +97,18 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   ok(v.coins === 117 && s.coins === 117 && v.rec.ruri['明鏡止水'] === 1, '明鏡止水で +60（サーバー ' + v.coins + '）');
   ok(server(A) && JSON.parse(sql("select coalesce(day_coins,0) from public.saves where id = :'id'", { id: USERS[A] })) === 60, '今日の銭として数えている');
 
+  console.log('--- 同じ端末の二人対戦は銭3分の1（サーバーでも）');
+  await p1.evaluate(() => { G.mode = 'vs'; WALLET.coins += 20; recordWin(0, '明鏡止水', 20); G.mode = 'title'; });
+  await p1.waitForFunction(() => IssenSave.status().pending === 0, null, { timeout: 10000 });
+  v = server(A); s = await st(p1);
+  ok(v.coins === 137 && s.coins === 137, '二人対戦の明鏡止水は +20（サーバー ' + v.coins + '）');
+  await p1.evaluate(() => { G.mode = 'vs'; WALLET.coins += 60; recordWin(0, '明鏡止水', 60); G.mode = 'title'; });   // 画面の銭を書き換えても
+  await p1.waitForFunction(() => IssenSave.status().pending === 0, null, { timeout: 10000 });
+  v = server(A); s = await st(p1);
+  ok(v.coins === 157 && s.coins === 157, '画面で +60 にしてもサーバーは +20（' + v.coins + '）');
+  sql("update public.saves set coins = 117 where id = :'id'", { id: USERS[A] });
+  await p1.reload(); await p1.waitForFunction(() => window.__issen && __issen.isAccount(), null, { timeout: 15000 });
+
   console.log('--- ガチャはサーバーが引く');
   await p1.click('#m_gacha'); await p1.waitForTimeout(300);
   const before = server(A);

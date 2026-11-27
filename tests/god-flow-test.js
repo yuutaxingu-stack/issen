@@ -84,9 +84,9 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   ok(/所持 無限 銭/.test((await st(p)).meta), 'タイトルに「所持 無限 銭」');
   await p.click('#m_gacha'); await p.waitForTimeout(300);
   ok(await p.textContent('#g_coins') === '無限', 'ガチャの銭が「無限」');
-  ok(await p.isVisible('#g_pick') && await p.isEnabled('#g_pull1') && /十振り/.test(await p.textContent('#g_all')), 'ピックアップの選択が出て、銭0でも引ける');
+  ok(await p.isVisible('#g_pick') && await p.isEnabled('#g_pull1') && /十振り/.test(await p.textContent('#g_pull10')) && await p.isHidden('#g_all'), 'ピックアップの選択が出て、銭0でも引ける');
   await p.selectOption('#g_pick', 'ouka');
-  await p.click('#g_all');
+  await p.click('#g_pull10');
   await p.waitForFunction(() => GA.phase !== 'wait' && GA.phase !== 'idle', null, { timeout: 10000 });
   let v = server(G);
   ok(v.owned.ouka === 10 && v.coins === 0 && v.pulls === 10, '十振りすべて桜華、銭は減らない ' + JSON.stringify({ ouka: v.owned.ouka, coins: v.coins }));

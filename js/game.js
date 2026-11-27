@@ -1203,7 +1203,7 @@ window.addEventListener('keydown',e=>{
   else if(k&&(k[0]===0||G.mode==='vs')){ ensureAudio(); press(k[0],k[1]); }
   else if(e.key==='Enter'||e.key===' '){ e.preventDefault(); advance(); }
 });
-document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')&&!e.target.closest('#online')&&!e.target.closest('#rank')&&!e.target.closest('#team')&&!e.target.closest('#pf')&&!e.target.closest('#pf_pop')) e.preventDefault(); },{passive:false});
+document.addEventListener('touchmove',e=>{ if(!e.target.closest('#panel')&&!e.target.closest('#gacha')&&!e.target.closest('#online')&&!e.target.closest('#rank')&&!e.target.closest('#team')&&!e.target.closest('#pf')&&!e.target.closest('#zukan')&&!e.target.closest('#pf_pop')) e.preventDefault(); },{passive:false});
 document.addEventListener('gesturestart',e=>e.preventDefault());
 document.addEventListener('dblclick',e=>e.preventDefault());
 

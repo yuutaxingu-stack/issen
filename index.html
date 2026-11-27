@@ -13,6 +13,7 @@
 <link rel="stylesheet" href="css/team.css">
 <link rel="stylesheet" href="css/chat.css">
 <link rel="stylesheet" href="css/profile.css">
+<link rel="stylesheet" href="css/zukan.css">
 </head>
 <body>
 
@@ -26,6 +27,7 @@
     <button type="button" id="m_action" class="mb" onclick="location.href='action.html'"><span class="mk">新・一閃</span><span class="ms">動いて斬り合う（試作）</span></button>
     <button type="button" id="m_gacha" class="mb"><span class="mk">刀ガチャ</span><span class="ms">銭で引く</span></button>
     <button type="button" id="m_book" class="mb"><span class="mk">刀帳</span><span class="ms">集めた刀・玉鋼で鍛える</span></button>
+    <button type="button" id="m_zukan" class="mb"><span class="mk">図鑑</span><span class="ms">決着と二つ名の条件</span></button>
     <button type="button" id="m_online" class="mb"><span class="mk">オンライン</span><span class="ms" id="m_online_s">フレンドと対戦</span></button>
     <button type="button" id="m_rank" class="mb"><span class="mk">番付</span><span class="ms">フレンドと競う</span></button>
     <button type="button" id="m_team" class="mb"><span class="mk">団体戦</span><span class="ms" id="m_team_s">赤と青に分かれて</span></button>
@@ -192,6 +194,17 @@
     <p class="gnote" id="r_note"></p>
   </div>
 </div>
+<div id="zukan" hidden>
+  <div class="gwrap">
+    <div class="gtop">
+      <button type="button" id="z_back" class="gback">戻る</button>
+      <div class="otitle">図鑑</div>
+      <span class="ospacer"></span>
+    </div>
+    <div class="gtabs ztabs" role="tablist"><button type="button" data-tab="fin" class="on">決着</button><button type="button" data-tab="title">二つ名</button><button type="button" data-tab="plate">背景の札</button></div>
+    <div id="z_body"></div>
+  </div>
+</div>
 <div id="team" hidden>
   <div class="gwrap">
     <div class="gtop">
@@ -306,6 +319,7 @@
 <script src="js/team.js"></script>
 <script src="js/chat.js"></script>
 <script src="js/profile.js"></script>
+<script src="js/zukan.js"></script>
 <script src="js/update-check.js"></script>
 </body>
 </html>

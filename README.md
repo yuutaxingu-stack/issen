@@ -183,6 +183,12 @@ web/
 - **隠し二つ名**: `crowns` 表（profile.sql）。一番の人だけが持ち、抜かれたら移る（並びは今の持ち主のまま、神様は数えない）。移ると二人の文箱に知らせ。足すときは title_catalog に hidden=true で1行、crowns に kind（finish/wins/cpu/katana/rating）と arg を1行
 - **お知らせ**: メンテナンス・大事なお知らせ・更新。ログインしなくても読める。未読は朱の「新」。大事なお知らせはタイトルで一度だけ大きく出る（はじめて遊ぶ人には3日以内のものだけ）。神様は「書く」の札で載せ、一覧から取り下げられる
 
+### 図鑑（決着・二つ名・背景の札の条件）
+- タイトルの「図鑑」。js/zukan.js, css/zukan.css。決着の条件は js/zukan.js の OLD（旧・一閃）・NEW（新・一閃）に書く（決着を足したら、ここも足す）。回数は刀ごとの戦績の合計。
+- 「一閃」だけは決めるまで条件を伏せる。
+- 二つ名・背景はサーバーの zukan()（supabase/zukan.sql、profile.sql の後に実行）。隠し二つ名は title_seen（一度でも手にした二つ名）にある人にだけ名前と条件を返す。
+- テスト: sh tests/zukan-db-test.sh
+
 ### テスト
 ```
 node tests/save-values-test.js    # ゲームとサーバーで刀の一覧・確率・銭が一致しているか

@@ -164,3 +164,9 @@
 .pftag{display:inline-block;margin-left:.5em;font-family:var(--display);font-size:11px;letter-spacing:.12em;padding:1px 6px;color:#f2ede1;
   background:linear-gradient(90deg,#a8322a,rgba(168,50,42,.6));vertical-align:.2em;}
 [data-pid]{cursor:pointer;}
+
+/* 書き換えの決定ボタンは画面の下に貼りつける（横向きのスマホでも押せるように） */
+.pfsave{position:sticky;bottom:0;z-index:3;margin:4px -16px 0;padding:8px 16px max(10px,env(safe-area-inset-bottom,0px));
+  background:linear-gradient(180deg,rgba(14,15,12,0),rgba(14,15,12,.92) 30%,#0e0f0c);}
+.pfsave .pfacts{margin:0;}
+.pfsave .omsg{margin:0 0 6px;text-align:center;color:#f0a59a;}

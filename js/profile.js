@@ -244,9 +244,8 @@
           '<label class="pff">好きな一振り<select id="pf_fav"><option value="">選ばない</option>' +
             ownedKatanas().map(k => '<option value="' + esc(k.id) + '"' + (ed.fav === k.id ? ' selected' : '') + '>' + esc(k.tier + '　' + k.mei) + '</option>').join('') +
           '</select></label>' +
-          '<div class="pfacts"><button type="button" class="gpull" data-act="save"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? '記しています…' : 'これで名乗る') + '</button>' +
-          '<button type="button" class="gback" data-act="cancel">やめる</button></div>' +
-          '<p class="omsg">' + esc(S.msg) + '</p>' +
+          '<div class="pfsave">' + (S.msg ? '<p class="omsg">' + esc(S.msg) + '</p>' : '') + '<div class="pfacts"><button type="button" class="gpull" data-act="save"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? '記しています…' : 'これで名乗る') + '</button>' +
+          '<button type="button" class="gback" data-act="cancel">やめる</button></div></div>' +
         '</div>';
       } else {
         h += '<p class="gnote">' + esc(p.name) + 'さんの名乗り</p>';

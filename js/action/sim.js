@@ -158,6 +158,8 @@ function readInput(p, inp){
 function takeC(p, inp){
   if (p.cb && --p.cb.n <= 0) p.cb = null;
   if (inp.C) { p.buf.A = C.buf; p.cb = { d: inp.C, n: C.buf }; }
+  if (p.wk && --p.wk.n <= 0) p.wk = null;
+  if (inp.K) { p.buf.A = C.buf; p.wk = { d: inp.K, n: C.buf }; p.cb = null; } // 技スティック
 }
 /* 落花の間は速く動ける（1.5倍） */
 const spd = (p, v) => p.tree && p.tree.stage >= 2 ? Math.trunc(v * 13 / 10) : v; // 満開・落花は動きが1.3倍
@@ -201,14 +203,24 @@ Sim.prototype.startMove = function(p, id){
     if (id === 'ten' && p.boost) id = ['ten', 'tenK', 'tenM', 'tenR'][p.boost];
   }
   p.treeHit = false;
-  p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null; p.spB = 0;
+  p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null; p.wk = null; p.spB = 0;
   if (id === 'iai' || id === 'airiai') { p.buf.G = 0; const o = this.p[1 - p.i]; if (o.x !== p.x) p.face = sgn(o.x - p.x); }
   this.ev.push({ t: 'start', p: p.i, mv: id });
 };
 
 /* 地上: 攻撃スティックは通常技、斬ボタンは 向きなし＝三段 / 横・上・下＝特殊技 */
+/* 技スティック（設定）: 弾いた向きの刀の技。向きなし＝特殊技1、横＝その向きへ特殊技1、上＝特殊技2、下＝特殊技3 */
+Sim.prototype.kitByStick = function(p, air){
+  const kit = KIT[p.kit] || KIT.common, k = p.wk.d; p.wk = null;
+  if (k === 'u') return this.startMove(p, air ? kit.s2a : kit.s2);
+  if (k === 'd') { const id = air ? kit.s3a : kit.s3; if (id === 'plant' && p.tree) { p.buf.A = 0; return; } return this.startMove(p, id); }
+  if (air) { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; }
+  if (k === 'l' || k === 'r') p.face = k === 'r' ? 1 : -1;
+  return this.startMove(p, air ? kit.s1a : kit.s1);
+};
 Sim.prototype.groundAttack = function(p){
   const kit = KIT[p.kit] || KIT.common;
+  if (p.wk) return this.kitByStick(p, false);
   if (p.cb) {
     const d = adir(p);
     if (d === 'h') { p.face = hsign(p); return this.startMove(p, 'ftilt'); }
@@ -224,6 +236,7 @@ Sim.prototype.groundAttack = function(p){
 };
 Sim.prototype.airAttack = function(p){
   const kit = KIT[p.kit] || KIT.common;
+  if (p.wk) return this.kitByStick(p, true);
   if (p.cb) {
     const dv = adir(p, true);
     if (dv === 'u') return this.startMove(p, 'uair');
@@ -302,7 +315,7 @@ Sim.prototype.think = function(p, o){
     }
     case 'atk': {
       const m = MV[p.mv];
-      if (m.chain && p.buf.A && p.mvf >= m.s) p.chainReq = true;
+      if (m.chain && p.buf.A && !p.wk && p.mvf >= m.s) p.chainReq = true;
       return;
     }
     case 'down':
@@ -669,6 +682,7 @@ Sim.prototype.step = function(inputs){
       const inp = inputs[p.i] || NOIN;
       for (const k of ['A', 'J', 'G']) if (inp[k] && !p.inp[k]) p.buf[k] = C.buf;
       if (inp.C) p.cb = { d: inp.C, n: C.buf + 1 }, p.buf.A = C.buf + 1;
+      if (inp.K) p.wk = { d: inp.K, n: C.buf + 1 }, p.buf.A = C.buf + 1;
       p.inp = Object.assign({}, p.inp, { A: inp.A, J: inp.J, G: inp.G });
     }
     return;

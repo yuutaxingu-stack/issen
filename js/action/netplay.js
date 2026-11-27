@@ -20,7 +20,8 @@ function encode(i){
   if (!i) return 0;
   let c = (i.L ? 1 : 0) | (i.R ? 2 : 0) | (i.U ? 4 : 0) | (i.D ? 8 : 0) | (i.A ? 16 : 0) | (i.J ? 32 : 0) | (i.G ? 64 : 0) | (i.S ? 128 : 0) | (i.F ? 256 : 0);
   const ci = i.C ? CD.indexOf(i.C) : 0, vi = i.V ? VD.indexOf(i.V) : 0;
-  return c | ((ci > 0 ? ci : 0) << 9) | ((vi > 0 ? vi : 0) << 12);
+  const ki = i.K ? CD.indexOf(i.K) : 0;
+  return c | ((ci > 0 ? ci : 0) << 9) | ((vi > 0 ? vi : 0) << 12) | ((ki > 0 ? ki : 0) << 15);
 }
 function decode(c){
   const i = { L: c & 1 ? 1 : 0, R: c & 2 ? 1 : 0, U: c & 4 ? 1 : 0, D: c & 8 ? 1 : 0, A: c & 16 ? 1 : 0, J: c & 32 ? 1 : 0, G: c & 64 ? 1 : 0 };
@@ -29,10 +30,11 @@ function decode(c){
   const ci = (c >> 9) & 7, vi = (c >> 12) & 7;
   if (ci) i.C = CD[ci];
   if (vi) i.V = VD[vi];
+  const ki = (c >> 15) & 7; if (ki) i.K = CD[ki];
   return i;
 }
 // 見込み: 押しっぱなしはそのまま、一瞬だけの入力（斬の向き・ダッシュ）は続かないものとする
-const predictFrom = c => c & ~(256 | (7 << 9));
+const predictFrom = c => c & ~(256 | (7 << 9) | (7 << 15));
 
 function NetPlay(o){
   const me = o.me, op = 1 - me, D = o.delay == null ? 2 : o.delay, MAXR = o.maxRoll || 10;

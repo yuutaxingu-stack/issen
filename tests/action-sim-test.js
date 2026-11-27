@@ -141,4 +141,14 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   const r = new A.Sim({ training: true, dashRoll: [true, false] }); r.p[0].x = 400 * A.FP; r.step([I({ R: 1, F: true }), I()]); for (let k = 0; k < 10; k++) r.step([I({ R: 1 }), I()]);
   r.step([I({ R: 1, G: 1 }), I()]); ok(r.p[0].st === 'roll', '設定オンならダッシュ中の守で前方回避 (' + r.p[0].st + ')'); }
 
+// 技スティック（設定）: 弾いた向きの刀の技
+{ const mk = () => { const s = new A.Sim({ training: true }); s.p[0].x = 600 * A.FP; s.p[1].x = 1200 * A.FP; return s; };
+  const first = (K, pre) => { const s = mk(); if (pre) pre(s); s.step([I({ K }), I()]); for (let k = 0; k < 8 && !s.p[0].mv; k++) s.step([I(), I()]); return s.p[0]; };
+  ok(first('n').mv === 'shot', '技スティック 向きなし＝飛ぶ斬撃');
+  const l = first('l'); ok(l.mv === 'shot' && l.face === -1, '技スティック 左＝左へ飛ぶ斬撃');
+  ok(first('u').mv === 'rise', '技スティック 上＝昇り斬り');
+  ok(first('d').mv === 'counter', '技スティック 下＝カウンター');
+  const s = mk(); s.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 11; k++) s.step([I(), I()]); s.step([I({ K: 'u' }), I()]);
+  let mv = new Set(); for (let k = 0; k < 40; k++) { s.step([I(), I()]); if (s.p[0].mv) mv.add(s.p[0].mv); } ok(mv.has('rise') && !mv.has('jab2'), '弱斬り中に弾くと、斬りの続きでなく技が出る ' + [...mv]); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

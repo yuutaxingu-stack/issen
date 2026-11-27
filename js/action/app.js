@@ -40,7 +40,7 @@ function viewAt(sx, sy){
 }
 
 /* ---------- 設定 ---------- */
-const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false }; // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
+const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false, wazaStick: false }; // wazaStick: 技ボタンをスティックにする // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('issen-action-opt') || '{}')); } catch (e) {}
 function saveOpt(){ try { localStorage.setItem('issen-action-opt', JSON.stringify(OPT)); } catch (e) {} }
 const DUMMY = [['stand', '立つだけ'], ['guard', '守り続ける'], ['jump', '跳び回る'], ['mash', '暴れる']];
@@ -80,6 +80,7 @@ cv.addEventListener('pointerdown', e => {
   const pd = at.v.pad, x = at.x, y = at.y;
   const b = inBtn(pd, x, y);
   if (EDIT) { if (b) { EDIT.sel = b; OWN[e.pointerId] = { v: at.v, r: 'E', id: b, dx: x - pd.BTN.find(q => q.id === b).x, dy: y - pd.BTN.find(q => q.id === b).y }; } return; }
+  if (b === 'A' && OPT.wazaStick) { const q = pd.BTN.find(z => z.id === 'A'); pd.wz = { ox: q.x, oy: q.y, x, y, fired: false }; OWN[e.pointerId] = { v: at.v, r: 'W' }; return; }
   if (b) { pd.btn[b] = true; OWN[e.pointerId] = { v: at.v, r: b }; return; }
   if (x < at.v.w * 0.5 && !pd.stick) { pd.stick = { id: e.pointerId, ox: x, oy: y, x, y }; OWN[e.pointerId] = { v: at.v, r: 'S' }; }
 }, { passive: false });
@@ -88,12 +89,14 @@ cv.addEventListener('pointermove', e => {
   const o = OWN[e.pointerId]; if (!o) return;
   const pd = o.v.pad, [x, y] = localOf(o.v, e.clientX, e.clientY);
   if (o.r === 'S' && pd.stick) { pd.stick.x = x; pd.stick.y = y; }
+  if (o.r === 'W' && pd.wz) { pd.wz.x = x; pd.wz.y = y; }
   if (o.r === 'E') { // 配置を変える: ボタンを指で動かす
     const nx = clamp(x - o.dx, 20, pd.w - 20), ny = clamp(y - o.dy, 20, pd.h - 20);
     BLAY = BLAY || { s: 1 }; BLAY[o.id] = [nx / pd.w, ny / pd.h]; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); }
 });
 function upPtr(e){ const o = OWN[e.pointerId]; if (!o) return; const pd = o.v.pad;
   if (o.r === 'S') pd.stick = null;
+  else if (o.r === 'W') { if (pd.wz && !pd.wz.fired) pd.wzTap = true; pd.wz = null; } // 弾かずに離したら向きなしの技
   else if (o.r !== 'E') pd.btn[o.r] = false;
   delete OWN[e.pointerId]; }
 cv.addEventListener('pointerup', upPtr); cv.addEventListener('pointercancel', upPtr);
@@ -135,6 +138,13 @@ function readHuman(pi){
     i.C = d;
   }
   pd.prevN = nOn;
+  // 技スティック: 弾いた瞬間にその向きの刀の技（弾かずに離すと向きなし）
+  if (pd.wzTap) { pd.wzTap = false; i.K = 'n'; }
+  else if (pd.wz && !pd.wz.fired) {
+    const q = pd.BTN.find(z => z.id === 'A'), R = q ? q.r * 0.5 : 24;
+    let wx = pd.wz.x - pd.wz.ox; const wy = pd.wz.y - pd.wz.oy; if (flip) wx = -wx;
+    if (wx * wx + wy * wy > R * R) { pd.wz.fired = true; i.K = Math.abs(wx) >= Math.abs(wy) ? (wx > 0 ? 'r' : 'l') : wy < 0 ? 'u' : 'd'; }
+  }
   return i;
 }
 
@@ -292,7 +302,7 @@ function tick(now){
 function inputSym(i){
   const h = (i.R ? 1 : 0) - (i.L ? 1 : 0), v = (i.U ? 1 : 0) - (i.D ? 1 : 0);
   const ar = ['↙', '↓', '↘', '←', '・', '→', '↖', '↑', '↗'][(1 - v) * 3 + (h + 1)];
-  return ar + (i.C ? '斬' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.C] : '') + (i.A ? '技' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
+  return ar + (i.C ? '斬' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.C] : '') + (i.K ? '技' + { u: '↑', d: '↓', l: '←', r: '→', n: '・' }[i.K] : '') + (i.A ? '技' : '') + (i.J ? '跳' : '') + (i.G ? (sim.p[1].st === 'stun' ? '居' : '守') : '');
 }
 function stepOnce(){
   if (DBG.pause || GAME.mode === 'menu' || GAME.mode === 'online' || PAUSED || EDIT) return;
@@ -934,7 +944,11 @@ function drawPad(v){
     cx.beginPath(); cx.arc(b.x, b.y, b.r * pulse, 0, Math.PI * 2); cx.fill();
     cx.strokeStyle = iai ? '#ffd9cf' : 'rgba(20,21,18,.7)'; cx.lineWidth = 2; cx.stroke();
     cx.fillStyle = iai || on ? PALE : INK; cx.font = `${Math.round(b.r * 0.85)}px ${DISPLAY}`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
-    cx.fillText(iai ? '居' : b.label, b.x, b.y + 1);
+    if (b.id === 'A' && OPT.wazaStick) { // 技スティック: 輪と、指の向きに動く玉
+      const w = pd.wz, dx = w ? w.x - w.ox : 0, dy = w ? w.y - w.oy : 0, dd = Math.hypot(dx, dy), kk = dd > b.r * 0.6 ? b.r * 0.6 / dd : 1;
+      cx.strokeStyle = 'rgba(20,21,18,.35)'; cx.lineWidth = 1.5; cx.beginPath(); cx.arc(b.x, b.y, b.r * 0.55, 0, Math.PI * 2); cx.stroke();
+      cx.font = `${Math.round(b.r * 0.6)}px ${DISPLAY}`; cx.fillText(b.label, b.x + dx * kk, b.y + dy * kk + 1);
+    } else cx.fillText(iai ? '居' : b.label, b.x, b.y + 1);
     cx.textBaseline = 'alphabetic'; cx.globalAlpha = 1;
     if (EDIT) { cx.setLineDash([6, 5]); cx.strokeStyle = EDIT.sel === b.id ? '#c8372d' : 'rgba(20,21,18,.6)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(b.x, b.y, b.r * 1.25, 0, Math.PI * 2); cx.stroke(); cx.setLineDash([]); }
   }
@@ -1087,6 +1101,8 @@ function setupBar(){
   const bx = document.getElementById('a_boxes'); bx.checked = OPT.boxes; bx.addEventListener('change', () => { OPT.boxes = bx.checked; saveOpt(); });
   for (const id of ['a_droll', 'mn_droll']) { const el = document.getElementById(id); el.checked = !!OPT.dashRoll;
     el.addEventListener('change', () => { OPT.dashRoll = el.checked; saveOpt(); ['a_droll', 'mn_droll'].forEach(q => { document.getElementById(q).checked = OPT.dashRoll; }); for (const p of sim.p) if (GAME.mode === 'train' || GAME.mode === 'vs' || p.i === 0) p.dashRoll = OPT.dashRoll; el.blur(); }); }
+  for (const id of ['a_wstick', 'mn_wstick']) { const el = document.getElementById(id); el.checked = !!OPT.wazaStick;
+    el.addEventListener('change', () => { OPT.wazaStick = el.checked; saveOpt(); ['a_wstick', 'mn_wstick'].forEach(q => { document.getElementById(q).checked = OPT.wazaStick; }); el.blur(); }); }
   const rf = document.getElementById('a_refill'); rf.checked = OPT.refill; rf.addEventListener('change', () => { OPT.refill = rf.checked; saveOpt(); });
   document.getElementById('a_reset').addEventListener('click', e => { resetRound(); e.target.blur(); });
   document.getElementById('a_help').addEventListener('click', () => { document.getElementById('help').hidden = false; });

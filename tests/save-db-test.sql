@@ -58,6 +58,16 @@ do $$ begin perform public.forge_katana('fake'); raise exception 'NG'; exception
 do $$ begin perform public.forge_katana('mumei'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 無銘は鍛えない: %', sqlerrm; end $$;
 select 'forge2', public.forge_katana('yamabuki') ->> 'steel';
 do $$ begin update public.saves set steel = 999999; raise exception 'NG 直接書けた'; exception when insufficient_privilege then raise notice 'OK 玉鋼を直接は書けない'; end $$;
+-- 同じ端末の二人対戦（p_mode 'vs'）は銭3分の1、CPU戦・ネット対戦（なし）はそのまま
+do $$ declare a bigint; b bigint; c bigint; d bigint; begin
+  a := (public.get_save() ->> 'coins')::bigint;
+  b := (public.record_win('明鏡止水', 'mumei', 'vs') ->> 'gained')::bigint;
+  c := (public.record_win('疾風', 'mumei', 'vs') ->> 'gained')::bigint;
+  d := (public.record_win('明鏡止水', 'mumei') ->> 'gained')::bigint;
+  if b <> 20 or c <> 1 or d <> 60 then raise exception 'NG 二人対戦の銭: % % %', b, c, d; end if;
+  if (public.get_save() ->> 'coins')::bigint <> a + 81 then raise exception 'NG 所持の銭'; end if;
+  raise notice 'OK 二人対戦の銭は3分の1（幻 %・並 %）、ふつうは幻 %', b, c, d;
+end $$;
 -- 引っ越しで玉鋼も足す
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 select 'import steel', public.import_local('{"steel":77}') ->> 'steel';

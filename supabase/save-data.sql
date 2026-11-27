@@ -65,6 +65,7 @@ alter table public.app_config add column if not exists pull_cost int not null de
 alter table public.app_config add column if not exists day_coin_cap int not null default 15000;  -- 1日に勝負で得られる銭の上限（ずる対策）
 alter table public.app_config alter column day_coin_cap set default 15000;
 update public.app_config set day_coin_cap = 15000 where day_coin_cap = 5000;  -- 銭3倍(2026-11-26)に合わせて上限も3倍
+alter table public.app_config add column if not exists vs_coin_div int not null default 3 check (vs_coin_div >= 1);  -- 同じ端末の二人対戦は銭をこの数で割る（2026-11-27、一人で両方を操作する銭稼ぎ対策）
 
 -- ---------- 一人ひとりの持ち物 ----------
 create table if not exists public.saves (
@@ -265,15 +266,21 @@ end;
 $$;
 
 -- 勝ったことを記録し、決着に応じた銭を足す（銭の額はサーバーが決める）
-create or replace function public.record_win(p_finish text, p_katana text) returns jsonb
+-- p_mode: 'vs' = 同じ端末の二人対戦（銭は app_config.vs_coin_div 分の1、切り上げ）。なし = CPU戦・ネット対戦（そのまま）
+drop function if exists public.record_win(text, text);
+create or replace function public.record_win(p_finish text, p_katana text, p_mode text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   s public.saves;
-  c int; gain int; cap int; cur jsonb;
+  c int; gain int; cap int; cur jsonb; dv int;
 begin
   s := public.save_lock();
   select x.coins into c from public.finish_coins x where x.finish = p_finish;
   if c is null then raise exception 'その決着はありません'; end if;
+  if p_mode = 'vs' then
+    select x.vs_coin_div into dv from public.app_config x where x.id = 1;
+    dv := greatest(coalesce(dv, 3), 1); c := (c + dv - 1) / dv;
+  end if;
   if not public.save_has(s, p_katana) then raise exception 'その刀を持っていません'; end if;
 
   -- 1分に30回より多い勝ちは受け付けない（1回の決着には数秒かかるので、ふつうは届かない）
@@ -436,11 +443,11 @@ grant execute on function public.zetsu_owners(uuid[]) to authenticated;
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.save_num(jsonb, bigint), public.save_json(public.saves), public.save_lock(), public.save_has(public.saves, text),
-  public.get_save(), public.import_local(jsonb), public.record_win(text, text), public.record_cpu_best(int),
+  public.get_save(), public.import_local(jsonb), public.record_win(text, text, text), public.record_cpu_best(int),
   public.pull_gacha(int, text, text), public.set_equip(text, text), public.forge_katana(text),
   public.box_latest(), public.box_rates(text)
   from public, anon, authenticated;
 grant execute on function
-  public.get_save(), public.import_local(jsonb), public.record_win(text, text), public.record_cpu_best(int),
+  public.get_save(), public.import_local(jsonb), public.record_win(text, text, text), public.record_cpu_best(int),
   public.pull_gacha(int, text, text), public.set_equip(text, text), public.forge_katana(text)
   to authenticated;

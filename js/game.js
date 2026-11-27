@@ -287,7 +287,7 @@ function katOf(i){ if(G.mode==='online') return KMAP[i===NET.me?(NET.watch?NET.m
 function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x)],['上',lerp(0.12,0.45,x)],['極',lerp(0,0.22,x)],['幻',lerp(0,0.06,x)],['絶',lerp(0,0.015,x)]];
   let r=Math.random()*w.reduce((s,v)=>s+v[1],0), t='並'; for(const [k,v] of w){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
-function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&(NET.watch||i!==NET.me)) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0); }
+function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&(NET.watch||i!==NET.me)) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0,G.mode==='vs'?'vs':null); }
 function rollKatana(b){ const rt=boxRates(b); let r=Math.random()*rt.reduce((s,v)=>s+v[1],0), t=rt[0][0]; for(const [k,v] of rt){ if((r-=v)<=0){ t=k; break; } }
   const pool=boxKats(b).filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
 
@@ -313,6 +313,8 @@ const TOWIN=()=>G.mode==='cpu'?1:(G.mode==='online'&&NET.toWin)?NET.toWin:CFG.to
 
 /* コインと記録（ログインしていなければこの端末に、ログイン中はアカウントに保存） */
 const COIN={'並':3,'上':9,'極':24,'幻':60,'絶':150,'分':0};
+const VS_DIV=3; // 同じ端末の二人対戦は銭を3分の1に（一人で両方を操作する銭稼ぎ対策。サーバーは app_config.vs_coin_div）
+const vsCoin=c=>Math.ceil(c/VS_DIV);
 const WALLET={coins:0,best:0,steel:0};
 function loadGuestWallet(){ WALLET.coins=0; WALLET.best=0; WALLET.steel=0;
   try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){} }
@@ -335,8 +337,8 @@ function importAction(){
   let a; try{ a=JSON.parse(localStorage.getItem(AOUT)||'[]'); }catch(e){ a=[]; } if(!Array.isArray(a)||!a.length) return;
   const keep=[]; let n=0;
   for(const r of a){ if(!r||!FIN[r.f]||!KMAP[r.k]){ continue; } if(!!r.acct!==!!ACCT){ keep.push(r); continue; } if(!ARM.owned[r.k]) continue;
-    const coin=COIN[FIN[r.f].tier]||0; ARM.rec[r.k]=ARM.rec[r.k]||{}; ARM.rec[r.k][r.f]=(ARM.rec[r.k][r.f]||0)+1;
-    if(coin){ WALLET.coins+=coin; } if(ACCT) ACCT.win(r.f,r.k,coin); n++; }
+    let coin=COIN[FIN[r.f].tier]||0; if(r.m==='vs') coin=vsCoin(coin); ARM.rec[r.k]=ARM.rec[r.k]||{}; ARM.rec[r.k][r.f]=(ARM.rec[r.k][r.f]||0)+1;
+    if(coin){ WALLET.coins+=coin; } if(ACCT) ACCT.win(r.f,r.k,coin,r.m==='vs'?'vs':null); n++; }
   try{ localStorage.setItem(AOUT,JSON.stringify(keep)); }catch(e){}
   if(n){ saveArm(); saveWallet(); uiCache=''; }
 }
@@ -481,6 +483,7 @@ function finish(W,L,name,kind){
   let coin=COIN[tier]||0;
   if(G.mode==='cpu'&&W.i!==0) coin=0;
   if(G.mode==='online'&&(NET.watch||W.i!==NET.me)) coin=0;
+  if(G.mode==='vs') coin=vsCoin(coin);
   if(coin){ WALLET.coins+=coin; RUN.coins+=coin; saveWallet(); }
   G.result={name,winner:W.i,coin};
   recordWin(W.i,name,coin);

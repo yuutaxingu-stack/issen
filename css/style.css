@@ -187,3 +187,34 @@ body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--ui);use
 .zzbar button{padding:9px 16px;border-radius:4px;border:1px solid rgba(220,60,80,.5);background:rgba(20,2,5,.7);color:#f4d6d6;font-family:var(--ui);font-size:14px;letter-spacing:.1em;cursor:pointer;}
 .zzbar button.on{background:#8a0f22;border-color:#e0405a;}
 .zzhint{margin:0 0 max(10px,env(safe-area-inset-bottom,0px));text-align:center;font-size:12px;color:rgba(244,214,214,.55);letter-spacing:.1em;}
+
+/* 絶の色は刀ごと。八咫 = 輝く白と日食の黒（桜華は上の赤黒のまま） */
+.gbx.z-yata{background:linear-gradient(115deg,rgba(2,2,3,.97) 30%,rgba(58,58,66,.92));}
+.gbx.z-yata::after{background:linear-gradient(90deg,transparent,rgba(255,255,255,.6),transparent);}
+.gbx.z-yata.on{border-color:#f2f2f6;box-shadow:0 0 0 1px #f2f2f6 inset,0 0 18px rgba(255,255,255,.3);}
+.gbx.z-yata .m{color:#fbfbfd;text-shadow:0 0 12px rgba(255,255,255,.6);}
+.gbx.z-yata .z i{color:#fff;}
+.gbx.z-yata em{background:#f2f2f6;color:#050506;}
+.gban.z-yata{background:#020203;box-shadow:0 0 0 1px rgba(255,255,255,.4),0 0 30px rgba(255,255,255,.14);}
+.gban.z-yata .gbm{color:#fbfbfd;text-shadow:0 0 18px rgba(255,255,255,.75),0 2px 0 #000;}
+.gban.z-yata .gbk,.gban.z-yata .gbr span,.gban.z-yata .gbb{color:#e8e8ee;}
+.gban.z-yata .gbs{background:#050506;color:#fbfbfd;box-shadow:inset 0 0 0 1px #f2f2f6,0 0 14px rgba(255,255,255,.45);}
+.gban.z-yata .gbr b{color:#fff;text-shadow:0 0 16px rgba(255,255,255,.85);}
+.gban.z-yata .gbb{background:linear-gradient(90deg,rgba(40,40,46,.92),rgba(8,8,10,.75) 55%,rgba(2,2,3,0));border-top-color:rgba(255,255,255,.45);}
+.gban.z-yata .gbl{color:#fff;}
+.gban.z-yata .gbd{background:rgba(2,2,3,.6);border-color:rgba(255,255,255,.5);color:#f4f4f6;}
+.gban.z-yata.wait::after{background:rgba(0,0,0,.55);color:#f4f4f6;}
+#g_pull.z-yata .gact .gpull:not(.sec),#g_pull.z-yata #g_cntgo{background:#050506;border-color:#f2f2f6;color:#fbfbfd;box-shadow:0 0 14px rgba(255,255,255,.22);}
+#g_pull.z-yata .gact .gpull.on{border-color:#f2f2f6;box-shadow:0 0 0 1px #f2f2f6 inset;}
+#g_pull.z-yata .gcnt{border-color:rgba(255,255,255,.4);background:rgba(10,10,12,.5);}
+#g_pull.z-yata .gcn input{accent-color:#f2f2f6;}
+.gres.t4.z-yata .gm{background:linear-gradient(90deg,#3a3a42,#ffffff,#050506,#f4f4f8,#3a3a42);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 0 14px rgba(255,255,255,.7));}
+.gcard.t4.z-yata{border-color:rgba(240,240,246,.7);box-shadow:0 0 22px rgba(255,255,255,.12) inset;}
+.gdsheet.t4.z-yata{border-color:rgba(240,240,246,.8);box-shadow:0 0 36px rgba(255,255,255,.18);}
+.gdsheet.t4.z-yata:not(.unk){background:linear-gradient(180deg,#141417,#050506 60%);}
+.gdsheet.t4.z-yata:not(.unk) .gm{color:#fbfbfd;text-shadow:0 0 14px rgba(255,255,255,.7);}
+.gdsheet.t4.z-yata .gzw h3{color:#e8e8ee;}
+#zzoom.z-yata .zzst img{filter:drop-shadow(0 0 18px rgba(255,255,255,.55));}
+#zzoom.z-yata{background:radial-gradient(ellipse at 50% 45%,#2e2e34,#020203 70%);}
+#zzoom.z-yata .zzbar button{border-color:rgba(255,255,255,.45);background:rgba(4,4,5,.7);color:#f4f4f6;}
+#zzoom.z-yata .zzbar button.on{background:#f2f2f6;border-color:#fff;color:#050506;}

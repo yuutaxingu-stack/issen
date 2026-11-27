@@ -531,14 +531,15 @@ $$;
 
 
 -- ---------- 隠し二つ名（一番の人だけが持つ。記録を抜かれたら移る）（2026-11-27） ----------
+-- 決着の回数で一番を取るものは「天下　〇〇」（全角の空白）と名付ける（ユーザー指定）
 -- 二つ名そのものは title_catalog に hidden = true で入れる（手に入れるまで、条件も名前も一覧に出さない）
 -- kind: 'finish' = arg の決着を出した回数 / 'wins' = 勝ちの合計 / 'cpu' = CPU戦の最高の勝ち抜き
 --       'katana' = 刀帳の種類 / 'rating' = 戦闘力（オンライン対戦を1回以上した人）
 -- 一番が並んだときは、今の持ち主がそのまま持つ（抜いたときだけ移る）。神様は数えない
 alter table public.title_catalog add column if not exists hidden boolean not null default false;
 insert into public.title_catalog (id, name, note, style, ord, hidden) values
-  ('top_meikyo',  '明鏡止水の達人', '明鏡止水を、誰よりも多く決めた者', 'crown', 10, true),
-  ('top_issen',   '一閃の覇者',     '一閃を、誰よりも多く決めた者',     'crown', 11, true),
+  ('top_meikyo',  '天下　明鏡止水', '明鏡止水を、誰よりも多く決めた者', 'crown', 10, true),
+  ('top_issen',   '天下　一閃',     '一閃を、誰よりも多く決めた者',     'crown', 11, true),
   ('top_wins',    '剣聖',           '誰よりも多く勝った者',             'crown', 12, true),
   ('top_cpu',     '無双',           'CPU戦で、誰よりも多く勝ち抜いた者', 'crown', 13, true),
   ('top_katana',  '刀狩り',         '誰よりも多くの刀を刀帳に記した者', 'crown', 14, true),

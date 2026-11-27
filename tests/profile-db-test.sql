@@ -136,7 +136,7 @@ update public.saves set rec = rec || '{"ruri":{"明鏡止水":3,"一閃":1}}' wh
 update public.saves set rec = rec || '{"ouka":{"明鏡止水":2}}' where id = '22222222-2222-2222-2222-222222222222';
 select case when (select holder from public.crowns where title = 'top_meikyo') = '11111111-1111-1111-1111-111111111111'
             and (select 'top_meikyo' = any(titles) from public.profile_ext where id = '11111111-1111-1111-1111-111111111111')
-            and exists (select 1 from public.mail where to_id = '11111111-1111-1111-1111-111111111111' and subject = '隠し二つ名「明鏡止水の達人」')
+            and exists (select 1 from public.mail where to_id = '11111111-1111-1111-1111-111111111111' and subject = '隠し二つ名「天下　明鏡止水」')
   then 'OK 明鏡止水の達人は甲（3回）' else 'NG' end;
 select pg_temp.as_('11111111-1111-1111-1111-111111111111');
 select public.set_profile('', null, 'top_meikyo', null) ->> 'title_name';
@@ -148,8 +148,8 @@ update public.saves set rec = rec || '{"ouka":{"明鏡止水":4}}' where id = '2
 select case when (select holder from public.crowns where title = 'top_meikyo') = '22222222-2222-2222-2222-222222222222'
             and not (select 'top_meikyo' = any(titles) from public.profile_ext where id = '11111111-1111-1111-1111-111111111111')
             and (select title from public.profile_ext where id = '11111111-1111-1111-1111-111111111111') is distinct from 'top_meikyo'
-            and exists (select 1 from public.mail where to_id = '11111111-1111-1111-1111-111111111111' and subject = '「明鏡止水の達人」が移りました' and body like '%乙さん%')
-            and exists (select 1 from public.mail where to_id = '22222222-2222-2222-2222-222222222222' and subject = '隠し二つ名「明鏡止水の達人」')
+            and exists (select 1 from public.mail where to_id = '11111111-1111-1111-1111-111111111111' and subject = '「天下　明鏡止水」が移りました' and body like '%乙さん%')
+            and exists (select 1 from public.mail where to_id = '22222222-2222-2222-2222-222222222222' and subject = '隠し二つ名「天下　明鏡止水」')
   then 'OK 乙へ移り、甲からは外れて名乗りも替わり、二人に知らせ' else 'NG' end;
 select case when (select count(*) from public.crowns where holder = '99999999-9999-9999-9999-999999999999') = 0 then 'OK 神様は数えない' else 'NG' end;
 select pg_temp.as_('99999999-9999-9999-9999-999999999999');

@@ -39,6 +39,27 @@ do $$ declare i int; begin
 end $$;
 reset role;
 
+-- 1日の銭の上限: 0（初期値）なら上限なしで数え続ける。数を入れればその数で止まる
+update public.saves set win_min = null, win_count = 0, coin_day = current_date, day_coins = 14990, coins = 99990 where id = '11111111-1111-1111-1111-111111111111';
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := public.record_win('疾風', 'mumei');
+  if (r ->> 'gained')::int <> 3 or (r ->> 'coins')::bigint <> 99993 then raise exception 'NG 上限なしのはず %', r; end if;
+  r := public.record_win('疾風', 'mumei'); r := public.record_win('疾風', 'mumei'); r := public.record_win('疾風', 'mumei');
+  if (r ->> 'coins')::bigint <> 100002 then raise exception 'NG 99999を超えて数えていない %', r; end if;
+  raise notice 'OK 1日の上限なし・99999を超えても数え続ける (coins=%)', r ->> 'coins';
+end $$;
+reset role;
+update public.app_config set day_coin_cap = 15000 where id = 1;
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := public.record_win('疾風', 'mumei');
+  if (r ->> 'gained')::int <> 0 then raise exception 'NG 上限を入れたら止まるはず %', r; end if;
+  raise notice 'OK day_coin_cap を入れるとその数で止まる';
+end $$;
+reset role;
+update public.app_config set day_coin_cap = 0 where id = 1;
+
 -- 玉鋼: 持っている刀が出たら玉鋼になり、銭は戻らない
 select 'steel after 3000 pulls', steel, coins from public.saves where id = '22222222-2222-2222-2222-222222222222';
 do $$ declare s public.saves; begin

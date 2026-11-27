@@ -62,9 +62,9 @@ alter table public.gacha_tiers add column if not exists forge_cost int not null 
 
 -- ---------- 設定（schema.sql の app_config に列を足す） ----------
 alter table public.app_config add column if not exists pull_cost int not null default 10;        -- ガチャ1回の銭
-alter table public.app_config add column if not exists day_coin_cap int not null default 15000;  -- 1日に勝負で得られる銭の上限（ずる対策）
-alter table public.app_config alter column day_coin_cap set default 15000;
-update public.app_config set day_coin_cap = 15000 where day_coin_cap = 5000;  -- 銭3倍(2026-11-26)に合わせて上限も3倍
+alter table public.app_config add column if not exists day_coin_cap int not null default 0;  -- 1日に勝負で得られる銭の上限（0 = 上限なし。ずる対策で戻すときは数を入れる）
+alter table public.app_config alter column day_coin_cap set default 0;
+update public.app_config set day_coin_cap = 0 where day_coin_cap in (5000, 15000);  -- 2026-11-27 上限を外す（1分30勝までの守りは残す）
 alter table public.app_config add column if not exists vs_coin_div int not null default 3 check (vs_coin_div >= 1);  -- 同じ端末の二人対戦は銭をこの数で割る（2026-11-27、一人で両方を操作する銭稼ぎ対策）
 
 -- ---------- 一人ひとりの持ち物 ----------
@@ -288,10 +288,10 @@ begin
   s.win_count := s.win_count + 1;
   if s.win_count > 30 then raise exception '勝ちの記録が多すぎます。少し待ってください'; end if;
 
-  -- 1日の上限
+  -- 1日の上限（app_config.day_coin_cap が 0 以下なら上限なし。今日得た銭は数え続ける）
   if s.coin_day is distinct from current_date then s.coin_day := current_date; s.day_coins := 0; end if;
   select x.day_coin_cap into cap from public.app_config x where x.id = 1;
-  gain := greatest(0, least(c, coalesce(cap, 15000) - s.day_coins));
+  if coalesce(cap, 0) <= 0 then gain := c; else gain := greatest(0, least(c, cap - s.day_coins)); end if;
 
   cur := coalesce(s.rec -> p_katana, '{}');
   cur := jsonb_set(cur, array[p_finish], to_jsonb(coalesce((cur ->> p_finish)::bigint, 0) + 1));

@@ -26,7 +26,7 @@
 
   // 背景の札。絵は css/profile.css の .pl-<id>
   const PLATE_NAME = { sumi: '墨', take: '竹林', tsuki: '月夜', ouka: '桜華' };
-  const KIND = { maint: 'メンテナンス', important: '大事なお知らせ', update: '更新' };
+  const KIND = { maint: 'メンテナンス', important: '大事なお知らせ', update: '更新', special: '特別' };
   const SEEN = 'issen-news-seen-v1', POPPED = 'issen-news-pop-v1';
 
   /* ---------- 画面の部品をつくる ---------- */
@@ -74,7 +74,7 @@
     scr.hidden = false; scr.scrollTop = 0;
     render();
   }
-  function close(){ scr.hidden = true; S.mode = ''; S.edit = null; badges(); }
+  function close(){ stopSpecials(); scr.hidden = true; S.mode = ''; S.edit = null; badges(); }
   $('pf_back').addEventListener('click', () => {
     if (S.mode === 'card' && S.edit) { S.edit = null; render(); return; }
     close();
@@ -209,7 +209,7 @@
       x.clearRect(0, 0, c.width, c.height);
       if (!k || !k.canvas) { setTimeout(drawKats, 300); return; }
       const w = c.width, h = w * k.canvas.height / k.canvas.width;
-      x.drawImage(k.canvas, 0, (c.height - h) / 2, w, h);
+      x.save(); x.translate(0, c.height); x.scale(1, -1); x.drawImage(k.canvas, 0, (c.height - h) / 2, w, h); x.restore();
     });
   }
 
@@ -304,18 +304,38 @@
     const god = I && I.isGod && I.isGod();
     return '<ul class="pfnews">' + S.notices.map((n, i) => {
       const open = S.open['n' + n.id] != null ? S.open['n' + n.id] : i === 0;
-      return '<li class="k-' + esc(n.kind) + (open ? ' open' : '') + '">' +
+      return '<li class="k-' + esc(n.kind) + (n.art ? ' sp-' + esc(n.art) : '') + (open ? ' open' : '') + '">' +
         '<button type="button" class="pfnh" data-news="' + n.id + '"><span class="pfkind">' + esc(KIND[n.kind] || '') + '</span>' +
         '<b>' + esc(n.title) + '</b><time>' + day(n.at) + '</time></button>' +
-        (open ? '<div class="pfnb">' + (n.body ? para(n.body) : '') +
+        (open ? '<div class="pfnb">' + (n.kind === 'special' && n.art ? special(n.art) : '') + (n.body ? para(n.body) : '') +
           (god ? '<button type="button" class="olink" data-delnews="' + n.id + '">' + (S.arm === 'd' + n.id ? 'もう一度触れて取り下げる' : 'このお知らせを取り下げる') + '</button>' : '') + '</div>' : '') +
       '</li>';
     }).join('') + '</ul>';
   }
 
+  /* 特別なお知らせの看板: 絶の刀の抜刀演出を流し、その刀が目玉の箱が出ていれば「ガチャへ」、まだなら「近日公開」 */
+  const zart = id => (I && I.ZART && I.ZART[id]) || null;
+  function special(art){
+    const a = zart(art); if (!a) return '';
+    const live = !!(I && I.KMAP && I.KMAP[art]) && !!(I.gachaReady && I.gachaReady(art));
+    return '<div class="pfzs sp-' + esc(art) + '"><canvas data-art="' + esc(art) + '"></canvas>' +
+      '<div class="pfzst"><span class="m">' + esc(a.mei) + '</span><span class="c"><span class="s">絶</span><span class="k">新たな目玉</span></span></div>' +
+      '<button type="button" class="pfzsgo" data-spgo="' + esc(art) + '"' + (live ? '' : ' disabled') + '>' + (live ? 'ガチャへ' : '近日公開') + '</button></div>';
+  }
+  let SPS = [];
+  function stopSpecials(){ SPS.forEach(z => z.stop()); SPS = []; }
+  function startSpecials(){
+    stopSpecials(); if (!I || !I.zRun) return;
+    scr.querySelectorAll('.pfzs canvas[data-art]').forEach(c => {
+      const r = c.getBoundingClientRect(), d = Math.min(2, window.devicePixelRatio || 1);
+      c.width = Math.max(2, Math.round(r.width * d)); c.height = Math.max(2, Math.round(r.height * d));
+      SPS.push(I.zRun(c, { id: c.dataset.art }, { ban: true, art: c.dataset.art }));
+    });
+  }
+
   /* ---------- 神様: 送る・書く ---------- */
   const GF = { target: 'login', katana: 'ouka', logins: '', subject: '', body: '', coins: '', steel: '', title: '', plate: '' };
-  const NF = { kind: 'update', title: '', body: '' };
+  const NF = { kind: 'update', title: '', body: '', art: 'yata' };
   const PRESETS = {
     issen: { target: 'issen', subject: '一閃の誉れ', body: '後のない刹那に、明鏡止水を決めた者へ。\n二つ名を贈ります。名乗りの画面で名乗れます。', title: 'issen', plate: '', coins: '', steel: '' },
     ouka: { target: 'katana', katana: 'ouka', subject: '桜華の札', body: '絶の一振り「桜華」を手にした者へ。\n背景の札「桜華」を贈ります。名乗りの画面で使えます。', title: '', plate: 'ouka', coins: '', steel: '' }
@@ -346,16 +366,18 @@
         (S.arm === 'send' ? 'もう一度触れて送る' + (pv ? '（' + pv.n + '人）' : '') : '送る') + '</button></div>' +
       '<p class="omsg">' + esc(S.msg) + '</p>' +
       (g.auto && g.auto.length ? '<h3>条件を満たすと自動で届く贈り物</h3><ul class="pfsent">' + g.auto.map(a => '<li><b>' + esc(a.subject) + '</b><span>' + esc(a.cond === 'issen' ? '一閃を決めたら' : a.cond === 'issen_with' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」で一閃を決めたら' : a.cond === 'katana' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」を手にしたら' : '') + '・' + a.n + '人に届いた</span></li>').join('') + '</ul>' : '') +
+      (g.crowns && g.crowns.length ? '<h3>隠し二つ名の持ち主（遊ぶ人には、手に入れるまで見えません）</h3><ul class="pfsent">' + g.crowns.map(c => '<li><b><span class="pftag s-crown">' + esc(c.name) + '</span></b><span>' + (c.holder ? esc(c.holder) + '・' + Number(c.value) : 'まだいない') + '</span><time>' + esc(c.note) + '</time></li>').join('') + '</ul>' : '') +
       '<h3>送った手紙</h3><ul class="pfsent">' + ((g.sent || []).map(x => '<li><b>' + esc(x.subject) + '</b><span>' + x.n + '人・受け取り ' + x.claimed + '</span><time>' + day(x.at) + '</time></li>').join('') || '<li class="none">まだありません</li>') + '</ul>' +
     '</div>';
   }
   function renderWrite(){
     return '<div class="pfedit pfgod">' +
       '<div class="pff"><span>種類</span><div class="pfchips">' + Object.keys(KIND).map(k => '<button type="button" data-kind="' + k + '"' + (NF.kind === k ? ' class="on"' : '') + '>' + KIND[k] + '</button>').join('') + '</div></div>' +
+      (NF.kind === 'special' ? '<label class="pff">看板に流す刀<select id="nf_art">' + Object.keys((I && I.ZART) || {}).map(k => '<option value="' + k + '"' + (NF.art === k ? ' selected' : '') + '>' + esc(I.ZART[k].mei) + '</option>').join('') + '</select></label>' : '') +
       '<label class="pff">題<input id="nf_title" maxlength="40" value="' + esc(NF.title) + '"></label>' +
       '<label class="pff">本文（空行で段落を分ける）<textarea id="nf_body" maxlength="2000" rows="7">' + esc(NF.body) + '</textarea></label>' +
       '<div class="pfacts"><button type="button" class="gpull' + (S.arm === 'post' ? ' arm' : '') + '" data-act="post"' + (S.busy ? ' disabled' : '') + '>' + (S.arm === 'post' ? 'もう一度触れて載せる' : '載せる') + '</button></div>' +
-      '<p class="gnote">大事なお知らせは、皆がタイトルを開いたときに一度だけ大きく出ます。</p>' +
+      '<p class="gnote">大事なお知らせは、皆がタイトルを開いたときに一度だけ大きく出ます。特別なお知らせは、選んだ刀の抜刀を看板に流し、その刀の箱が出るまでは「近日公開」、出たら「ガチャへ」になります。</p>' +
       '<p class="omsg">' + esc(S.msg) + '</p>' +
     '</div>';
   }
@@ -438,6 +460,7 @@
     $('pf_body').className = 'pfb-' + S.mode;
     if (keep) { const el = $(keep.id); if (el) { el.focus(); try { el.setSelectionRange(keep.s, keep.e); } catch (e) {} } }
     drawKats();
+    if (S.mode === 'news' && S.tab !== 'write') startSpecials(); else stopSpecials();
   }
 
   /* ---------- 操作 ---------- */
@@ -448,7 +471,7 @@
       ['target', 'katana', 'logins', 'subject', 'body', 'coins', 'steel', 'title', 'plate'].forEach(k => { const x = v('gf_' + k); if (x != null) GF[k] = x; });
     }
     if (S.tab === 'report') { const b = v('rf_body'); if (b != null) RF.body = b; }
-    if (S.tab === 'write') { const t = v('nf_title'), b = v('nf_body'); if (t != null) NF.title = t; if (b != null) NF.body = b; }
+    if (S.tab === 'write') { const t = v('nf_title'), b = v('nf_body'), a = v('nf_art'); if (t != null) NF.title = t; if (b != null) NF.body = b; if (a != null) NF.art = a; }
   }
   let armTimer = 0;
   function armOnce(key){
@@ -488,6 +511,7 @@
       S.busy = true; S.msg = ''; render();
       try {
         const ed = S.edit;
+        if (N.hasLink(ed.word) && !N.isGod()) throw new Error('一言に' + N.LINK_MSG);
         S.prof = await rpc('set_profile', { p_word: ed.word || '', p_fav: ed.fav || null, p_title: ed.title || null, p_plate: ed.plate || null });
         if (S.prof && S.prof.id) tags[S.prof.id] = { title: S.prof.title_name, style: S.prof.title_style, plate: S.prof.plate };
         tagFns.forEach(f => { try { f(); } catch (x) {} });
@@ -517,6 +541,7 @@
       S.busy = false; render(); return;
     }
     if (d.act === 'me') { openProfile(null); return; }
+    if (d.spgo) { if (I && I.gachaFor && I.gachaFor(d.spgo)) close(); else if (N && N.toast) N.toast('近日公開です', 2500); return; }
     if (d.news) { const k = 'n' + d.news, i = S.notices.findIndex(n => String(n.id) === d.news); S.open[k] = !(S.open[k] != null ? S.open[k] : i === 0); render(); return; }
     if (d.delnews) {
       if (!armOnce('d' + d.delnews)) return;
@@ -570,7 +595,7 @@
       if (!armOnce('post')) return;
       S.busy = true; S.msg = ''; render();
       try {
-        const nid = await rpc('god_post_notice', { p_kind: NF.kind, p_title: NF.title, p_body: NF.body });
+        const nid = await rpc('god_post_notice', Object.assign({ p_kind: NF.kind, p_title: NF.title, p_body: NF.body }, NF.kind === 'special' ? { p_art: NF.art } : {}));
         store.set(POPPED, Math.max(store.get(POPPED, 0) || 0, Number(nid) || 0));   // 書いた本人には大きく出さない
         NF.title = ''; NF.body = ''; S.msg = '載せました';
         await loadNews(); markSeen();

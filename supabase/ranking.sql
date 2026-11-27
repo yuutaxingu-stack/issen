@@ -166,6 +166,7 @@ begin
     union
     select case when f.a = me then f.b else f.a end from public.friendships f
       where (f.a = me or f.b = me) and f.status = 'accepted'
+        and not exists (select 1 from public.god_accounts g where g.id = case when f.a = me then f.b else f.a end)   -- 神様は番付に出さない
   )
   select coalesce(jsonb_agg(jsonb_build_object(
       'id', p.id,

@@ -15,6 +15,8 @@ Q="psql -h $D -p 5499 -U postgres -v ON_ERROR_STOP=1 -q"
 $Q -f tests/supabase-stub.sql
 for f in schema save-data ranking profile; do $Q -f supabase/$f.sql; done
 $Q -f tests/profile-db-test.sql
+# 外しておいた隠し二つ名を全部戻す（ここで一度実行してから、もう一度実行しても変わらないことを確かめる）
+$Q -f supabase/profile.sql
 SNAP="select id, word, fav, title, plate, titles, plates from public.profile_ext order by id; select id, to_id, claimed_at is null from public.mail order by id; select id, title from public.notices order by id"
 $Q -Atc "$SNAP" > "$D/before.txt"
 echo '--- SQLをもう一度実行（アップデートのまね）'

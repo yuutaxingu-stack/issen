@@ -131,6 +131,7 @@
     const box = $('c_text'), text = box.value.trim();
     if (!text) return;
     if (text.length > MAXLEN) return N.toast(MAXLEN + '文字までにしてください');
+    if (N.hasLink(text) && !N.isGod()) return N.toast(N.LINK_MSG);
     const dm = C.tab === 'dm' ? C.dm : null;
     if (C.tab === 'dm' && !dm) return;
     // 本文に残っている @名前 だけを名指しにする
@@ -441,6 +442,7 @@
   function mcSay(text){
     text = String(text || '').trim().slice(0, MC_MAX);
     if (!text || !inMatch()) return;
+    if (N.hasLink(text)) { N.toast(N.LINK_MSG); return; }
     if (performance.now() - mcLast < 1500) return;
     mcLast = performance.now();
     IssenMatch.say(text);
@@ -453,7 +455,7 @@
     b.textContent = text; b.hidden = false; b.classList.remove('pop'); void b.offsetWidth; b.classList.add('pop');
     clearTimeout(bubT[side]); bubT[side] = setTimeout(() => { b.hidden = true; }, 3800);
   }
-  C.matchSay = text => { if (I.G.mode === 'online') bubble(1, String(text || '').slice(0, MC_MAX)); };
+  C.matchSay = text => { if (I.G.mode === 'online' && !N.hasLink(text)) bubble(1, String(text || '').slice(0, MC_MAX)); };   // リンク入りは見せない
   if (mcBtn) {
     $('mc_phr').innerHTML = PHRASES.map(p => '<button type="button" data-say="' + p + '">' + p + '</button>').join('');
     mcBtn.addEventListener('click', () => { mcPanel.hidden = !mcPanel.hidden; mcTick(); });

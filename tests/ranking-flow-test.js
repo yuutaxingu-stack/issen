@@ -65,12 +65,12 @@ const rows = p => p.$$eval('#r_list li', ls => ls.map(l => l.innerText.replace(/
 
 (async () => {
   const browser = await chromium.launch();
-  console.log('--- ログイン前は、ログインを促す');
+  console.log('--- ログイン前は番付を開けず、登録画面が出る（招待された人だけ）');
   const p = await mk(browser);
   await p.click('#m_rank'); await p.waitForTimeout(300);
-  ok(!(await p.isHidden('#r_login')) && /ログイン/.test(await p.textContent('#r_msg')), 'ログインを促す: ' + await p.textContent('#r_msg'));
+  ok(await p.isVisible('#o_gate') && await p.isHidden('#rank'), '番付は開かず、ログインを促す');
   await p.screenshot({ path: out + '/rank-guest.png' });
-  await p.click('#r_back');
+  await p.click('#o_back');
 
   console.log('--- 甲でログインして番付を見る');
   await login(p, 'aaa');

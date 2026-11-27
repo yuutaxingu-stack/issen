@@ -11,3 +11,5 @@ create function realtime.topic() returns text language sql as $$ select '' $$;
 grant usage on schema realtime to authenticated;
 alter table realtime.messages enable row level security;
 create publication supabase_realtime;
+-- 招待コードの確かめを手元のテストでは飛ばす（招待コードのテスト tests/invite-db-test.sql では入れ直す）
+alter database postgres set issen.no_invite = 'on';

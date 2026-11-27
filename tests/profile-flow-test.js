@@ -143,6 +143,20 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   await g.click('#pf_back');
   await g.waitForTimeout(300);
   ok(await g.isHidden('#pf_pop'), '書いた本人には大きく出さない');
+  // 特別なお知らせ: 八咫の抜刀を看板に流す。箱が出るまでは「近日公開」
+  await g.click('#pf_corner [data-go="news"]');
+  await g.click('#pf_tabs [data-tab="write"]');
+  await g.click('[data-kind="special"]');
+  await g.selectOption('#nf_art', 'yata');
+  await g.fill('#nf_title', '新たな絶「八咫」近日');
+  await g.fill('#nf_body', '日食の刀。');
+  await g.click('[data-act="post"]'); await g.click('[data-act="post"]');
+  await g.waitForFunction(() => document.querySelectorAll('.pfnews li').length === 3, null, { timeout: 8000 });
+  await g.waitForTimeout(4500);
+  ok(await g.isVisible('.pfzs canvas') && /近日公開/.test(await g.textContent('.pfzsgo')) && await g.isDisabled('.pfzsgo'), '特別なお知らせ: 八咫の看板が流れ、ガチャは近日公開');
+  await g.screenshot({ path: OUT + '/news-special.png' });
+  for (const [w, h, n] of [[1180, 820, 'ipad']]) { await g.setViewportSize({ width: w, height: h }); await g.waitForTimeout(400); await g.screenshot({ path: OUT + '/news-special-' + n + '.png' }); await g.setViewportSize({ width: 844, height: 390 }); }
+  await g.click('#pf_back');
 
   console.log('--- 風見さん: 大事なお知らせ → 文箱で受け取る → 名乗り');
   const a = await mk(browser);

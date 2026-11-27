@@ -5,7 +5,7 @@
   const N = window.IssenNet, I = window.__issen;
   const $ = id => document.getElementById(id);
   const el = $('online');
-  let authTab = 'in';
+  let authTab = 'in', gateOpen = false;   // gateOpen: ログインのために開いた（ログインできたら閉じる）
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   /* ---------- 小さな知らせ ---------- */
@@ -16,8 +16,8 @@
   };
 
   /* ---------- 開け閉め ---------- */
-  function open(){ el.hidden = false; render(); if (N.user) N.refreshFriends(); }
-  function close(){ el.hidden = true; }
+  function open(){ el.hidden = false; if (locked()) gateOpen = true; render(); if (N.user) { N.refreshFriends(); if (N.isGod()) loadInvites(); } }
+  function close(){ el.hidden = true; gateOpen = false; }
   $('m_online').addEventListener('click', () => open());
   $('o_back').addEventListener('click', () => close());
 
@@ -28,8 +28,9 @@
     const btn = $('o_ago'), msg = $('o_amsg'); btn.disabled = true; msg.textContent = authTab === 'in' ? 'ログインしています…' : '登録しています…';
     try {
       if (authTab === 'in') await N.signIn($('o_login').value, $('o_pass').value);
-      else await N.signUp($('o_login').value, $('o_pass').value, $('o_name').value);
+      else await N.signUp($('o_login').value, $('o_pass').value, $('o_name').value, $('o_invite').value);
       msg.textContent = ''; $('o_pass').value = '';
+      if (authTab === 'up') { $('o_invite').value = ''; dropInviteFromUrl(); }
     } catch (err) { msg.textContent = err.message; }
     btn.disabled = false;
   });
@@ -79,6 +80,74 @@
     } catch (err) { N.toast(err.message); b.disabled = false; }
   });
 
+  /* ---------- ログインしないと遊べない（招待された人だけ） ---------- */
+  // タイトルのボタンは「オンライン」以外、ログインするまで押しても登録画面が開くだけ
+  const locked = () => N.configured() && !(N.ready && N.user);
+  const menu = $('menu');
+  menu.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b || b.id === 'm_online' || !locked()) return;
+    e.preventDefault(); e.stopImmediatePropagation(); open();
+  }, true);
+  // 招待のリンク（…/?invite=コード）で来たら、「はじめて」にコードを入れておく
+  const urlInvite = N.normInvite(new URLSearchParams(location.search).get('invite'));
+  if (urlInvite) { $('o_invite').value = urlInvite; authTab = 'up'; }
+  function dropInviteFromUrl(){
+    if (!urlInvite) return;
+    try { const u = new URL(location.href); u.searchParams.delete('invite'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch (e) {}
+  }
+  let gateShown = false;
+  function autoGate(){
+    // 招待のリンクで来て、ログインしていなければ登録画面を出す（ふだんはボタンを押したときに出す。お知らせは読める）
+    if (gateShown || !urlInvite || !N.ready || N.user || !N.configured() || I.G.phase !== 'title') return;
+    gateShown = true; open();
+  }
+  N.on(() => { if (gateOpen && N.user) { gateOpen = false; close(); } });   // 登録・ログインできたらタイトルへ
+
+  /* ---------- 招待コード（神様だけ） ---------- */
+  let invites = [], invLoading = false;
+  const SITE = location.origin + location.pathname.replace(/[^/]*$/, '');
+  const fmtCode = c => c.slice(0, 4) + '-' + c.slice(4);
+  const shareText = c => '一閃の招待コード ' + fmtCode(c) + '\n' + SITE + '?invite=' + c + '\n（1回だけ使えます。登録は「はじめて」から）';
+  async function loadInvites(){
+    if (invLoading) return; invLoading = true;
+    try { invites = await N.inviteList(); } catch (e) { $('o_imsg').textContent = e.message; }
+    invLoading = false; render();
+  }
+  function copy(text, done){
+    try { navigator.clipboard.writeText(text).then(() => N.toast(done), () => prompt('写してください', text)); } catch (e) { prompt('写してください', text); }
+  }
+  $('o_iform').addEventListener('submit', async e => {
+    e.preventDefault();
+    const msg = $('o_imsg'), memo = $('o_imemo').value.trim();
+    msg.textContent = '発行しています…';
+    try {
+      const [code] = await N.inviteCreate(memo, 1);
+      $('o_imemo').value = ''; msg.textContent = '発行しました: ' + fmtCode(code) + '（「写す」で招待の文が写せます）';
+      await loadInvites();
+    } catch (err) { msg.textContent = err.message; }
+  });
+  $('o_ilist').addEventListener('click', async e => {
+    const b = e.target.closest('button[data-ic]'); if (!b) return;
+    const code = b.dataset.code;
+    if (b.dataset.ic === 'copy') copy(shareText(code), '招待の文を写しました。渡したい人だけに送ってください');
+    else if (b.dataset.ic === 'rv' && confirmTwice(b, '本当に取り消す')) {
+      try { await N.inviteRevoke(code); N.toast('取り消しました'); } catch (err) { N.toast(err.message); }
+      loadInvites();
+    }
+  });
+  const jpDate = t => { const d = new Date(t); return (d.getMonth() + 1) + '/' + d.getDate(); };
+  function renderInvites(){
+    const god = !!(N.user && N.isGod());
+    $('o_god').hidden = !god; if (!god) return;
+    const shown = invites.filter(v => !v.used_at).concat(invites.filter(v => v.used_at).slice(0, 20));   // 未使用を上に。使用済みは新しい20件
+    $('o_ilist').innerHTML = shown.length ? shown.map(v => {
+      const used = !!v.used_at;
+      return '<li><span class="ocode' + (used ? ' used' : '') + '">' + fmtCode(v.code) + '</span>' +
+        '<span class="ost">' + (v.memo ? esc(v.memo) + '　' : '') + (used ? jpDate(v.used_at) + ' ' + esc(v.used_name || '（消えた人）') + (v.used_login ? '（' + esc(v.used_login) + '）' : '') + 'が使用' : jpDate(v.created_at) + ' 発行・未使用') + '</span>' +
+        (used ? '' : '<button type="button" class="obtn pri" data-ic="copy" data-code="' + v.code + '">写す</button><button type="button" class="obtn" data-ic="rv" data-code="' + v.code + '">取り消す</button>') + '</li>';
+    }).join('') : '<li class="none">まだ発行していません</li>';
+  }
+
   const STATUS = { online: ['オンライン', 'on'], playing: ['試合中', 'play'], offline: ['オフライン', 'off'] };
 
   function render(){
@@ -88,10 +157,14 @@
     $('o_auth').hidden = !(ok && N.ready && !N.user);
     $('o_main').hidden = !(ok && N.ready && N.user);
     $('o_err').textContent = N.error || '';
-    $('m_online_s').textContent = !ok ? '準備中' : N.user && N.profile ? N.profile.name + ' でログイン中' : 'フレンドと対戦';
+    const lock = locked();
+    menu.classList.toggle('locked', lock);
+    $('o_gate').hidden = !lock;
+    $('m_online_s').textContent = !ok ? '準備中' : N.user && N.profile ? N.profile.name + ' でログイン中' : N.ready ? 'ログイン・登録' : 'つないでいます…';
     if (!el.hidden && N.ready && !N.user) {
       document.querySelectorAll('#o_auth .otabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === authTab));
       $('o_namerow').hidden = authTab === 'in';
+      $('o_invrow').hidden = authTab === 'in';
       $('o_ago').textContent = authTab === 'in' ? 'ログイン' : '登録してはじめる';
       $('o_pass').autocomplete = authTab === 'in' ? 'current-password' : 'new-password';
     }
@@ -116,7 +189,9 @@
         '<button type="button" class="obtn" data-act="undo" data-id="' + f.id + '">取り消す</button></li>').join('');
       $('o_outh').hidden = !N.outgoing.length;
     }
+    renderInvites();
     renderInvite();
+    autoGate();
   }
 
   /* ---------- 招待の知らせ（どの画面でも上に出る） ---------- */

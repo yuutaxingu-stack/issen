@@ -75,3 +75,14 @@
 #r_note{line-height:1.7;}
 @keyframes rin{from{opacity:0;transform:translateX(-6px);}to{opacity:1;transform:none;}}
 @media (prefers-reduced-motion: reduce){.rlist li{animation:none;opacity:1;}}
+
+/* 招待コード（2026-11-27） */
+.ogate{margin:0 auto 14px;max-width:360px;text-align:center;font-size:13.5px;line-height:1.75;color:#e9e2cf;padding:12px 14px;border:1px solid rgba(178,52,40,.55);border-radius:6px;background:rgba(178,52,40,.10)}
+#o_invite{text-transform:uppercase;letter-spacing:.2em}
+.oadd.oinv input{text-transform:none;letter-spacing:.04em}
+.oinvl li{flex-wrap:wrap}
+.oinvl .ocode{font-family:ui-monospace,Menlo,monospace;letter-spacing:.14em;font-size:14px}
+.oinvl .ocode.used{opacity:.45;text-decoration:line-through}
+.oinvl .ost{flex:1;min-width:8em}
+#menu.locked .mb:not(#m_online){opacity:.38}
+#menu.locked #m_online{box-shadow:0 0 0 1px rgba(178,52,40,.8)}

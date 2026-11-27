@@ -128,13 +128,19 @@
   async function refreshFriends(){
     if (!N.user) return;
     const me = N.user.id;
-    const { data: fs, error } = await N.sb.from('friendships').select('a,b,requester,status');
-    if (error) { N.error = jp(error); emit(); return; }
+    // 神様は全員とフレンドなので多い。1000行ずつ読み、名前は100人ずつ聞く
+    let fs = [];
+    for (let at = 0; ; at += 1000) {
+      const { data, error } = await N.sb.from('friendships').select('a,b,requester,status').order('a').order('b').range(at, at + 999);
+      if (error) { N.error = jp(error); emit(); return; }
+      fs = fs.concat(data || []);
+      if (!data || data.length < 1000) break;
+    }
     const ids = fs.map(f => f.a === me ? f.b : f.a);
     let ps = [];
-    if (ids.length) {
-      const r = await N.sb.from('profiles').select('id,name,code').in('id', ids);
-      if (!r.error) ps = r.data;
+    for (let i = 0; i < ids.length; i += 100) {
+      const r = await N.sb.from('profiles').select('id,name,code').in('id', ids.slice(i, i + 100));
+      if (!r.error) ps = ps.concat(r.data);
     }
     const P = {}; ps.forEach(p => P[p.id] = p);
     N.friends = []; N.incoming = []; N.outgoing = [];

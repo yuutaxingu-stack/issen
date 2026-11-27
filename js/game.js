@@ -316,6 +316,8 @@ const COIN={'並':3,'上':9,'極':24,'幻':60,'絶':150,'分':0};
 const VS_DIV=3; // 同じ端末の二人対戦は銭を3分の1に（一人で両方を操作する銭稼ぎ対策。サーバーは app_config.vs_coin_div）
 const vsCoin=c=>Math.ceil(c/VS_DIV);
 const WALLET={coins:0,best:0,steel:0};
+// 銭の表示は 99999 まで（中ではそれより多くても数え続ける）
+const COIN_SHOW=99999; function coinTxt(n){ n=Math.max(0,Math.floor(n||0)); return n>COIN_SHOW?COIN_SHOW+'+':String(n); }
 function loadGuestWallet(){ WALLET.coins=0; WALLET.best=0; WALLET.steel=0;
   try{ const w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); if(w) Object.assign(WALLET,w); }catch(e){} }
 loadGuestWallet();
@@ -884,7 +886,7 @@ function drawResult(c,now,vw){
   else if(G.mode==='online') line=(r.winner===NET.me&&!NET.watch?'あなたの一本':whoName(r.winner)+'の一本')+'　　'+P[NET.me].score+' − '+P[1-NET.me].score;
   else line=COL[r.winner].name+'の一本　　朱 '+P[0].score+' − '+P[1].score+' 藍';
   txt(c,line,VW/2,cy+bh/2-sl*2.4,sl*1.15,UIF,r.winner==null?'#e6dfcd':COL[r.winner].light,'center',a);
-  if(r.coin) txt(c,'銭 +'+r.coin+'　（所持 '+WALLET.coins+'）',VW/2,cy+bh/2-sl*1.0,sl*0.95,UIF,'#e8c35a','center',a);
+  if(r.coin) txt(c,'銭 +'+r.coin+'　（所持 '+coinTxt(WALLET.coins)+'）',VW/2,cy+bh/2-sl*1.0,sl*0.95,UIF,'#e8c35a','center',a);
   if(e>1200&&G.mode!=='online') txt(c,'画面をタップで次へ',VW/2,cy+bh/2+sl*1.3,sl*0.95,UIF,'#1b1e19','center',0.55+0.35*Math.sin(now/260));
 }
 function drawMatch(c,now,vw){
@@ -895,7 +897,7 @@ function drawMatch(c,now,vw){
     const wins=RUN.n-1;
     txt(c,wins+'人抜き',VW/2,VH*0.3,big,DISPLAY,PALE,'center',a);
     txt(c,RUN.newBest?'自己最高を更新':'自己最高　'+WALLET.best+'人抜き',VW/2,VH*0.3+big*0.8,sl*1.3,UIF,RUN.newBest?'#e8c35a':'#cfc8b6','center',a);
-    txt(c,'この挑戦で得た銭　'+RUN.coins+'　（所持 '+WALLET.coins+'）',VW/2,VH*0.3+big*0.8+sl*2.2,sl,UIF,'#e8c35a','center',a);
+    txt(c,'この挑戦で得た銭　'+RUN.coins+'　（所持 '+coinTxt(WALLET.coins)+'）',VW/2,VH*0.3+big*0.8+sl*2.2,sl,UIF,'#e8c35a','center',a);
     const hist=G.history.filter(h=>h.winner!=null).slice(-6).map(h=>h.name).join('・');
     txt(c,hist,VW/2,VH*0.3+big*0.8+sl*4,sl*0.9,UIF,'#cfc8b6','center',a);
     if(e>1200) txt(c,'画面をタップでタイトルへ',VW/2,VH*0.3+big*0.8+sl*6.2,sl*1.1,UIF,PALE,'center',0.55+0.35*Math.sin(now/260));
@@ -1218,7 +1220,7 @@ function updateUI(){
   document.getElementById('ps_resume').textContent=G.mode==='online'?'続ける（試合は止まりません）':'続ける';
   document.getElementById('ps_title').textContent=G.mode==='online'?'退出してタイトルへ':'タイトルへ戻る';
   menuEl.hidden=!menuOn;
-  document.getElementById('m_meta').textContent='所持 '+(GOD?'無限':WALLET.coins)+' 銭・玉鋼 '+(WALLET.steel||0)+'　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
+  document.getElementById('m_meta').textContent='所持 '+(GOD?'無限':coinTxt(WALLET.coins))+' 銭・玉鋼 '+(WALLET.steel||0)+'　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
 }
 document.getElementById('m_cpu').addEventListener('click',()=>{ ensureAudio(); startMatch('cpu'); });
 document.getElementById('m_vs').addEventListener('click',()=>{ ensureAudio(); startMatch('vs'); });
@@ -1288,7 +1290,7 @@ function closeGacha(){ banStop(); gachaEl.hidden=true; uiCache=''; cancelAnimati
 const GOD_N=1000; // 運営アカウントが一度に引ける数
 const PULLMAX=1000; // 一度に引ける数の上限（サーバーの pull_gacha と同じ）
 let GCNT=10;        // 「回数」で選んだ数
-function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.min(PULLMAX,Math.floor(WALLET.coins/PULLCOST)), busy=gBusy();
+function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':coinTxt(WALLET.coins); document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.min(PULLMAX,Math.floor(WALLET.coins/PULLCOST)), busy=gBusy();
   const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='<b>一振り</b><small>'+(GOD?'無料':PULLCOST+'銭')+'</small>';
   const p10=document.getElementById('g_pull10'); p10.disabled=busy||n<10; p10.innerHTML='<b>十振り</b><small>'+(GOD?'無料':10*PULLCOST+'銭')+'</small>';
   const all=document.getElementById('g_all'); all.hidden=GOD; all.disabled=busy||n<2;

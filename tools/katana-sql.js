@@ -10,10 +10,10 @@ const rows = body.split('\n').map(l => {
   const b = l.match(/\bbox:'([a-z0-9_]+)'/); return [m[1], m[2], b ? b[1] : 'b1'];
 }).filter(Boolean);
 const ev = s => Function('return ' + s)();
-const boxes = ev(js.match(/const BOXES=(\[.*?\]);/)[1]);
+const boxes = ev(js.match(/const BOXES=(\[[\s\S]*?\]);/)[1]);
 const ZNEW = +js.match(/const ZNEW=([\d.]+)/)[1], ZOLD = +js.match(/ZOLD=([\d.]+)/)[1];
-// [id, 出た順, 名前, 目玉の絶, 最新のときの絶%, 古くなってからの絶%]
-const boxRows = boxes.map((b, i) => [b.id, i + 1, b.mei, b.pick || null, b.zNew != null ? b.zNew : ZNEW, ZOLD]);
+// [id, 出た順, 名前, 目玉の絶, 最新のときの絶%, 古くなってからの絶%, 公開済みか（pre の箱は神様だけ。最初に入れるときだけ使う）]
+const boxRows = boxes.map((b, i) => [b.id, i + 1, b.mei, b.pick || null, b.zNew != null ? b.zNew : ZNEW, ZOLD, !b.pre]);
 function katanaRows(){ return rows; }
 module.exports = { katanaRows, boxRows: () => boxRows };
 if (require.main === module) {
@@ -21,7 +21,7 @@ if (require.main === module) {
   let sql = fs.readFileSync(file, 'utf8');
   const put = (tag, lines) => { const a = sql.indexOf('-- ' + tag + '-BEGIN'), b = sql.indexOf('  -- ' + tag + '-END');
     sql = sql.slice(0, a) + '-- ' + tag + '-BEGIN\n' + lines + '\n' + sql.slice(b); };
-  const q = v => v == null ? 'null' : typeof v === 'number' ? String(v) : "'" + String(v).replace(/'/g, "''") + "'";
+  const q = v => v == null ? 'null' : typeof v === 'number' || typeof v === 'boolean' ? String(v) : "'" + String(v).replace(/'/g, "''") + "'";
   put('BOXES', boxRows.map(r => '  (' + r.map(q).join(', ') + ')').join(',\n'));
   put('KATANA', rows.map(r => '  (' + r.map(q).join(', ') + ')').join(',\n'));
   fs.writeFileSync(file, sql);

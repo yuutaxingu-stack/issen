@@ -91,6 +91,14 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   let v = server(G);
   ok(v.owned.ouka === 10 && v.coins === 0 && v.pulls === 10, '十振りすべて桜華、銭は減らない ' + JSON.stringify({ ouka: v.owned.ouka, coins: v.coins }));
   ok(await p.screenshot({ path: process.env.SHOT || '/tmp/god-gacha.png' }) && true, '画面を撮った');
+  // 公開前の第二弾（八咫）は神様だけに見え、引ける
+  const gb = await p.evaluate(() => [...document.querySelectorAll('#g_box .gbx')].map(b => b.textContent));
+  ok(gb.length === 2 && /第二弾/.test(gb[0]) && /先/.test(gb[0]), '神様には公開前の第二弾が見える（先の印） ' + JSON.stringify(gb));
+  const gp = await p.evaluate(() => ACCT.pull(10, null, 'b2').then(r => (r.got || []).map(g => g.id), e => e.message));
+  const B2 = sql("select string_agg(id, ',') from public.katana_catalog where box = 'b2'").split(',');
+  ok(Array.isArray(gp) && gp.length === 10 && gp.every(id => B2.includes(id)), '神様は第二弾を引ける（第二弾の刀だけ）');
+  await p.evaluate(() => openGacha('book')); await p.waitForTimeout(200);
+  ok(/第二弾/.test(await p.textContent('#g_grid')), '神様の刀帳に第二弾が出る');
 
   console.log('--- ふつうのアカウント');
   const q = await mk(browser);
@@ -100,6 +108,14 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   ok(await q.textContent('#g_coins') === '0' && !(await q.isVisible('#g_pick')), '銭は0のまま、ピックアップは出ない');
   const r = await q.evaluate(() => ACCT.pull(1, 'ouka').then(() => 'got', e => e.message));
   ok(/ピックアップは使えません/.test(r), 'ピックアップを直接呼んでもサーバーが断る: ' + r);
+  const nb = await q.evaluate(() => [...document.querySelectorAll('#g_box .gbx')].map(b => b.textContent));
+  ok(nb.length === 1 && /第一弾/.test(nb[0]), 'ふつうの人には第二弾の箱が見えない ' + JSON.stringify(nb));
+  const r2 = await q.evaluate(() => ACCT.pull(1, null, 'b2').then(() => 'got', e => e.message));
+  ok(/その箱は引けません/.test(r2), '第二弾を直接引こうとしてもサーバーが断る: ' + r2);
+  await q.evaluate(() => openGacha('book')); await q.waitForTimeout(200);
+  const bt = await q.textContent('#g_grid');
+  ok(!/第二弾/.test(bt) && /第一弾/.test(bt), 'ふつうの人の刀帳に第二弾は出ない');
+  ok(!/八咫|\/50/.test(await q.textContent('#g_count')) , '刀帳の数も第一弾の分だけ: ' + (await q.textContent('#g_count')).slice(0, 14));
 
   await browser.close();
   console.log(fails ? 'NG ' + fails + '件' : 'すべてOK');

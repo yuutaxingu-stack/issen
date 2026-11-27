@@ -131,20 +131,50 @@ do $$ declare z numeric; n numeric; begin
   if public.box_latest() <> 'b1' then raise exception 'NG 最新の箱'; end if;
   raise notice 'OK 第一弾だけのうちは 絶 % ・並 %', z, n;
 end $$;
+-- 第二弾（八咫）は公開前: 神様だけが見て引ける。ほかの人は引けず、鍛えられず、最新の箱も第一弾のまま
+do $$ declare z2 numeric; begin
+  select weight into z2 from public.box_rates('b2') where tier = '絶';
+  if (select open from public.gacha_boxes where id = 'b2') or z2 <> 0.3 then raise exception 'NG 公開前の第二弾 %', z2; end if;
+  raise notice 'OK 第二弾は公開前（見えるのは神様だけ）・絶 %', z2;
+end $$;
 begin;
-insert into public.gacha_boxes (id, ord, mei, pick) values ('b2', 2, '第二弾', 'test_z2');
-insert into public.katana_catalog (id, tier, box) values ('test_z2', '絶', 'b2'), ('test_n2', '並', 'b2'), ('test_j2', '上', 'b2');
-do $$ declare z1 numeric; z2 numeric; n2 numeric; c int; begin
+update public.saves set coins = 1000000, steel = 100000, owned = '{"mumei":1}' where id = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
+do $$ begin perform public.pull_gacha(1, null, 'b2'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 公開前の箱は神様でないと引けない: %', sqlerrm; end $$;
+do $$ begin perform public.forge_katana('yata'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 公開前の箱の刀は鍛えられない: %', sqlerrm; end $$;
+do $$ declare g jsonb; begin g := public.get_save();
+  if g->'open_boxes' <> '["b1"]' then raise exception 'NG open_boxes %', g->'open_boxes'; end if;
+  if (public.pull_gacha(10) ->> 'box') <> 'b1' then raise exception 'NG 箱なしは第一弾'; end if;
+  raise notice 'OK 公開済みの箱 % ・箱を渡さなければ第一弾', g->'open_boxes'; end $$;
+do $$ begin perform public.god_open_box('b2'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 神様でないと公開できない: %', sqlerrm; end $$;
+reset role;
+insert into public.god_accounts (id) values ('22222222-2222-2222-2222-222222222222') on conflict do nothing;
+set role authenticated;
+create temp table p1 as select public.pull_gacha(1000, null, 'b2') g;
+reset role;
+update public.saves set owned = owned - 'yata' where id = '22222222-2222-2222-2222-222222222222';
+set role authenticated;
+do $$ begin if (public.forge_katana('yata') ->> 'god')::boolean is not true then raise exception 'NG'; end if; raise notice 'OK 神様は公開前の箱の刀も鍛えられる'; end $$;
+reset role;
+do $$ declare bad int; begin
+  select count(*) into bad from p1, jsonb_array_elements(g->'got') x join public.katana_catalog c on c.id = x->>'id' where c.box <> 'b2';
+  if bad > 0 then raise exception 'NG 箱の外の刀 %', bad; end if;
+  raise notice 'OK 神様は公開前の第二弾を引ける（第二弾の刀だけ）';
+end $$;
+-- 公開すると第二弾が最新に。第一弾は0.1%、第二弾は0.3%
+set role authenticated;
+do $$ declare g jsonb; begin g := public.god_open_box('b2'); if g->'open_boxes' <> '["b1", "b2"]' then raise exception 'NG %', g->'open_boxes'; end if; end $$;
+reset role;
+delete from public.god_accounts where id = '22222222-2222-2222-2222-222222222222';
+do $$ declare z1 numeric; z2 numeric; n2 numeric; begin
   select weight into z1 from public.box_rates('b1') where tier = '絶';
   select weight into z2 from public.box_rates('b2') where tier = '絶';
   select weight into n2 from public.box_rates('b2') where tier = '並';
-  select count(*) into c from public.box_rates('b2');
-  if public.box_latest() <> 'b2' or z1 <> 0.1 or z2 <> 0.3 or n2 <> 59.7 or c <> 3 then raise exception 'NG 第二弾の割合 % % % %', z1, z2, n2, c; end if;
-  raise notice 'OK 第二弾が出ると 第一弾の絶 % ・第二弾の絶 % ・第二弾の並 %（極・幻のない階級は外れる）', z1, z2, n2;
+  if public.box_latest() <> 'b2' or z1 <> 0.1 or z2 <> 0.3 or n2 <> 59.7 then raise exception 'NG 第二弾の割合 % % %', z1, z2, n2; end if;
+  raise notice 'OK 公開すると 第一弾の絶 % ・第二弾の絶 % ・第二弾の並 %', z1, z2, n2;
 end $$;
-update public.saves set coins = 1000000, owned = '{"mumei":1}' where id = '22222222-2222-2222-2222-222222222222';
 set role authenticated;
-set request.jwt.claim.sub = '22222222-2222-2222-2222-222222222222';
 create temp table p2 as select public.pull_gacha(1000) g union all select public.pull_gacha(1000, null, 'b1');
 reset role;
 do $$ declare bad int; old int; begin
@@ -157,9 +187,9 @@ end $$;
 set role authenticated;
 do $$ begin perform public.pull_gacha(1, null, 'nobox'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 知らない箱は断る: %', sqlerrm; end $$;
 reset role;
-update public.saves set steel = 6000, owned = owned - 'test_z2' where id = '22222222-2222-2222-2222-222222222222';
+update public.saves set steel = 6000, owned = owned - 'yata' where id = '22222222-2222-2222-2222-222222222222';
 set role authenticated;
-do $$ begin if (public.forge_katana('test_z2') ->> 'steel')::int <> 0 then raise exception 'NG'; end if; raise notice 'OK 新しい箱の絶も玉鋼6000で鍛えられる'; end $$;
+do $$ begin if (public.forge_katana('yata') ->> 'steel')::int <> 0 then raise exception 'NG'; end if; raise notice 'OK 公開した箱の絶は玉鋼6000で鍛えられる'; end $$;
 reset role;
 rollback;
 -- 絶0.5%を大きく引いて確かめる（2万回で 100 前後）

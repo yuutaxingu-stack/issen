@@ -12,7 +12,7 @@ const srv = [...block.matchAll(/\('([a-z0-9_]+)', '(.)', '([a-z0-9_]+)'\)/g)].ma
 ok(game === srv, '刀の一覧と箱（' + katanaRows().length + '本）が一致' + (game === srv ? '' : '。node tools/katana-sql.js を実行してください'));
 const ids = katanaRows().map(r => r[0]); ok(new Set(ids).size === ids.length, '刀の id に重なりがない');
 const bblock = sql.slice(sql.indexOf('BOXES-BEGIN'), sql.indexOf('BOXES-END'));
-const q = v => v == null ? 'null' : typeof v === 'number' ? String(v) : "'" + v + "'";
+const q = v => v == null ? 'null' : typeof v === 'number' || typeof v === 'boolean' ? String(v) : "'" + v + "'";
 const brow = boxRows().map(r => '(' + r.map(q).join(', ') + ')').join('|');
 const bsrv = [...bblock.matchAll(/\((.*)\)/g)].map(m => '(' + m[1] + ')').join('|');
 ok(brow === bsrv, '箱（' + boxRows().length + 'つ）が一致');

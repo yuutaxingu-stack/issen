@@ -34,6 +34,7 @@ create table if not exists public.gacha_boxes (
   pick text,                                                -- 目玉の絶の刀id
   z_new numeric not null default 0.3 check (z_new >= 0),    -- いちばん新しい箱のときの絶（%）
   z_old numeric not null default 0.1 check (z_old >= 0),    -- 古くなってからの絶（%）
+  open boolean not null default true,                       -- 公開済みか（false の箱は神様だけが見て引ける）
   added_at timestamptz not null default now()
 );
 
@@ -121,10 +122,15 @@ insert into public.finish_coins (finish, coins) values
   ('斬り伏せ', 3), ('背水', 9), ('落花', 9), ('刹那', 9), ('百花', 24), ('散華', 150)
 on conflict (finish) do update set coins = excluded.coins;
 
--- 箱（js/game.js の BOXES から node tools/katana-sql.js で作る）: id・出た順・名前・目玉の絶・新しいときの絶%・古いときの絶%
-insert into public.gacha_boxes (id, ord, mei, pick, z_new, z_old) values
+-- 公開前の箱（2026-11-27）: open = false の箱は神様だけに見え、神様だけが引ける。みんなに出すときは god_open_box
+alter table public.gacha_boxes add column if not exists open boolean not null default true;
+
+-- 箱（js/game.js の BOXES から node tools/katana-sql.js で作る）: id・出た順・名前・目玉の絶・新しいときの絶%・古いときの絶%・最初の公開
+-- 公開したかどうか（open）は、もう入っている箱では書き換えない
+insert into public.gacha_boxes (id, ord, mei, pick, z_new, z_old, open) values
   -- BOXES-BEGIN
-  ('b1', 1, '第一弾', 'ouka', 0.5, 0.1)
+  ('b1', 1, '第一弾', 'ouka', 0.5, 0.1, true),
+  ('b2', 2, '第二弾', 'yata', 0.3, 0.1, false)
   -- BOXES-END
 on conflict (id) do update set ord = excluded.ord, mei = excluded.mei, pick = excluded.pick, z_new = excluded.z_new, z_old = excluded.z_old;
 
@@ -164,7 +170,26 @@ insert into public.katana_catalog (id, tier, box) values
   ('mugen', '幻', 'b1'),
   ('nichirin', '幻', 'b1'),
   ('ouka', '絶', 'b1'),
-  ('geppaku', '幻', 'b1')
+  ('geppaku', '幻', 'b1'),
+  ('sumizome', '並', 'b2'),
+  ('yuugarasu', '並', 'b2'),
+  ('yoiyami', '並', 'b2'),
+  ('nibiiro', '並', 'b2'),
+  ('keshizumi', '並', 'b2'),
+  ('tasogare', '並', 'b2'),
+  ('kagebousi', '並', 'b2'),
+  ('yamiyo', '並', 'b2'),
+  ('karasuba', '上', 'b2'),
+  ('gesshoku', '上', 'b2'),
+  ('kinkan', '上', 'b2'),
+  ('saku', '上', 'b2'),
+  ('gyouan', '上', 'b2'),
+  ('kokuyou', '極', 'b2'),
+  ('kinu', '極', 'b2'),
+  ('yogarasu', '極', 'b2'),
+  ('kaiki', '幻', 'b2'),
+  ('iwato', '幻', 'b2'),
+  ('yata', '絶', 'b2')
   -- KATANA-END
 on conflict (id) do update set tier = excluded.tier, box = excluded.box;
 
@@ -180,7 +205,8 @@ create or replace function public.save_json(s public.saves) returns jsonb
 language sql stable set search_path = '' as $$
   select jsonb_build_object('coins', s.coins, 'steel', s.steel, 'best', s.cpu_best, 'owned', s.owned, 'rec', s.rec, 'equip', s.equip,
     'imports', s.imports, 'cost', (select c.pull_cost from public.app_config c where c.id = 1),
-    'god', exists (select 1 from public.god_accounts g where g.id = s.id));
+    'god', exists (select 1 from public.god_accounts g where g.id = s.id),
+    'open_boxes', (select coalesce(jsonb_agg(b.id order by b.ord), '[]') from public.gacha_boxes b where b.open));
 $$;
 
 -- 自分の行を（なければ作って）鍵をかけて取る
@@ -324,14 +350,14 @@ drop function if exists public.pull_gacha(int, text);
 create or replace function public.box_latest() returns text
 language sql stable set search_path = '' as $$
   select b.id from public.gacha_boxes b
-  where exists (select 1 from public.katana_catalog c where c.box = b.id and c.in_gacha)
+  where b.open and exists (select 1 from public.katana_catalog c where c.box = b.id and c.in_gacha)
   order by b.ord desc limit 1;
 $$;
 -- その箱の階級ごとの割合（刀が1本もない階級は出さない）
 create or replace function public.box_rates(p_box text) returns table (tier text, weight numeric)
 language sql stable set search_path = '' as $$
   with z as (
-    select case when b.id = public.box_latest() then b.z_new else b.z_old end as z from public.gacha_boxes b where b.id = p_box
+    select case when b.id = public.box_latest() or not b.open then b.z_new else b.z_old end as z from public.gacha_boxes b where b.id = p_box
   ), w as (
     select g.tier, case g.tier
       when '絶' then (select z.z from z)
@@ -358,6 +384,7 @@ begin
   if p_pick is not null and not exists (select 1 from public.katana_catalog c where c.id = p_pick) then raise exception 'その刀はありません'; end if;
   bx := coalesce(p_box, public.box_latest());
   if bx is null or not exists (select 1 from public.katana_catalog c where c.box = bx and c.in_gacha) then raise exception 'その箱は引けません'; end if;
+  if not god and not exists (select 1 from public.gacha_boxes b where b.id = bx and b.open) then raise exception 'その箱は引けません'; end if;
   select x.pull_cost into cost from public.app_config x where x.id = 1;
   if god then cost := 0; end if;
   if s.coins < p_n::bigint * cost then raise exception '銭が足りません。勝負に勝って銭を集めてください'; end if;
@@ -396,7 +423,8 @@ language plpgsql security definer set search_path = '' as $$
 declare s public.saves; t text; cost int;
 begin
   s := public.save_lock();
-  select c.tier into t from public.katana_catalog c where c.id = p_id and c.in_gacha;
+  select c.tier into t from public.katana_catalog c join public.gacha_boxes b on b.id = c.box
+  where c.id = p_id and c.in_gacha and (b.open or exists (select 1 from public.god_accounts g where g.id = s.id));
   if t is null then raise exception 'その刀は鍛えられません'; end if;
   if public.save_has(s, p_id) then raise exception 'その刀はもう持っています'; end if;
   select g.forge_cost into cost from public.gacha_tiers g where g.tier = t;
@@ -440,14 +468,25 @@ $$;
 revoke execute on function public.zetsu_owners(uuid[]) from public, anon, authenticated;
 grant execute on function public.zetsu_owners(uuid[]) to authenticated;
 
+-- 公開前の箱をみんなに公開する（神様だけ）。公開した箱が最新の箱になり、前の箱の絶は z_old に下がる
+create or replace function public.god_open_box(p_box text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not exists (select 1 from public.god_accounts g where g.id = auth.uid()) then raise exception '神様だけが使えます'; end if;
+  update public.gacha_boxes set open = true where id = p_box;
+  if not found then raise exception 'その箱はありません'; end if;
+  return public.get_save();
+end;
+$$;
+
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.save_num(jsonb, bigint), public.save_json(public.saves), public.save_lock(), public.save_has(public.saves, text),
   public.get_save(), public.import_local(jsonb), public.record_win(text, text, text), public.record_cpu_best(int),
   public.pull_gacha(int, text, text), public.set_equip(text, text), public.forge_katana(text),
-  public.box_latest(), public.box_rates(text)
+  public.box_latest(), public.box_rates(text), public.god_open_box(text)
   from public, anon, authenticated;
 grant execute on function
   public.get_save(), public.import_local(jsonb), public.record_win(text, text, text), public.record_cpu_best(int),
-  public.pull_gacha(int, text, text), public.set_equip(text, text), public.forge_katana(text)
+  public.pull_gacha(int, text, text), public.set_equip(text, text), public.forge_katana(text), public.god_open_box(text)
   to authenticated;

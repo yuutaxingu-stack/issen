@@ -223,7 +223,27 @@ const KATANA=[
   {id:'mugen',mei:'夢幻',yomi:'むげん',tier:'幻',wrap:[22,22,32],metal:'gold',blade:'iris',lore:'夢か、幻か。持つ者の影さえ映さない。',slash:{rainbow:true,glow:'rgba(180,140,255,1)',double:true,thick:1.5}},
   {id:'nichirin',mei:'日輪',yomi:'にちりん',tier:'幻',wrap:[232,202,122],metal:'gold',blade:[255,232,152,0.5],lore:'昇る日の輪。抜けば竹林に朝が来るという。',slash:{col:'#fff6d0',glow:'rgba(255,190,40,1)',double:true,thick:1.6}},
   {id:'ouka',mei:'桜華',yomi:'おうか',tier:'絶',src:'assets/katana_ouka.png',lore:'散ってなお咲く、ただ一振りの桜。抜けば竹林に花が舞う。',slash:{col:'#24030a',glow:'rgba(235,20,55,1)',double:true,thick:1.7,petals:true}},
-  {id:'geppaku',mei:'月白',yomi:'げっぱく',tier:'幻',wrap:[236,236,242],metal:'silver',blade:'iris',lore:'月が昇る前、東の空がわずかに白む色。鍛えた者を誰も知らない。',slash:{rainbow:true,glow:'rgba(233,184,255,1)',double:true,thick:1.5}}
+  {id:'geppaku',mei:'月白',yomi:'げっぱく',tier:'幻',wrap:[236,236,242],metal:'silver',blade:'iris',lore:'月が昇る前、東の空がわずかに白む色。鍛えた者を誰も知らない。',slash:{rainbow:true,glow:'rgba(233,184,255,1)',double:true,thick:1.5}},
+  // ---- 第二弾「八咫」の箱（並〜幻は色替えの仮の刀。絵が届いたら src を足して差し替える） ----
+  {id:'sumizome',box:'b2',mei:'墨染',yomi:'すみぞめ',tier:'並',wrap:[40,40,44],metal:'black',blade:[90,90,96,0.3],lore:'喪に服す者がまとう、墨で染めた衣の色。',slash:{col:'#e8e8ea',glow:'rgba(200,200,206,0.9)'}},
+  {id:'yuugarasu',box:'b2',mei:'夕烏',yomi:'ゆうがらす',tier:'並',wrap:[120,64,44],metal:'copper',blade:null,lore:'夕焼けを横切って、ねぐらへ帰る烏。',slash:{col:'#fff0e2',glow:'rgba(255,160,110,0.9)'}},
+  {id:'yoiyami',box:'b2',mei:'宵闇',yomi:'よいやみ',tier:'並',wrap:[44,48,82],metal:'silver',blade:[100,110,160,0.25],lore:'日が落ちて、月がまだ昇らない間の闇。',slash:{col:'#e6e8ff',glow:'rgba(140,150,230,0.9)'}},
+  {id:'nibiiro',box:'b2',mei:'鈍色',yomi:'にびいろ',tier:'並',wrap:[110,112,112],metal:'silver',blade:[140,140,140,0.3],lore:'光を返さない、くすんだ鉛の色。',slash:{col:'#ececec',glow:'rgba(190,190,190,0.9)'}},
+  {id:'keshizumi',box:'b2',mei:'消炭',yomi:'けしずみ',tier:'並',wrap:[58,50,46],metal:'black',blade:null,lore:'火を消したあとに残る軽い炭。また火を待っている。',slash:{col:'#f2e8e0',glow:'rgba(220,150,110,0.9)'}},
+  {id:'tasogare',box:'b2',mei:'黄昏',yomi:'たそがれ',tier:'並',wrap:[182,132,62],metal:'gold',blade:[220,170,100,0.2],lore:'誰そ彼と問うほど、人の顔が見えなくなる刻。',slash:{col:'#fff4de',glow:'rgba(255,200,120,0.9)'}},
+  {id:'kagebousi',box:'b2',mei:'影法師',yomi:'かげぼうし',tier:'並',wrap:[30,30,30],metal:'silver',blade:[60,60,64,0.35],lore:'持ち主の足もとから離れない、もう一人の剣士。',slash:{col:'#dcdcdc',glow:'rgba(160,160,160,0.9)'}},
+  {id:'yamiyo',box:'b2',mei:'闇夜',yomi:'やみよ',tier:'並',wrap:[22,26,40],metal:'black',blade:[50,56,80,0.35],lore:'月も星もない夜。抜いた刃だけが白い。',slash:{col:'#eef0f8',glow:'rgba(170,180,220,0.9)'}},
+  {id:'karasuba',box:'b2',mei:'烏羽',yomi:'からすば',tier:'上',wrap:[18,22,34],metal:'silver',blade:[70,90,140,0.35],lore:'濡れた烏の羽のような、青みを帯びた黒。',slash:{col:'#e6eeff',glow:'rgba(90,130,230,1)',double:true}},
+  {id:'gesshoku',box:'b2',mei:'月蝕',yomi:'げっしょく',tier:'上',wrap:[122,36,30],metal:'gold',blade:[180,70,50,0.3],lore:'地の影に呑まれ、赤銅に染まる月。',slash:{col:'#ffe4da',glow:'rgba(230,90,60,1)',double:true}},
+  {id:'kinkan',box:'b2',mei:'金環',yomi:'きんかん',tier:'上',wrap:[40,34,24],metal:'gold',blade:[255,210,110,0.32],lore:'月が日を覆いきれず、金の輪だけが残る。',slash:{col:'#fff4d2',glow:'rgba(255,200,70,1)',double:true}},
+  {id:'saku',box:'b2',mei:'朔',yomi:'さく',tier:'上',wrap:[60,60,70],metal:'silver',blade:[120,120,150,0.3],lore:'月の見えない夜。ここからまた満ちていく。',slash:{col:'#f0f0ff',glow:'rgba(170,170,240,1)',double:true}},
+  {id:'gyouan',box:'b2',mei:'暁闇',yomi:'ぎょうあん',tier:'上',wrap:[72,52,92],metal:'silver',blade:[160,130,200,0.28],lore:'夜明け前、いちばん深くなる闇。',slash:{col:'#f2eaff',glow:'rgba(170,130,240,1)',double:true}},
+  {id:'kokuyou',box:'b2',mei:'黒曜',yomi:'こくよう',tier:'極',wrap:[14,14,18],metal:'black',blade:[30,30,40,0.55],lore:'火の山が生んだ黒い玻璃。割れ口は刃より鋭い。',slash:{col:'#ffffff',glow:'rgba(200,210,255,1)',double:true,thick:1.3}},
+  {id:'kinu',box:'b2',mei:'金烏',yomi:'きんう',tier:'極',wrap:[200,150,40],metal:'gold',blade:[255,200,90,0.42],lore:'日の中に棲むという三本足の烏。',slash:{col:'#fff2cc',glow:'rgba(255,170,30,1)',double:true,thick:1.3}},
+  {id:'yogarasu',box:'b2',mei:'夜鴉',yomi:'よがらす',tier:'極',wrap:[30,20,40],metal:'black',blade:[90,60,140,0.42],lore:'夜に鳴く鴉は凶事の兆し。斬られた者だけがその声を聞く。',slash:{col:'#efe6ff',glow:'rgba(140,90,230,1)',double:true,thick:1.3}},
+  {id:'kaiki',box:'b2',mei:'皆既',yomi:'かいき',tier:'幻',wrap:[16,16,20],metal:'silver',blade:'iris',lore:'日が欠けきる一瞬。昼の空に星が出る。',slash:{rainbow:true,glow:'rgba(230,230,255,1)',double:true,thick:1.5}},
+  {id:'iwato',box:'b2',mei:'岩戸',yomi:'いわと',tier:'幻',wrap:[150,120,80],metal:'gold',blade:[255,240,200,0.5],lore:'日が隠れた岩の戸。開けば世に光が戻る。',slash:{col:'#fffbe8',glow:'rgba(255,230,150,1)',double:true,thick:1.6}},
+  {id:'yata',box:'b2',mei:'八咫',yomi:'やた',tier:'絶',src:'assets/katana_yata.png',up:true,lore:'日を覆う黒に、三本足の烏が道を示す。抜けば空が欠け、羽が降る。',slash:{col:'#000000',glow:'rgba(255,255,255,1)',double:true,thick:1.7,feathers:true}}
 ];
 const KMAP={}; KATANA.forEach(k=>KMAP[k.id]=k);
 // 描いた絵がある刀（src）は、その絵を読み込んでから作り直す
@@ -232,15 +252,21 @@ const METAL={gold:null,silver:[198,204,214],copper:[206,122,82],black:[44,40,38]
 /* ガチャの箱。出た順に並べる（新しい箱ほど後ろ）。箱の刀は katana の box で決まる（書いていなければ b1 = 第一弾）
    絶は箱ごとの目玉で、その箱の絶だけが出る。最新の箱は zNew%（ふつう0.3）、新しい箱が出たら古い箱は ZOLD%
    第一弾はリリース記念で、次の箱が出るまで 0.5%。並は残り（100 − 上・極・幻 − 絶）
-   箱を足すとき: ここに1行、刀に box:'b2' を付け、node tools/katana-sql.js → save-data.sql を SQL Editor で実行 */
-const BOXES=[{id:'b1',mei:'第一弾',pick:'ouka',zNew:0.5,note:'リリース記念'}];
+   箱を足すとき: ここに1行、刀に box:'b2' を付け、node tools/katana-sql.js → save-data.sql を SQL Editor で実行
+   pre:true の箱は最初は神様だけに見える（サーバーの gacha_boxes.open が false）。公開するとみんなに見え、最新の箱になる */
+const BOXES=[{id:'b1',mei:'第一弾',pick:'ouka',zNew:0.5,note:'リリース記念'},
+  {id:'b2',mei:'第二弾',pick:'yata',zNew:0.3,pre:true}];
+let OPENB=null; // サーバーが教える、公開済みの箱 id（まだ知らなければ pre でない箱が公開済み）
 const ZNEW=0.3, ZOLD=0.1;
 const TIERRATE=[['上',28],['極',10],['幻',2]];
 const boxOf=k=>k.box||'b1';
 const boxKats=b=>KATANA.filter(k=>boxOf(k)===b.id);
-function liveBoxes(){ return BOXES.filter(b=>boxKats(b).length); }
-function latestBox(){ const l=liveBoxes(); return l[l.length-1]; }
-function boxZ(b){ return b===latestBox()?(b.zNew!=null?b.zNew:ZNEW):ZOLD; }
+const boxOpen=b=>OPENB?OPENB.includes(b.id):!b.pre;
+const boxSeen=b=>boxOpen(b)||GOD;                 // 見えてよい箱（公開前の箱は神様だけ）
+const katSeen=k=>{ const b=BOXES.find(x=>x.id===boxOf(k)); return !b||boxSeen(b); };
+function liveBoxes(){ return BOXES.filter(b=>boxKats(b).length&&boxSeen(b)); }
+function latestBox(){ const l=liveBoxes().filter(boxOpen); return l[l.length-1]; }   // 確率の上での最新（公開済みの中で）
+function boxZ(b){ return (b===latestBox()||!boxOpen(b))?(b.zNew!=null?b.zNew:ZNEW):ZOLD; }
 function boxRates(b){ const z=boxZ(b), has=t=>boxKats(b).some(k=>k.tier===t);
   const r=[['並',100-TIERRATE.reduce((s,v)=>s+v[1],0)-z]].concat(TIERRATE,[['絶',z]]); return r.filter(([t])=>has(t)); }
 // 持っている刀が出たら玉鋼に変わる。玉鋼で好きな刀を鍛えられる（値段 ≒ その階級が出るまでの平均の銭 × 3）
@@ -255,7 +281,7 @@ function buildKatanas(){
   let src; try{ src=bx.getImageData(0,0,KIMG_W,KIMG_H); }catch(e){ src=null; }
   KATANA.forEach(def=>{
     const cvk=document.createElement('canvas'); cvk.width=KIMG_W; cvk.height=KIMG_H; const x=cvk.getContext('2d');
-    if(def.img&&def.img.complete&&def.img.naturalWidth){ x.drawImage(def.img,0,0,KIMG_W,KIMG_H); }
+    if(def.img&&def.img.complete&&def.img.naturalWidth){ if(def.up){ x.translate(0,KIMG_H); x.scale(1,-1); } x.drawImage(def.img,0,0,KIMG_W,KIMG_H); x.setTransform(1,0,0,1,0,0); } // up: 絵が元から刃が上
     else if(!src){ x.drawImage(KIMG,0,0,KIMG_W,KIMG_H); }
     else {
       const d=new ImageData(new Uint8ClampedArray(src.data),KIMG_W,KIMG_H), a=d.data;
@@ -286,7 +312,7 @@ function katOf(i){ if(G.mode==='online') return KMAP[i===NET.me?(NET.watch?NET.m
   return KMAP[(G.mode==='cpu'&&i===1)?CPUKAT:(ARM.equip[i]||'mumei')]||KMAP.mumei; }
 function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x)],['上',lerp(0.12,0.45,x)],['極',lerp(0,0.22,x)],['幻',lerp(0,0.06,x)],['絶',lerp(0,0.015,x)]];
   let r=Math.random()*w.reduce((s,v)=>s+v[1],0), t='並'; for(const [k,v] of w){ if((r-=v)<=0){ t=k; break; } }
-  const pool=KATANA.filter(k=>k.tier===t); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
+  const pool=KATANA.filter(k=>k.tier===t&&boxOpen(BOXES.find(b=>b.id===boxOf(k))||{})); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
 function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&(NET.watch||i!==NET.me)) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0,G.mode==='vs'?'vs':null); }
 function rollKatana(b){ const rt=boxRates(b); let r=Math.random()*rt.reduce((s,v)=>s+v[1],0), t=rt[0][0]; for(const [k,v] of rt){ if((r-=v)<=0){ t=k; break; } }
   const pool=boxKats(b).filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
@@ -328,7 +354,7 @@ function guestData(){ // この端末に保存されている記録（ログイ�
   a=a||{}; w=w||{}; return {coins:w.coins||0,best:w.best||0,steel:w.steel||0,owned:a.owned||{},rec:a.rec||{},equip:a.equip||['mumei','mumei']}; }
 function applySave(d,pend){ // アカウントの持ち物を画面に映す。pend: まだサーバーに届いていない銭
   ARM.owned=Object.assign({mumei:1},d.owned||{}); ARM.rec=d.rec||{}; ARM.equip=Array.isArray(d.equip)&&d.equip.length===2?d.equip.slice():['mumei','mumei'];
-  WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; WALLET.steel=d.steel||0; if(d.cost>0) PULLCOST=d.cost; GOD=!!d.god;
+  WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; WALLET.steel=d.steel||0; if(d.cost>0) PULLCOST=d.cost; GOD=!!d.god; if(Array.isArray(d.open_boxes)) OPENB=d.open_boxes;
   uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
 function useAccount(api){ ACCT=api; setTimeout(importAction,0); }
 /* 新・一閃（action.html）との受け渡し: 持っている刀をあちらへ見せ、あちらの勝ちを銭と戦績に足す */
@@ -938,13 +964,15 @@ function enso(c,cx,cy,R,col,seed){ const r=mulberry32(seed); const a0=-1.9, span
   c.restore(); }
 function drawTitle(c,now){
   // 墨を重ねて竹林を沈める
-  const Z=KREADY&&katOf(0).tier==='絶'; // 絶の刀を持たせていると、赤黒い闇と紅い月
+  const Z=KREADY&&katOf(0).tier==='絶'; // 絶の刀を持たせていると、その刀の色の闇（桜華=赤黒と紅い月、八咫=墨と日食）
+  const ZT=Z?zTheme(katOf(0)):null;
   const R=Math.min(VH*0.3,VW*0.2), ecx=VW*0.36, ecy=VH*0.42;
-  if(Z){ c.save(); const zg=c.createRadialGradient(VW*0.4,VH*0.5,VH*0.05,VW*0.45,VH*0.5,Math.max(VW,VH)*0.75); zg.addColorStop(0,'#5a0d18'); zg.addColorStop(0.55,'#250609'); zg.addColorStop(1,'#070203');
+  if(Z){ c.save(); const zg=c.createRadialGradient(VW*0.4,VH*0.5,VH*0.05,VW*0.45,VH*0.5,Math.max(VW,VH)*0.75); zg.addColorStop(0,ZT.bg[0]); zg.addColorStop(0.55,ZT.bg[1]); zg.addColorStop(1,ZT.bg[2]);
     c.fillStyle=zg; c.fillRect(0,0,VW,VH);
-    c.globalAlpha=0.6; c.fillStyle='#b3122a'; c.shadowColor='#ff2a44'; c.shadowBlur=R*0.5; c.beginPath(); c.arc(ecx+R*0.55,ecy-R*0.35,R*0.62,0,7); c.fill(); c.restore();
-    c.save(); c.globalAlpha=0.1; c.fillStyle='#ff5a6a'; c.font='bold '+(R*2.1)+'px '+DISPLAY; c.textAlign='center'; c.textBaseline='middle'; c.fillText('絶',ecx-R*0.55,ecy+R*0.15); c.restore();
-    enso(c,ecx,ecy,R,'rgba(220,40,60,0.22)',23);
+    if(ZT.sun==='eclipse'){ c.restore(); drawEclipse(c,ecx+R*0.55,ecy-R*0.35,Math.round(R*0.42),now/1000); }
+    else { c.globalAlpha=0.6; c.fillStyle='#b3122a'; c.shadowColor='#ff2a44'; c.shadowBlur=R*0.5; c.beginPath(); c.arc(ecx+R*0.55,ecy-R*0.35,R*0.62,0,7); c.fill(); c.restore(); }
+    c.save(); c.globalAlpha=0.1; c.fillStyle=ZT.mark; c.font='bold '+(R*2.1)+'px '+DISPLAY; c.textAlign='center'; c.textBaseline='middle'; c.fillText('絶',ecx-R*0.55,ecy+R*0.15); c.restore();
+    enso(c,ecx,ecy,R,rgba(ZT.deep,0.22),23);
   } else {
   c.save(); c.fillStyle='rgba(14,15,12,0.84)'; c.fillRect(0,0,VW,VH);
   const vg=c.createRadialGradient(VW*0.34,VH*0.4,VH*0.1,VW*0.4,VH*0.5,Math.max(VW,VH)*0.75); vg.addColorStop(0,'rgba(40,42,34,0)'); vg.addColorStop(1,'rgba(4,4,3,0.7)');
@@ -958,7 +986,7 @@ function drawTitle(c,now){
   brushStroke(c,-kw*0.58,kh*1.5,kw*0.46,kh*1.25,kh*1.1,'rgba(4,4,3,0.55)',7);
   // 刀（描き替えず、光と影だけ）
   if(KIMG.complete&&KIMG.naturalWidth){
-    const TK=KREADY?katOf(0).canvas:KIMG; c.save(); c.shadowColor=Z?'rgba(255,30,60,0.8)':'rgba(0,0,0,0.85)'; c.shadowBlur=18; c.shadowOffsetY=6; c.scale(1,-1); c.drawImage(TK,-kw/2,-kh/2,kw,kh); c.restore();
+    const TK=KREADY?katOf(0).canvas:KIMG; c.save(); c.shadowColor=Z?rgba(ZT.hot,0.8):'rgba(0,0,0,0.85)'; c.shadowBlur=18; c.shadowOffsetY=6; c.scale(1,-1); c.drawImage(TK,-kw/2,-kh/2,kw,kh); c.restore();
     const T=5200, k=(now%T)/T;
     if(k<0.42){ const u=ease(k/0.42), B0=262, sx=B0+(KIMG_W-B0)*u, gw=KIMG_W*0.09, a=0.85*Math.sin(Math.PI*u);
       if(!SHINE){ SHINE=document.createElement('canvas'); SHINE.width=KIMG_W; SHINE.height=KIMG_H; }
@@ -985,6 +1013,7 @@ function drawTitle(c,now){
   txt(c,'閃',lx,ly+1,sz*0.72,DISPLAY,'rgba(14,15,12,0.85)','center');
   // 散る花びら（絶）
   if(Z){ for(let i=0;i<90;i++){ const q=ZPET[i], t=now/1000, x=((q.x+t*0.02*q.s+Math.sin(t*0.7+i)*0.01)%1)*VW, y=((q.y+t*0.035*q.s)%1)*VH, sz=VH*0.008*(1+q.s), rr=q.r+t*1.5*q.s;
+    if(ZT.parts==='feather'){ if(i%2) continue; c.save(); c.globalAlpha=0.6+q.v*0.4; drawFeather(c,{x,y,s:sz*1.3,r:rr*0.4,w:t*0.8+i,d:q.k<0.7,c:'rgba(246,246,250,.95)'}); c.restore(); continue; }
     c.save(); c.globalAlpha=0.55+q.v*0.4; c.fillStyle=q.k<0.3?'#1a0205':q.k<0.75?'#b3122a':'#e0566c'; c.translate(x,y); c.rotate(rr); c.scale(1,0.45+0.55*Math.abs(Math.sin(rr*1.7))); c.beginPath(); c.ellipse(0,0,sz,sz*0.55,0,0,7); c.fill(); c.restore(); } }
   // 散る一葉
   const lt=(now%9000)/9000, lx2=VW*(0.62-lt*0.25)+Math.sin(lt*9)*VW*0.02, ly2=VH*(-0.05+lt*1.1), L=VH*0.024;
@@ -1001,6 +1030,7 @@ function zetsuField(now){
   const on=G.phase!=='title'&&(katOf(0).tier==='絶'||katOf(1).tier==='絶');
   const dt=Math.min(0.1,Math.max(0,(now-ZFS.last)/1000)); ZFS.last=now;
   ZFS.b+=((on?1:0)-ZFS.b)*Math.min(1,dt*3); if(!on&&ZFS.b<0.01) ZFS.b=0;
+  if(on) ZFS.t=zTheme(katOf(0).tier==='絶'?katOf(0):katOf(1));  // 二人とも絶なら朱の刀の戦場
   ZFS.f=on?mutualLevel(now):0; return ZFS;
 }
 function buildSakuraBG(night){
@@ -1025,8 +1055,35 @@ function buildSakuraBG(night){
   b.fillStyle=gr; b.fillRect(0,GY,VW,VH-GY); b.fillStyle=night?'rgba(255,90,110,.35)':'rgba(255,230,236,.35)'; b.fillRect(0,GY,VW,2);
   return bgc;
 }
+/* 八咫の戦場: 竹林が枯れ木の野に変わり、空の日が欠ける。互いに後なしでは日が欠けきり、白いコロナだけが残る闇 */
+function buildEclipseBG(night){
+  const bgc=document.createElement('canvas'); bgc.width=Math.round(VW*DPR); bgc.height=Math.round(VH*DPR);
+  const b=bgc.getContext('2d'); b.setTransform(DPR,0,0,DPR,0,0); const rnd=mulberry32(night?83:82);
+  let g=b.createLinearGradient(0,0,0,GY);
+  if(night){ g.addColorStop(0,'#000000'); g.addColorStop(0.6,'#0b0b0e'); g.addColorStop(1,'#26262c'); } else { g.addColorStop(0,'#3c3c44'); g.addColorStop(0.6,'#7a7a84'); g.addColorStop(1,'#b4b2b0'); }
+  b.fillStyle=g; b.fillRect(0,0,VW,GY+2);
+  const R=Math.round(Math.min(VW,VH)*(night?0.11:0.09)), mx=VW*0.7, my=VH*0.22;
+  if(night) drawEclipse(b,mx,my,R,0);
+  else { // 欠けていく日: 白い日に黒い月が半ばかかる
+    const sg=b.createRadialGradient(mx,my,R*0.9,mx,my,R*3.2); sg.addColorStop(0,'rgba(255,255,255,.55)'); sg.addColorStop(1,'rgba(255,255,255,0)'); b.fillStyle=sg; b.fillRect(0,0,VW,GY);
+    b.fillStyle='#fbfbfd'; b.beginPath(); b.arc(mx,my,R,0,7); b.fill(); b.fillStyle='#0a0a0c'; b.beginPath(); b.arc(mx-R*0.45,my-R*0.12,R*0.98,0,7); b.fill(); }
+  // 枯れ木を一列に（枝に烏の影）
+  const n=Math.max(5,Math.round(VW/(FH*1.25))), trunk=night?'#000':'#1c1c20';
+  for(let i=0;i<n;i++){ let x=(i+0.5)*VW/n+(rnd()-0.5)*VW/n*0.5; if(Math.abs(x-VW*0.2)<VW*0.05||Math.abs(x-VW*0.8)<VW*0.05) x+=VW*0.06*(rnd()<0.5?-1:1);
+    const h=FH*(1.9+rnd()*0.35), w=FH*(0.95+rnd()*0.25);
+    b.strokeStyle=trunk; b.lineCap='round'; b.lineWidth=FH*0.07; b.beginPath(); b.moveTo(x,GY+2); b.quadraticCurveTo(x+FH*0.08,GY-h*0.5,x,GY-h*0.72); b.stroke();
+    b.lineWidth=FH*0.025; b.beginPath(); b.moveTo(x+FH*0.03,GY-h*0.5); b.lineTo(x-w*0.5,GY-h*0.82); b.moveTo(x+FH*0.04,GY-h*0.58); b.lineTo(x+w*0.55,GY-h*0.9);
+    b.moveTo(x,GY-h*0.7); b.lineTo(x+w*0.12,GY-h*1.0); b.moveTo(x-w*0.25,GY-h*0.66); b.lineTo(x-w*0.42,GY-h*0.7); b.stroke();
+    if(rnd()<0.6){ const cx=x+(rnd()<0.5?-w*0.38:w*0.42), cy=GY-h*(0.79+rnd()*0.06), s=FH*0.05; b.fillStyle=trunk; // 枝の烏
+      b.beginPath(); b.ellipse(cx,cy,s*0.9,s*0.55,-0.2,0,7); b.fill(); b.beginPath(); b.arc(cx+s*0.75,cy-s*0.45,s*0.38,0,7); b.fill();
+      b.beginPath(); b.moveTo(cx-s*0.7,cy); b.lineTo(cx-s*1.6,cy+s*0.5); b.lineTo(cx-s*0.6,cy+s*0.35); b.fill(); } }
+  const gr=b.createLinearGradient(0,GY,0,VH); if(night){ gr.addColorStop(0,'#0c0c0e'); gr.addColorStop(1,'#000'); } else { gr.addColorStop(0,'#3a3a40'); gr.addColorStop(1,'#16161a'); }
+  b.fillStyle=gr; b.fillRect(0,GY,VW,VH-GY); b.fillStyle=night?'rgba(255,255,255,.4)':'rgba(255,255,255,.25)'; b.fillRect(0,GY,VW,2);
+  return bgc;
+}
 function drawZetsuField(c,now,zf){
-  const key=VW+'x'+VH+'@'+DPR; if(!bgCache[key+'s']) bgCache[key+'s']=buildSakuraBG(false); if(!bgCache[key+'n']) bgCache[key+'n']=buildSakuraBG(true);
+  const FE=zf.t&&zf.t.parts==='feather', key=VW+'x'+VH+'@'+DPR+(FE?'e':''), mk=FE?buildEclipseBG:buildSakuraBG;
+  if(!bgCache[key+'s']) bgCache[key+'s']=mk(false); if(!bgCache[key+'n']) bgCache[key+'n']=mk(true);
   c.save(); c.globalAlpha=zf.b; c.drawImage(bgCache[key+'s'],0,0,VW,VH);
   if(zf.f>0){ c.globalAlpha=zf.b*zf.f; c.drawImage(bgCache[key+'n'],0,0,VW,VH);
     const pulse=0.5+0.5*Math.sin(now/520); const vg=c.createRadialGradient(VW/2,VH*0.5,Math.min(VW,VH)*0.32,VW/2,VH*0.5,Math.max(VW,VH)*0.75); vg.addColorStop(0,'rgba(40,0,6,0)'); vg.addColorStop(1,'rgba(30,0,4,'+(0.5+0.15*pulse)+')'); c.fillStyle=vg; c.fillRect(0,0,VW,VH); }
@@ -1036,22 +1093,24 @@ function drawZetsuField(c,now,zf){
 const ZPET=[]; (function(){ const r=mulberry32(29); for(let i=0;i<320;i++) ZPET.push({x:r(),y:r(),s:0.6+r()*1.1,r:r()*6,v:r(),k:r()}); })();
 function drawZetsuPetals(c,now,dt,zf){
   const f=zf.f, n=Math.floor((90+230*f)*zf.b), wind=0.02+f*0.16+Math.max(0,Math.sin(now/900))*f*0.12, fall=0.05+f*0.07;
-  const PK=['#f8d3de','#f2b3c6','#e88aa7'], CR=['#a3182c','#7d0f20','#2a0306'];
-  for(let i=0;i<n;i++){ const q=ZPET[i];
+  const PK=['#f8d3de','#f2b3c6','#e88aa7'], CR=['#a3182c','#7d0f20','#2a0306'], FE=zf.t&&zf.t.parts==='feather';
+  for(let i=0;i<n;i++){ const q=ZPET[i]; if(FE&&i%(f>0.5?5:3)) continue;  // 八咫は烏の羽（数は少なめ、大きめ）
     if(dt>0){ q.x+=(wind+0.01*Math.sin(now/700+i))*q.s*dt; q.y+=(fall*q.s+0.008*Math.sin(now/500+i))*dt; q.r+=dt*2*q.s; }
     if(q.y>1.04){ q.y=-0.04; q.x=Math.random(); } if(q.x>1.04){ q.x=-0.04; q.y=Math.random(); }
     const x=q.x*VW, y=q.y*VH, sz=VH*0.008*(1+q.s)*(0.9+f*0.4);
+    if(FE){ c.save(); c.globalAlpha=(0.6+q.v*0.4)*zf.b; drawFeather(c,{x,y,s:sz*(f>0.5?1.05:1.3),r:q.r*0.4,w:now/1200+i,d:f>0.5?q.k<0.5:q.k<0.75,c:'rgba(246,246,250,.95)'}); c.restore(); continue; }
     c.save(); c.globalAlpha=(0.55+q.v*0.45)*zf.b; c.fillStyle=f>0.5&&q.k<0.75?CR[i%3]:PK[i%3]; c.translate(x,y); c.rotate(q.r); c.scale(1,0.45+0.55*Math.abs(Math.sin(q.r*1.7)));
     c.beginPath(); c.ellipse(0,0,sz,sz*0.55,0,0,7); c.fill(); c.restore(); }
 }
 // 桜華の居合: 赤黒い軌跡から花びらが散る
 function zSlashPetals(c,i,te){
-  const k=katOf(i); if(!k.slash||!k.slash.petals||te<0||te>1700) return;
+  const k=katOf(i); if(!k.slash||!(k.slash.petals||k.slash.feathers)||te<0||te>1700) return; const FE=k.slash.feathers;
   const y=GY-0.58*FH, r=mulberry32(91+i), t=te/1000;
   c.save();
   for(let j=0;j<70;j++){ const px=r()*VW, vx=(r()-0.5)*VW*0.12, vy=-(0.1+r()*0.5)*FH, rot=r()*6, s=FH*(0.018+r()*0.03), born=Math.abs(px-(MIR?VW-px:px))*0+r()*0.18;
     const tt=t-born; if(tt<0) continue; const a=Math.max(0,1-tt/1.5);
     const x=px+vx*tt, yy=y+(r()-0.5)*FH*0.12+vy*tt+FH*0.9*tt*tt;
+    if(FE){ if(j%2) continue; c.globalAlpha=a; drawFeather(c,{x,y:yy,s:s*1.5,r:rot+tt*3,w:rot+tt*4,d:j%4!==0,c:'rgba(250,250,252,.95)'}); continue; }
     c.globalAlpha=a; c.fillStyle=j%4===0?'#1a0205':j%2?'#c4142e':'#ff8aa0'; c.save(); c.translate(x,yy); c.rotate(rot+tt*5); c.scale(1,0.5+0.5*Math.abs(Math.sin(rot+tt*6)));
     c.beginPath(); c.ellipse(0,0,s,s*0.55,0,0,7); c.fill(); c.restore(); }
   c.restore();
@@ -1220,7 +1279,7 @@ function updateUI(){
   document.getElementById('ps_resume').textContent=G.mode==='online'?'続ける（試合は止まりません）':'続ける';
   document.getElementById('ps_title').textContent=G.mode==='online'?'退出してタイトルへ':'タイトルへ戻る';
   menuEl.hidden=!menuOn;
-  document.getElementById('m_meta').textContent='所持 '+(GOD?'無限':coinTxt(WALLET.coins))+' 銭・玉鋼 '+(WALLET.steel||0)+'　・　刀帳 '+KATANA.filter(k=>ARM.owned[k.id]).length+'/'+KATANA.length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
+  document.getElementById('m_meta').textContent='所持 '+(GOD?'無限':coinTxt(WALLET.coins))+' 銭・玉鋼 '+(WALLET.steel||0)+'　・　刀帳 '+KATANA.filter(k=>katSeen(k)&&ARM.owned[k.id]).length+'/'+KATANA.filter(katSeen).length+'　・　CPU戦 最高 '+WALLET.best+'人抜き'+(ACCT?'　・　アカウントに保存中':'');
 }
 document.getElementById('m_cpu').addEventListener('click',()=>{ ensureAudio(); startMatch('cpu'); });
 document.getElementById('m_vs').addEventListener('click',()=>{ ensureAudio(); startMatch('vs'); });
@@ -1261,13 +1320,13 @@ function boxName(b){ const f=KMAP[b.pick]; return b.mei+(f?'「'+f.mei+'」':'')
 function renderBox(){ const el=document.getElementById('g_box'); if(!el) return; const b=curBox(), l=liveBoxes().slice().reverse(), f=KMAP[b.pick], z=boxZ(b), busy=gBusy();
   const key=b.id+'|'+l.length+'|'+busy; if(el.dataset.k===key) return; el.dataset.k=key;
   // 左の札: 新しい箱ほど上
-  el.innerHTML=l.map(x=>{ const fk=KMAP[x.pick]; return '<button type="button" class="gbx'+(x===b?' on':'')+'" data-box="'+x.id+'"'+(busy?' disabled':'')+'><span class="n">'+x.mei+'</span><span class="m">'+(fk?fk.mei:'？')+'</span><span class="z"><i>絶</i>'+pct(boxZ(x))+'</span>'+(x===latestBox()?'<em>新</em>':'')+'</button>'; }).join('');
+  el.innerHTML=l.map(x=>{ const fk=KMAP[x.pick]; return '<button type="button" class="gbx'+(x===b?' on':'')+'" data-box="'+x.id+'"'+(busy?' disabled':'')+'><span class="n">'+x.mei+'</span><span class="m">'+(fk?fk.mei:'？')+'</span><span class="z"><i>絶</i>'+pct(boxZ(x))+'</span>'+(!boxOpen(x)?'<em class="pre">先</em>':x===latestBox()?'<em>新</em>':'')+'</button>'; }).join('');
   el.querySelectorAll('button[data-box]').forEach(btn=>btn.addEventListener('click',()=>{ if(gBusy()) return; const nb=BOXES.find(x=>x.id===btn.dataset.box); if(nb===GA.box) return; GA.box=nb; banStop(); refreshCoins(); }));
   // 看板の文字
   document.getElementById('g_bk').textContent=b.mei+'　目玉';
   document.getElementById('g_bm').textContent=f?f.mei:'？';
   document.getElementById('g_bz').textContent=pct(z);
-  document.getElementById('g_bn').textContent=(b===latestBox()&&b.note&&b.zNew!=null&&b.zNew!==ZNEW)?b.note+'　次の箱が出るまで 絶 '+pct(z):b===latestBox()?'最新の箱　絶 '+pct(z):'前の箱　絶 '+pct(z)+'・玉鋼でも鍛えられます';
+  document.getElementById('g_bn').textContent=!boxOpen(b)?'神様だけの先行公開（まだみんなには見えません）　絶 '+pct(z):(b===latestBox()&&b.note&&b.zNew!=null&&b.zNew!==ZNEW)?b.note+'　次の箱が出るまで 絶 '+pct(z):b===latestBox()?'最新の箱　絶 '+pct(z):'前の箱　絶 '+pct(z)+'・玉鋼でも鍛えられます';
   const rt=document.getElementById('g_rate'); if(rt) rt.textContent='出る確率（'+b.mei+'）　'+boxRates(b).map(([t,v])=>t+' '+pct(v)).join('・'); }
 /* 目玉の看板: 刀帳と同じ抜刀の舞台を、待っている間だけ動かす（開くたび・箱を替えるたびに抜き直す） */
 let BAN=null;
@@ -1315,7 +1374,7 @@ function doPull(n){
   msg.textContent=''; ensureAudio();
   if(ACCT){ // ログイン中: くじはサーバーが引く
     GA.phase='wait'; msg.textContent='引いています…'; refreshCoins();
-    ACCT.pull(n,GOD?(document.getElementById('g_pick').value||null):null,curBox()===latestBox()?null:curBox().id).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
+    ACCT.pull(n,GOD?(document.getElementById('g_pick').value||null):null,curBox().id).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
       startDraw(r.got.map(g=>{ const k=KMAP[g.id]||KMAP.mumei; return {k,isNew:!!g.new,steel:g.new?0:(g.steel!=null?g.steel:STEEL[k.tier])}; }),r.back||0); },
       e=>{ if(GA.phase==='wait') GA.phase='idle'; msg.textContent=e.message; refreshCoins(); });
     return;
@@ -1512,12 +1571,12 @@ function drawStrip(c,W,H){
 let FBAR=null; function FORGEBAR(){ return FBAR||(FBAR=tintCanvas(KMAP.mumei.canvas,'#ff8a3a')); }
 const TINTC={}; function tintCanvasCached(k,t){ const key=k.id+t; return TINTC[key]||(TINTC[key]=tintCanvas(k.canvas,t==='幻'?'#f3e6ff':t==='絶'?'#a3182c':(TIERGLOW[t]+'1)'))); }
 function renderBook(){
-  const grid=document.getElementById('g_grid'); grid.innerHTML='';
-  const got=KATANA.filter(k=>ARM.owned[k.id]).length;
-  document.getElementById('g_count').innerHTML='集めた刀　'+got+' / '+KATANA.length+'<small>玉鋼 <b>'+(WALLET.steel||0)+'</b>　まだ持っていない刀に触れると、玉鋼で鍛えられます</small>';
+  const grid=document.getElementById('g_grid'); grid.innerHTML=''; const KS=KATANA.filter(katSeen); // 公開前の箱の刀は神様だけ
+  const got=KS.filter(k=>ARM.owned[k.id]).length;
+  document.getElementById('g_count').innerHTML='集めた刀　'+got+' / '+KS.length+'<small>玉鋼 <b>'+(WALLET.steel||0)+'</b>　まだ持っていない刀に触れると、玉鋼で鍛えられます</small>';
   const bord=k=>{ const i=BOXES.findIndex(b=>b.id===boxOf(k)); return i<0?999:i; }; let hb=null;
-  KATANA.map((k,i)=>[k,i]).sort((a,b)=>bord(b[0])-bord(a[0])||TORD[a[0].tier]-TORD[b[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
-    if(boxOf(k)!==hb){ hb=boxOf(k); const bx=BOXES.find(b=>b.id===hb), ks=KATANA.filter(x=>boxOf(x)===hb);
+  KS.map((k,i)=>[k,i]).sort((a,b)=>bord(b[0])-bord(a[0])||TORD[a[0].tier]-TORD[b[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
+    if(boxOf(k)!==hb){ hb=boxOf(k); const bx=BOXES.find(b=>b.id===hb), ks=KS.filter(x=>boxOf(x)===hb);
       const h=document.createElement('h3'); h.className='gbh'; h.innerHTML=(bx?boxName(bx):hb)+'の箱<small>'+ks.filter(x=>ARM.owned[x.id]).length+' / '+ks.length+'</small>'; grid.appendChild(h); }
     const b=document.createElement('button'); b.type='button'; b.className='gcard t'+TORD[k.tier]+(own?'':' unk');
     const cvs=document.createElement('canvas'); cvs.width=420; cvs.height=Math.round(420*KIMG_H/KIMG_W)+8;
@@ -1541,10 +1600,12 @@ const ZART={
   yata:{mei:'八咫',yomi:'やた',up:true,saya:'assets/katana_yata_saya.png',hd:'assets/katana_yata_hd.png',sayaHd:'assets/katana_yata_saya_hd.png',src:'assets/katana_yata.png',
     bg:['#3a3a40','#121215','#020203'],hot:[255,255,255],deep:[210,210,220],pale:[255,255,255],void:[2,2,3],band:'#060608',seal:['#0a0a0c','#f4f4f6'],mark:'#ffffff',
     tint:['rgba(255,255,255,.18)','rgba(255,255,255,.55)'],parts:'feather',sun:'eclipse'}};
+function zTheme(k){ return ZART[k&&k.id]||ZART.ouka; }  // 絶の刀の色と舞うもの（ZART にない絶は桜華の色）
 function zArt(id){ const a=ZART[id]||ZART.ouka; if(!a.S){ a.S=new Image(); a.S.src=a.saya; a.B=new Image(); a.B.src=a.src; } return a; }
 function zArtHd(a){ if(!a.H){ a.H=new Image(); a.H.src=a.hd; } return a.H; }
 // 抜き身の絵: KATANA に入っていれば作り直した絵、まだなら元の絵
-function zBlade(k,a){ return k.canvas||(a.B.complete&&a.B.naturalWidth?a.B:null); }
+// up の絵（八咫）は元の絵をそのまま使う（鞘・HDの絵と同じく刃が上で、反転しない）
+function zBlade(k,a){ const raw=a.B.complete&&a.B.naturalWidth?a.B:null; return a.up?(raw||null):(k.canvas||raw); }
 const rgba=(c,al)=>'rgba('+c[0]+','+c[1]+','+c[2]+','+al+')';
 let ZST=null;
 /* 刀帳・桜華の抜刀: 闇に細い帯のカットが次々と斬り込む（鍔 → 鯉口の光 → 走る刃）。
@@ -1616,6 +1677,8 @@ function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
   if(ZST){ ZST.stop(); ZST=null; }
   c.hidden=!k; zw.hidden=!k; if(!k) return;
+  if(zw.dataset.ouka==null) zw.dataset.ouka=zw.innerHTML;   // 業の一覧は今は桜華だけ。ほかの絶は戦場の変化だけ書く
+  zw.innerHTML=k.id==='ouka'?zw.dataset.ouka:'<h3>絶の業（新・一閃）</h3><p class="gnote">業はこれから明かされる。</p><p class="gnote">この刀を持つ者が立てば、竹林は枯れ木の野に変わり、空の日が欠ける。互いに後がなければ日は欠けきる。</p>';
   ZST=zRun(c,k,{});
   c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
 }

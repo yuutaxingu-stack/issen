@@ -707,9 +707,15 @@ function drawBody(c,x,gy,h,face,J,o){
     if(full) c.drawImage(simg,-KIMG_TSUBA*kk,-KT/2,KL,KT); else { const sx=KIMG_TSUBA+14; c.drawImage(simg,sx,0,KIMG_W-sx,KIMG_H,14*kk,-KT/2,(KIMG_W-sx)*kk,KT); } c.restore(); };
   if(!simg) poly([s1,s2],o.mono||'#1d1512',lw*1.1);
   if(!J.blade){
-    const g=(o.glint||0)*0.05; const m=[s2[0]+dx*g,s2[1]+dy*g];
-    if(g>0) poly([s2,m],o.mono||'#ffffff',lw*0.8);
-    if(simg) sayaAt(m,true);
+    // 居合の溜め: 柄が前へ滑り、鯉口から刀身がのぞく（鞘は腰に残る）
+    const g=(o.glint||0)*0.1; const m=[s2[0]+dx*g,s2[1]+dy*g];
+    if(simg&&g>0) sayaAt(s2,false);
+    if(g>0&&kimg){ const q=M(m), len=Math.max(0,g*h/kk-14); c.save(); c.translate(q[0],q[1]); c.rotate(Math.atan2(-dy,-dx*face)); c.scale(1,face);
+      c.drawImage(kimg,KIMG_TSUBA+14,0,len,KIMG_H,14*kk,-KT/2,len*kk,KT); c.restore(); }
+    else if(g>0) poly([s2,m],o.mono||'#ffffff',lw*0.8);
+    if(simg&&g>0){ const q=M(m); c.save(); c.translate(q[0],q[1]); c.rotate(Math.atan2(-dy,-dx*face)); c.scale(1,face);
+      c.drawImage(simg,0,0,KIMG_TSUBA+14,KIMG_H,-KIMG_TSUBA*kk,-KT/2,(KIMG_TSUBA+14)*kk,KT); c.restore(); }
+    else if(simg) sayaAt(m,true);
     else if(kimg){ const q=M(m); c.save(); c.translate(q[0],q[1]); c.rotate(Math.atan2(-dy,-dx*face)); c.scale(1,face);
       c.drawImage(kimg,0,0,KIMG_TSUBA+14,KIMG_H,-KIMG_TSUBA*kk,-KT/2,(KIMG_TSUBA+14)*kk,KT); c.restore(); }
     else { poly([[m[0]-dy*0.03,m[1]+dx*0.03],[m[0]+dy*0.03,m[1]-dx*0.03]],o.mono||'#8a7436',lw*0.9); poly([m,[m[0]+dx*0.12,m[1]+dy*0.12]],o.mono||'#3b302a',lw*1.05); }

@@ -137,7 +137,7 @@ $$;
 -- 誰の名乗りでも見られる（id を知っている人だけ。id は番付・寄合・団体戦などで目にする相手）
 create or replace function public.get_profile(p_id uuid) returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
-declare me uuid := auth.uid(); j jsonb; x public.profile_ext;
+declare me uuid := auth.uid(); j jsonb; x public.profile_ext; g boolean := public.is_god(auth.uid());
 begin
   if me is null then raise exception 'ログインしていません'; end if;
   j := public.profile_json(coalesce(p_id, me));
@@ -147,9 +147,9 @@ begin
     select * into x from public.profile_ext e where e.id = me;
     j := j || jsonb_build_object('me', true,
       'my_titles', coalesce((select jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name, 'note', t.note) order by t.ord, t.id)
-                             from public.title_catalog t where t.id = any(coalesce(x.titles, '{}'))), '[]'),
+                             from public.title_catalog t where g or t.id = any(coalesce(x.titles, '{}'))), '[]'),
       'my_plates', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name, 'note', p.note) order by p.ord, p.id)
-                             from public.plate_catalog p where p.free or p.id = any(coalesce(x.plates, '{}'))), '[]'));
+                             from public.plate_catalog p where g or p.free or p.id = any(coalesce(x.plates, '{}'))), '[]'));
   end if;
   return j;
 end;
@@ -166,19 +166,19 @@ $$;
 -- 自分の名乗りを書き換える。二つ名・背景は持っている物だけ、好きな一振りは持っている刀だけ
 create or replace function public.set_profile(p_word text, p_fav text, p_title text, p_plate text) returns jsonb
 language plpgsql security definer set search_path = '' as $$
-declare me uuid := auth.uid(); x public.profile_ext; w text;
+declare me uuid := auth.uid(); x public.profile_ext; w text; g boolean := public.is_god(auth.uid());   -- 神様は二つ名・背景・刀を全部持っている
 begin
   if me is null then raise exception 'ログインしていません'; end if;
   insert into public.profile_ext (id) values (me) on conflict (id) do nothing;
   select * into x from public.profile_ext e where e.id = me for update;
   w := btrim(regexp_replace(coalesce(p_word, ''), '\s+', ' ', 'g'));
   if char_length(w) > 30 then raise exception '一言は30文字までです'; end if;
-  if p_fav is not null and p_fav <> 'mumei' and not exists (
+  if p_fav is not null and p_fav <> 'mumei' and not g and not exists (
       select 1 from public.saves s where s.id = me and coalesce((s.owned ->> p_fav)::numeric, 0) > 0) then
     raise exception 'その刀を持っていません';
   end if;
-  if p_title is not null and not (p_title = any(x.titles)) then raise exception 'その二つ名は持っていません'; end if;
-  if p_plate is not null and not (p_plate = any(x.plates) or exists (select 1 from public.plate_catalog p where p.id = p_plate and p.free)) then
+  if p_title is not null and not (g and exists (select 1 from public.title_catalog t where t.id = p_title)) and not (p_title = any(x.titles)) then raise exception 'その二つ名は持っていません'; end if;
+  if p_plate is not null and not (g and exists (select 1 from public.plate_catalog p where p.id = p_plate)) and not (p_plate = any(x.plates) or exists (select 1 from public.plate_catalog p where p.id = p_plate and p.free)) then
     raise exception 'その背景は持っていません';
   end if;
   update public.profile_ext set word = w, fav = p_fav, title = p_title, plate = p_plate, updated_at = now() where id = me;
@@ -271,7 +271,7 @@ $$;
 --   'all'    ログインしたことのある全員
 --   'issen'  決着「一閃」を一度でも決めた人（刀ごとの戦績から割り出す）
 --   'katana' p_arg の刀（例 'ouka'）を持っている人
---   'login'  p_arg のログインID（カンマ区切りで何人でも）
+--   'login'  p_arg の名前かログインID（カンマ・読点・空白で区切って何人でも）
 create or replace function public.god_targets(p_target text, p_arg text) returns table (id uuid)
 language plpgsql stable security definer set search_path = '' as $$
 begin
@@ -284,7 +284,8 @@ begin
     return query select s.id from public.saves s where coalesce((s.owned ->> p_arg)::numeric, 0) > 0;
   elsif p_target = 'login' then
     return query select pr.id from public.profiles pr
-      where pr.login = any(select btrim(lower(v)) from unnest(string_to_array(coalesce(p_arg, ''), ',')) v);
+      where exists (select 1 from regexp_split_to_table(coalesce(p_arg, ''), '[,、，\s　]+') v
+                    where btrim(v) <> '' and (pr.login = lower(btrim(v)) or pr.name = btrim(v)));
   else
     raise exception '宛先の選び方が正しくありません';
   end if;
@@ -342,6 +343,8 @@ begin
   return jsonb_build_object(
     'titles', (select coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name) order by t.ord, t.id), '[]') from public.title_catalog t),
     'plates', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name, 'free', p.free) order by p.ord, p.id), '[]') from public.plate_catalog p),
+    'auto', (select coalesce(jsonb_agg(jsonb_build_object('subject', a.subject, 'cond', a.cond, 'arg', a.arg, 'active', a.active,
+               'n', (select count(*) from public.auto_gifts_given d where d.gift_id = a.id)) order by a.ord), '[]') from public.auto_gifts a),
     'sent', (select coalesce(jsonb_agg(x order by x ->> 'at' desc), '[]') from (
       select jsonb_build_object('batch', m.batch, 'subject', min(m.subject), 'at', min(m.created_at), 'n', count(*), 'claimed', count(m.claimed_at)) x
       from public.mail m group by m.batch order by min(m.created_at) desc limit 20) y));
@@ -367,13 +370,88 @@ begin
 end;
 $$;
 
+
+-- ---------- 条件を満たしたら自動で送る贈り物（2026-11-27） ----------
+-- cond: 'issen' = 決着「一閃」を一度でも決めた / 'katana' = arg の刀を持っている
+-- 条件を満たした瞬間（勝ちの記録・ガチャ・鍛えるで持ち物が変わったとき）に、その人の文箱へ一通だけ届く
+-- すでにその二つ名・背景を持っている人や、同じ物を手で送られている人には送らない（二重にならない）
+create table if not exists public.auto_gifts (
+  id text primary key check (id ~ '^[a-z0-9_]{1,32}$'),
+  cond text not null check (cond in ('issen', 'katana')),
+  arg text,
+  gifts jsonb not null,
+  subject text not null,
+  body text not null default '',
+  active boolean not null default true,
+  ord int not null default 100
+);
+create table if not exists public.auto_gifts_given (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  gift_id text not null references public.auto_gifts(id) on delete cascade,
+  at timestamptz not null default now(),
+  primary key (user_id, gift_id)
+);
+alter table public.auto_gifts enable row level security;
+alter table public.auto_gifts_given enable row level security;
+revoke all on public.auto_gifts, public.auto_gifts_given from anon, authenticated;
+
+insert into public.auto_gifts (id, cond, arg, gifts, subject, body, ord) values
+  ('issen_title', 'issen', null, '{"titles":["issen"]}', '一閃の誉れ',
+   E'後のない刹那に、明鏡止水を決めた者へ。\n二つ名を贈ります。名乗りの画面で名乗れます。', 1),
+  ('ouka_plate', 'katana', 'ouka', '{"plates":["ouka"]}', '桜華の札',
+   E'絶の一振り「桜華」を手にした者へ。\n背景の札「桜華」を贈ります。名乗りの画面で使えます。', 2)
+on conflict (id) do update set cond = excluded.cond, arg = excluded.arg, gifts = excluded.gifts, subject = excluded.subject, body = excluded.body, ord = excluded.ord;
+
+-- その人が条件を満たす贈り物を、まだなら文箱へ入れる。返すのは送った通数
+create or replace function public.auto_gift_check(s public.saves) returns int
+language plpgsql security definer set search_path = '' as $$
+declare a public.auto_gifts; x public.profile_ext; n int := 0; has boolean;
+begin
+  if public.is_god(s.id) then return 0; end if;   -- 神様は全部持っている
+  select * into x from public.profile_ext e where e.id = s.id;
+  for a in select * from public.auto_gifts g where g.active order by g.ord loop
+    continue when exists (select 1 from public.auto_gifts_given d where d.user_id = s.id and d.gift_id = a.id);
+    if a.cond = 'issen' then has := public.has_issen(s);
+    elsif a.cond = 'katana' then has := coalesce((s.owned ->> a.arg)::numeric, 0) > 0;
+    else has := false; end if;
+    continue when not has;
+    insert into public.auto_gifts_given (user_id, gift_id) values (s.id, a.id) on conflict do nothing;
+    -- 同じ物をもう持っている・手で送られている（受け取り前も含む）なら、送ったことにして手紙は出さない
+    continue when exists (select 1 from jsonb_array_elements_text(coalesce(a.gifts -> 'titles', '[]')) t
+                          where t = any(coalesce(x.titles, '{}'))
+                             or exists (select 1 from public.mail m where m.to_id = s.id and m.gifts -> 'titles' ? t))
+              or exists (select 1 from jsonb_array_elements_text(coalesce(a.gifts -> 'plates', '[]')) p
+                          where p = any(coalesce(x.plates, '{}'))
+                             or exists (select 1 from public.mail m where m.to_id = s.id and m.gifts -> 'plates' ? p));
+    insert into public.mail (to_id, batch, subject, body, gifts) values (s.id, md5('auto:' || a.id)::uuid, a.subject, a.body, a.gifts);   -- 自動の手紙は贈り物ごとに同じまとまり
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$$;
+
+create or replace function public.auto_gift_trigger() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  if exists (select 1 from public.profiles p where p.id = new.id) then perform public.auto_gift_check(new); end if;
+  return new;
+end;
+$$;
+drop trigger if exists saves_auto_gift on public.saves;
+create trigger saves_auto_gift after insert or update of owned, rec on public.saves
+  for each row execute function public.auto_gift_trigger();
+
+-- いま条件を満たしている人にも届ける（何度実行しても一人一通まで）
+select public.auto_gift_check(s) from public.saves s;
+
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.is_god(uuid), public.profile_json(uuid), public.has_issen(public.saves), public.god_targets(text, text),
   public.get_profile(uuid), public.profile_tags(uuid[]), public.set_profile(text, text, text, text),
   public.my_mail(), public.read_mail(bigint), public.claim_mail(bigint), public.list_notices(),
   public.god_preview(text, text), public.god_send_mail(text, text, text, text, jsonb), public.god_info(),
-  public.god_post_notice(text, text, text), public.god_delete_notice(bigint)
+  public.god_post_notice(text, text, text), public.god_delete_notice(bigint),
+  public.auto_gift_check(public.saves), public.auto_gift_trigger()
   from public, anon, authenticated;
 grant execute on function
   public.get_profile(uuid), public.profile_tags(uuid[]), public.set_profile(text, text, text, text),

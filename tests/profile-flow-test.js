@@ -116,19 +116,20 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   await g.evaluate(() => goTitle()); await g.waitForTimeout(200);
   await g.click('#pf_corner [data-go="mail"]');
   await g.click('#pf_tabs [data-tab="send"]');
-  await g.waitForSelector('[data-preset="issen"]');
-  await g.click('[data-preset="issen"]');
-  await g.waitForSelector('.pfpv');
-  const nIssen = sql("select count(*) from public.saves s where public.has_issen(s)"), nOuka = sql("select count(*) from public.saves s where (s.owned->>'ouka')::int > 0"), m0 = +sql("select count(*) from public.mail");
-  ok(new RegExp('^' + nIssen + '人').test(await g.textContent('.pfpv')) && /風見/.test(await g.textContent('.pfpv')), '一閃を決めた人の宛先に風見さん: ' + await g.textContent('.pfpv'));
+  ok(sql("select count(*) from public.mail m where m.to_id = :'a' and m.subject = '一閃の誉れ'", { a: USERS[A] }) === '1' &&
+     sql("select count(*) from public.mail m where m.to_id = :'b' and m.subject = '桜華の札'", { b: USERS[B] }) === '1' &&
+     sql("select count(*) from public.mail m where m.to_id = :'g'", { g: USERS[G] }) === '0', '一閃の二つ名・桜華の背景は自動で届いた（神様には届かない）');
+  await g.waitForSelector('#gf_logins');
+  await g.waitForFunction(() => /自動で届く贈り物/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
+  await g.fill('#gf_logins', '風見');
+  await g.click('[data-act="preview"]');
+  await g.waitForFunction(() => /^1人/.test((document.querySelector('.pfpv') || {}).textContent || ''), null, { timeout: 8000 });
+  ok(/風見/.test(await g.textContent('.pfpv')), '名前で宛先を選べる: ' + await g.textContent('.pfpv'));
+  await g.fill('#gf_subject', 'いつもありがとう'); await g.fill('#gf_coins', '100');
   await g.screenshot({ path: OUT + '/god-send.png', fullPage: true });
   await g.click('[data-act="send"]'); await g.click('[data-act="send"]');
-  await g.waitForFunction(() => /人に送りました/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
-  await g.click('[data-preset="ouka"]');
-  await g.waitForFunction(() => n => new RegExp('^' + n + '人').test((document.querySelector('.pfpv') || {}).textContent || ''), nOuka, { timeout: 8000 });
-  await g.click('[data-act="send"]'); await g.click('[data-act="send"]');
-  await g.waitForFunction(() => n => new RegExp(n + '人に送りました').test(document.getElementById('pf_body').textContent), nOuka, { timeout: 8000 });
-  ok(+sql("select count(*) from public.mail") === m0 + +nIssen + +nOuka, '手紙は 一閃' + nIssen + '・桜華' + nOuka + '通');
+  await g.waitForFunction(() => /1人に送りました/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
+  ok(true, '名指しで銭を送った');
   // お知らせを書く（大事なお知らせ）
   await g.click('#pf_back');
   await g.click('#pf_corner [data-go="news"]');
@@ -156,16 +157,15 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   await login(a, A);
   await a.waitForFunction(() => __issen.isAccount(), null, { timeout: 15000 });
   await a.evaluate(() => goTitle());
-  await a.waitForFunction(() => document.getElementById('pf_mailb').textContent === '1', null, { timeout: 8000 });
-  ok(true, '文箱に「1」の印');
+  await a.waitForFunction(() => document.getElementById('pf_mailb').textContent === '2', null, { timeout: 8000 });
+  ok(true, '文箱に「2」の印');
   await a.click('#pf_corner [data-go="mail"]');
   await a.waitForSelector('.pfmh');
   await a.click('.pfmh');
-  await a.waitForSelector('[data-claim]');
   await a.screenshot({ path: OUT + '/mail.png' });
-  await a.click('[data-claim]');
-  await a.waitForFunction(() => /紫電一閃/.test((document.querySelector('.pfgot') || {}).textContent || ''), null, { timeout: 8000 });
-  ok(true, '二つ名を受け取った');
+  await a.click('[data-act="claimall"]');
+  await a.waitForFunction(() => /紫電一閃/.test((document.querySelector('.pfgot') || {}).textContent || '') && /銭 100/.test(document.querySelector('.pfgot').textContent), null, { timeout: 8000 });
+  ok(true, 'まとめて受け取った（二つ名と銭）');
   await a.click('.pfgot [data-act="me"]');
   await a.waitForSelector('.pfcard');
   ok(/紫電一閃/.test(await a.textContent('.pfnick')) && /一閃/.test(await a.textContent('.pfstats')), '名乗りに二つ名と一閃の回数');

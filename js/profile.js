@@ -310,7 +310,7 @@
   }
 
   /* ---------- 神様: 送る・書く ---------- */
-  const GF = { target: 'issen', katana: 'ouka', logins: '', subject: '', body: '', coins: '', steel: '', title: '', plate: '' };
+  const GF = { target: 'login', katana: 'ouka', logins: '', subject: '', body: '', coins: '', steel: '', title: '', plate: '' };
   const NF = { kind: 'update', title: '', body: '' };
   const PRESETS = {
     issen: { target: 'issen', subject: '一閃の誉れ', body: '後のない刹那に、明鏡止水を決めた者へ。\n二つ名を贈ります。名乗りの画面で名乗れます。', title: 'issen', plate: '', coins: '', steel: '' },
@@ -325,12 +325,11 @@
     const kats = ((I && I.KATANA) || []).filter(k => k.tier === '絶' || k.tier === '幻');
     const pv = S.preview;
     return '<div class="pfedit pfgod">' +
-      '<div class="pff"><span>ひな形</span><div class="pfchips"><button type="button" data-preset="issen">一閃を決めた人へ二つ名</button><button type="button" data-preset="ouka">桜華を持つ人へ背景</button></div></div>' +
       '<label class="pff">宛先<select id="gf_target">' +
-        [['issen', '決着「一閃」を決めた人'], ['katana', 'この刀を持つ人'], ['all', '全員'], ['login', 'ログインIDで選ぶ']]
+        [['issen', '決着「一閃」を決めた人'], ['katana', 'この刀を持つ人'], ['all', '全員'], ['login', '名前かログインIDで選ぶ']]
           .map(([v, l]) => '<option value="' + v + '"' + (GF.target === v ? ' selected' : '') + '>' + l + '</option>').join('') + '</select></label>' +
       (GF.target === 'katana' ? '<label class="pff">刀<select id="gf_katana">' + ((I && I.KATANA) || []).map(k => '<option value="' + k.id + '"' + (GF.katana === k.id ? ' selected' : '') + '>' + esc(k.tier + '　' + k.mei) + '</option>').join('') + '</select></label>' : '') +
-      (GF.target === 'login' ? '<label class="pff">ログインID（カンマで区切って何人でも）<input id="gf_logins" value="' + esc(GF.logins) + '" autocapitalize="none" spellcheck="false"></label>' : '') +
+      (GF.target === 'login' ? '<label class="pff">名前かログインID（「、」で区切れば何人でも）<input id="gf_logins" value="' + esc(GF.logins) + '" autocapitalize="none" spellcheck="false" placeholder="例　風見、take_99"></label>' : '') +
       '<div class="pfacts"><button type="button" class="obtn" data-act="preview">宛先を確かめる</button></div>' +
       (pv ? '<p class="pfpv"><b>' + pv.n + '人</b>' + (pv.list && pv.list.length ? '　' + pv.list.map(x => esc(x.name) + '<small>(' + esc(x.login) + ')</small>').join('、') + (pv.n > pv.list.length ? ' ほか' : '') : '') + '</p>' : '') +
       '<label class="pff">題<input id="gf_subject" maxlength="40" value="' + esc(GF.subject) + '"></label>' +
@@ -342,6 +341,7 @@
       '<div class="pfacts"><button type="button" class="gpull' + (S.arm === 'send' ? ' arm' : '') + '" data-act="send"' + (S.busy ? ' disabled' : '') + '>' +
         (S.arm === 'send' ? 'もう一度触れて送る' + (pv ? '（' + pv.n + '人）' : '') : '送る') + '</button></div>' +
       '<p class="omsg">' + esc(S.msg) + '</p>' +
+      (g.auto && g.auto.length ? '<h3>条件を満たすと自動で届く贈り物</h3><ul class="pfsent">' + g.auto.map(a => '<li><b>' + esc(a.subject) + '</b><span>' + esc(a.cond === 'issen' ? '一閃を決めたら' : a.cond === 'katana' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」を手にしたら' : '') + '・' + a.n + '人に届いた</span></li>').join('') + '</ul>' : '') +
       '<h3>送った手紙</h3><ul class="pfsent">' + ((g.sent || []).map(x => '<li><b>' + esc(x.subject) + '</b><span>' + x.n + '人・受け取り ' + x.claimed + '</span><time>' + day(x.at) + '</time></li>').join('') || '<li class="none">まだありません</li>') + '</ul>' +
     '</div>';
   }

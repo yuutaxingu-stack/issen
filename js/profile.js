@@ -434,7 +434,7 @@
         if (S.prof && S.prof.id) tags[S.prof.id] = { title: S.prof.title_name, plate: S.prof.plate };
         tagFns.forEach(f => { try { f(); } catch (x) {} });
         S.edit = null; if (N.toast) N.toast('名乗りを改めました', 2500);
-      } catch (x) { S.msg = errText(x); }
+      } catch (x) { S.msg = errText(x); if (N.toast) N.toast('名乗りを改められませんでした：' + S.msg, 6000); console.warn('set_profile', x); }
       S.busy = false; render(); return;
     }
     if (d.mail) {

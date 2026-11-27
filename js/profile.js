@@ -489,6 +489,7 @@
       S.busy = true; S.msg = ''; render();
       try {
         const ed = S.edit;
+        if (N.hasLink(ed.word) && !N.isGod()) throw new Error('一言に' + N.LINK_MSG);
         S.prof = await rpc('set_profile', { p_word: ed.word || '', p_fav: ed.fav || null, p_title: ed.title || null, p_plate: ed.plate || null });
         if (S.prof && S.prof.id) tags[S.prof.id] = { title: S.prof.title_name, style: S.prof.title_style, plate: S.prof.plate };
         tagFns.forEach(f => { try { f(); } catch (x) {} });

@@ -21,6 +21,10 @@
   function emit(){ N.listeners.forEach(f => { try { f(); } catch (e) { console.error(e); } }); }
   N.on = f => N.listeners.add(f);
   N.configured = () => !!(C.url && C.anonKey);
+  // リンク（URL）を書かせない。判定は js/no-link.js、サーバーでも同じものを弾く（神様は通す）
+  N.hasLink = t => !!(window.IssenNoLink && IssenNoLink.has(t));
+  N.LINK_MSG = 'リンク（URL）は書き込めません';
+  N.isGod = () => !!(window.__issen && __issen.isGod && __issen.isGod());
 
   // Supabase の言葉を、やさしい日本語に
   function jp(err){
@@ -95,6 +99,7 @@
     if (!LOGIN_RE.test(login)) throw new Error('ログインIDは英小文字・数字・_ で3〜16文字にしてください');
     if (String(password || '').length < 6) throw new Error('パスワードは6文字以上にしてください');
     if (name.length < 1 || name.length > 10) throw new Error('名前は1〜10文字にしてください');
+    if (N.hasLink(name)) throw new Error('名前に' + N.LINK_MSG);
     const av = await N.sb.rpc('login_available', { p_login: login });
     if (av.error) throw new Error(jp(av.error));
     if (!av.data) throw new Error('そのログインIDはもう使われています');
@@ -119,6 +124,7 @@
   }
 
   N.setName = async function(name){
+    if (N.hasLink(name) && !N.isGod()) throw new Error('名前に' + N.LINK_MSG);
     const { error } = await N.sb.rpc('set_name', { p_name: name });
     if (error) throw new Error(jp(error));
     await loadProfile(); emit();

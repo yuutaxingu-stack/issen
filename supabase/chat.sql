@@ -98,6 +98,7 @@ begin
   if p_kind not in ('say', 'recruit', 'team') then raise exception 'その種類の発言はできません'; end if;
   if p_kind = 'say' and b = '' then raise exception '何も書かれていません'; end if;
   if char_length(b) > cfg.max_len then raise exception '%文字までにしてください', cfg.max_len; end if;
+  if public.link_blocked(me, b) then raise exception 'リンク（URL）は書き込めません'; end if;
   if exists (select 1 from public.chat_messages where author = me and kind in ('say', 'recruit', 'team')
              and created_at > now() - make_interval(secs => cfg.gap_seconds)) then
     raise exception '少し待ってから送ってください';

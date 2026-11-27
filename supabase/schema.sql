@@ -135,7 +135,8 @@ begin
   values (
     new.id,
     lower(coalesce(new.raw_user_meta_data ->> 'login', '')),
-    coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), lower(new.raw_user_meta_data ->> 'login')),
+    case when public.has_link(new.raw_user_meta_data ->> 'name') then left(lower(new.raw_user_meta_data ->> 'login'), 10)   -- リンク入りの名前はログインIDにする
+         else coalesce(nullif(trim(new.raw_user_meta_data ->> 'name'), ''), lower(new.raw_user_meta_data ->> 'login')) end,
     c
   );
   return new;
@@ -157,6 +158,7 @@ language plpgsql security definer set search_path = '' as $$
 begin
   if auth.uid() is null then raise exception 'ログインしていません'; end if;
   if char_length(trim(p_name)) not between 1 and 10 then raise exception '名前は1〜10文字にしてください'; end if;
+  if public.link_blocked(auth.uid(), p_name) then raise exception '名前にリンク（URL）は書き込めません'; end if;
   update public.profiles set name = trim(p_name) where id = auth.uid();
 end;
 $$;
@@ -183,6 +185,21 @@ create or replace function public.is_god_acct(u uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
   select u is not null and exists (select 1 from public.god_accounts g where g.id = u);
 $$;
+
+-- ---------- リンク（URL）を書かせない（2026-11-27） ----------
+-- 寄合・密書・名前・名乗りの一言で使う。画面側の同じ判定は js/no-link.js（ここと揃えること）。
+-- 全角も半角に直してから見る。http:/ ://  www.  example.com（よく使う末尾）  example.xx/ を弾く
+create or replace function public.has_link(t text) returns boolean
+language sql immutable set search_path = '' as $$
+  select lower(normalize(coalesce(t, ''), nfkc)) ~
+    '(https?|ftp)\s?:\s?/|:\s?//|www\s?\.|[a-z0-9-]+\s?[.。]\s?(com|net|org|info|biz|jp|co|io|me|gg|tv|ly|to|cc|be|us|uk|ru|cn|kr|tw|hk|de|fr|eu|in|ai|so|gl|app|dev|xyz|link|site|online|top|club|shop|page|fun|live|vip|work|blog|store|tech|asia|mobi|pro|world|today|chat|social|moe|tokyo)(?![a-z0-9])|[a-z0-9-]+\.[a-z]{2,}/';
+$$;
+-- 神様（運営アカウント）は書ける
+create or replace function public.link_blocked(u uuid, t text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.has_link(t) and not exists (select 1 from public.god_accounts g where g.id = u);
+$$;
+revoke execute on function public.link_blocked(uuid, text) from public, anon;
 
 -- 新しく登録した人は、神様とフレンドになる
 create or replace function public.god_friends_on_profile() returns trigger

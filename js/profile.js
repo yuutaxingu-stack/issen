@@ -179,6 +179,7 @@
   /* ---------- 名乗りの札（カード） ---------- */
   function cardHtml(p, ed){
     const v = ed ? Object.assign({}, p, ed) : p;
+    if (ed && !String(ed.name || '').trim()) v.name = p.name;
     const tt = ed ? ((p.my_titles || []).find(t => t.id === ed.title) || {}) : { name: p.title_name, style: p.title_style };
     const title = tt.name, tstyle = tt.style ? ' s-' + esc(tt.style) : '';
     const fav = v.fav ? kat(v.fav) : null;
@@ -231,11 +232,12 @@
       h += cardHtml(p, ed);
       if (p.me && !ed) {
         h += '<div class="pfacts"><button type="button" class="gpull" data-act="edit">名乗りを書き換える</button></div>' +
-             '<p class="gnote">二つ名と背景の札は、文箱に届く贈り物で増えます。名前は「オンライン」の画面で変えられます。</p>';
+             '<p class="gnote">二つ名と背景の札は、文箱に届く贈り物で増えます。</p>';
         if (p.title_name && p.title_note) h += '<p class="gnote pfnote">二つ名「' + esc(p.title_name) + '」　' + esc(p.title_note) + '</p>';
       } else if (p.me && ed) {
         const titles = p.my_titles || [], plates = p.my_plates || [];
         h += '<div class="pfedit">' +
+          '<label class="pff">名前<input id="pf_name" maxlength="10" value="' + esc(ed.name) + '" placeholder="10文字まで" autocomplete="off"></label>' +
           '<label class="pff">一言<input id="pf_word" maxlength="30" value="' + esc(ed.word) + '" placeholder="30文字まで" autocomplete="off"></label>' +
           '<div class="pff"><span>二つ名</span><div class="pfchips">' +
             '<button type="button" data-title=""' + (!ed.title ? ' class="on"' : '') + '>名乗らない</button>' +
@@ -466,7 +468,7 @@
   /* ---------- 操作 ---------- */
   function readForms(){
     const v = id => { const e = $(id); return e ? e.value : null; };
-    if (S.edit) { const w = v('pf_word'); if (w != null) S.edit.word = w; const f = v('pf_fav'); if (f != null) S.edit.fav = f || null; }
+    if (S.edit) { const nm = v('pf_name'); if (nm != null) S.edit.name = nm; const w = v('pf_word'); if (w != null) S.edit.word = w; const f = v('pf_fav'); if (f != null) S.edit.fav = f || null; }
     if (S.tab === 'send') {
       ['target', 'katana', 'logins', 'subject', 'body', 'coins', 'steel', 'title', 'plate'].forEach(k => { const x = v('gf_' + k); if (x != null) GF[k] = x; });
     }
@@ -482,6 +484,9 @@
 
   scr.addEventListener('input', e => {
     readForms();
+    if (e.target.id === 'pf_name' && S.prof) {   // 名前も札にすぐ映す
+      const n = scr.querySelector('.pfname'); if (n && n.firstChild) n.firstChild.nodeValue = S.edit.name.trim() || S.prof.name;
+    }
     if (e.target.id === 'pf_word' && S.prof) {   // 一言は札にすぐ映す
       const w = scr.querySelector('.pfword'); if (w) w.innerHTML = S.edit.word ? '「' + esc(S.edit.word) + '」' : '<span class="none">一言はまだない</span>';
     }
@@ -503,7 +508,7 @@
       render(); return;
     }
     if (d.act === 'login') { close(); const b = $('m_online'); if (b) b.click(); return; }
-    if (d.act === 'edit') { const p = S.prof; S.edit = { word: p.word || '', fav: p.fav || null, title: p.title || null, plate: p.plate || 'sumi' }; S.msg = ''; render(); return; }
+    if (d.act === 'edit') { const p = S.prof; S.edit = { name: p.name || '', word: p.word || '', fav: p.fav || null, title: p.title || null, plate: p.plate || 'sumi' }; S.msg = ''; render(); return; }
     if (d.act === 'cancel') { S.edit = null; render(); return; }
     if (d.title != null && S.edit) { S.edit.title = d.title || null; render(); return; }
     if (d.plate && S.edit) { S.edit.plate = d.plate; render(); return; }
@@ -511,7 +516,11 @@
       S.busy = true; S.msg = ''; render();
       try {
         const ed = S.edit;
+        const nm = (ed.name || '').trim();
+        if (!nm || nm.length > 10) throw new Error('名前は1〜10文字にしてください');
+        if (N.hasLink(nm) && !N.isGod()) throw new Error('名前に' + N.LINK_MSG);
         if (N.hasLink(ed.word) && !N.isGod()) throw new Error('一言に' + N.LINK_MSG);
+        if (nm !== S.prof.name) await N.setName(nm);   // 名前は今までの set_name（リンクの判定もサーバーで）
         S.prof = await rpc('set_profile', { p_word: ed.word || '', p_fav: ed.fav || null, p_title: ed.title || null, p_plate: ed.plate || null });
         if (S.prof && S.prof.id) tags[S.prof.id] = { title: S.prof.title_name, style: S.prof.title_style, plate: S.prof.plate };
         tagFns.forEach(f => { try { f(); } catch (x) {} });

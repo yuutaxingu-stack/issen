@@ -190,6 +190,17 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   await a.click('[data-act="save"]');
   await a.waitForFunction(() => !document.getElementById('pf_word') && /刹那に生きる/.test(document.querySelector('.pfword').textContent), null, { timeout: 8000 });
   ok(sql("select word || ' ' || fav || ' ' || plate || ' ' || title from public.profile_ext where id = :'id'", { id: USERS[A] }) === '刹那に生きる nichirin tsuki issen', 'サーバーに名乗りが残った');
+  // 名前も名乗りから変えられる（リンク入りは断る）
+  await a.click('[data-act="edit"]');
+  await a.fill('#pf_name', 'example.com');
+  await a.click('[data-act="save"]');
+  await a.waitForFunction(() => /リンク/.test((document.querySelector('#pf .omsg') || {}).textContent || ''), null, { timeout: 8000 });
+  ok(!/example/.test(sql("select name from public.profiles where id = :'id'", { id: USERS[A] })), '名前にリンクは書けない');
+  await a.fill('#pf_name', '疾風丸');
+  ok(/疾風丸/.test(await a.textContent('.pfname')), '書いている名前が札にすぐ映る');
+  await a.click('[data-act="save"]');
+  await a.waitForFunction(() => !document.getElementById('pf_name') && /疾風丸/.test(document.querySelector('.pfname').textContent), null, { timeout: 8000 });
+  ok(sql("select name from public.profiles where id = :'id'", { id: USERS[A] }) === '疾風丸' && await a.evaluate(() => IssenNet.profile.name) === '疾風丸', '名乗りから名前を変えた');
   await a.waitForTimeout(600);
   await a.screenshot({ path: OUT + '/profile-a.png' });
 

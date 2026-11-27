@@ -1676,18 +1676,46 @@ function zRun(c,k,o){
   ZS.raf=requestAnimationFrame(frame);
   return ZS;
 }
-/* 日食: 黒い日のまわりに白い光の輪と、ゆっくり回る光の筋 */
+/* 日食: 黒い日のまわりに、真珠色のコロナ。細い筋が何百本も重なって柔らかく広がり、いくつかの方向へ長い吹き流しが伸びる
+   コロナは一度だけ別の canvas に描いておき、ゆっくり回して揺らぐように重ねる */
+const CORONA={};
+function coronaCanvas(r,seed){
+  const key=r+'_'+seed; if(CORONA[key]) return CORONA[key];
+  const R=r*3.6, S=2, c=document.createElement('canvas'); c.width=c.height=Math.ceil(R*2*S); const x=c.getContext('2d'); x.scale(S,S); x.translate(R,R);
+  let sd=seed*9301+49297; const rnd=()=>(sd=(sd*16807)%2147483647)/2147483647;
+  const gauss=()=>{ let u=0; for(let i=0;i<4;i++) u+=rnd(); return (u-2)/2; };
+  // 光の芯: 縁がいちばん明るく、外へ急に薄れる
+  const g=x.createRadialGradient(0,0,r*0.96,0,0,R); g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(.04,'rgba(240,244,255,.7)'); g.addColorStop(.12,'rgba(215,222,240,.32)');
+  g.addColorStop(.3,'rgba(170,178,205,.10)'); g.addColorStop(.6,'rgba(120,126,150,.03)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=g; x.beginPath(); x.arc(0,0,R,0,7); x.fill();
+  x.globalCompositeOperation='lighter'; x.lineCap='round';
+  // 吹き流しの向き（赤道寄りに長く、極は短い羽毛のような筋）
+  const lobes=[[0.25,0.32,2.4],[Math.PI+0.1,0.36,2.6],[1.95,0.22,1.6],[4.4,0.2,1.5],[0.95,0.15,1.2]];
+  for(let i=0;i<520;i++){
+    let a, len;
+    if(rnd()<0.62){ const L=lobes[Math.floor(rnd()*lobes.length)]; a=L[0]+gauss()*L[1]; len=r*(0.35+Math.pow(rnd(),1.6)*L[2]); }
+    else { a=rnd()*Math.PI*2; len=r*(0.15+Math.pow(rnd(),2.2)*0.75); }
+    const r0=r*(0.97+rnd()*0.04), bend=(rnd()-0.5)*0.35, x0=Math.cos(a)*r0, y0=Math.sin(a)*r0, r1=r0+len;
+    const a1=a+bend*len/r*0.25, x1=Math.cos(a1)*r1, y1=Math.sin(a1)*r1, am=(a+a1)/2+bend*0.12, rm=r0+len*0.5, xm=Math.cos(am)*rm, ym=Math.sin(am)*rm;
+    const lg=x.createLinearGradient(x0,y0,x1,y1), al=0.05+rnd()*0.11; lg.addColorStop(0,'rgba(250,252,255,'+al+')'); lg.addColorStop(.35,'rgba(232,238,255,'+al*0.55+')'); lg.addColorStop(1,'rgba(220,228,255,0)');
+    x.strokeStyle=lg; x.lineWidth=0.6+rnd()*(rnd()<0.15?5:2.2);
+    x.beginPath(); x.moveTo(x0,y0); x.quadraticCurveTo(xm,ym,x1,y1); x.stroke();
+  }
+  // 縁のすぐ外の細い光の輪
+  x.globalCompositeOperation='source-over';
+  const g2=x.createRadialGradient(0,0,r*0.99,0,0,r*1.12); g2.addColorStop(0,'rgba(255,255,255,.9)'); g2.addColorStop(1,'rgba(255,255,255,0)');
+  x.fillStyle=g2; x.beginPath(); x.arc(0,0,r*1.12,0,7); x.fill();
+  CORONA[key]={c,R}; return CORONA[key];
+}
 function drawEclipse(x,cx,cy,r,t){
+  const A=coronaCanvas(r,1), B=coronaCanvas(r,7);
   x.save(); x.globalCompositeOperation='lighter';
-  const g=x.createRadialGradient(cx,cy,r*0.9,cx,cy,r*3.2); g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(.08,'rgba(235,238,255,.55)'); g.addColorStop(.35,'rgba(170,175,200,.16)'); g.addColorStop(1,'rgba(0,0,0,0)');
-  x.fillStyle=g; x.fillRect(cx-r*3.3,cy-r*3.3,r*6.6,r*6.6);
-  x.translate(cx,cy); x.rotate(t*0.05);
-  for(let i=0;i<22;i++){ const a=i/22*Math.PI*2+Math.sin(i*7.3)*0.12, len=r*(1.5+0.9*Math.abs(Math.sin(i*2.1+t*0.6))), w=0.018+0.012*Math.sin(i*3.7);
-    x.save(); x.rotate(a); const lg=x.createLinearGradient(r,0,len,0); lg.addColorStop(0,'rgba(255,255,255,.55)'); lg.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=lg;
-    x.beginPath(); x.moveTo(r*0.98,-r*w*3); x.lineTo(len,0); x.lineTo(r*0.98,r*w*3); x.closePath(); x.fill(); x.restore(); }
+  x.save(); x.translate(cx,cy); x.rotate(t*0.012); x.globalAlpha=0.88+0.08*Math.sin(t*0.7); x.drawImage(A.c,-A.R,-A.R,A.R*2,A.R*2); x.restore();
+  x.save(); x.translate(cx,cy); x.rotate(-t*0.008+0.6); x.globalAlpha=0.32+0.12*Math.sin(t*0.45+1); x.drawImage(B.c,-B.R*1.05,-B.R*1.05,B.R*2.1,B.R*2.1); x.restore();
   x.restore();
-  x.save(); x.fillStyle='#000'; x.shadowColor='rgba(255,255,255,.9)'; x.shadowBlur=26; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill();
-  x.shadowBlur=0; x.strokeStyle='rgba(255,255,255,.9)'; x.lineWidth=1.6; x.beginPath(); x.arc(cx,cy,r+0.5,0,7); x.stroke(); x.restore();
+  // 黒い日
+  x.save(); x.fillStyle='#000'; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill();
+  x.strokeStyle='rgba(255,255,255,.85)'; x.lineWidth=1.2; x.beginPath(); x.arc(cx,cy,r+0.4,0,7); x.stroke(); x.restore();
 }
 /* 烏の羽: 羽軸と、片側が長い羽弁。黒い羽は白い縁で闇から浮かせる */
 function drawFeather(x,p){

@@ -209,6 +209,29 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   ok(!(await b.isVisible('[data-act="edit"]')), '番付から風見さんの名乗りが開き、書き換えはできない');
   await b.screenshot({ path: OUT + '/profile-other.png' });
 
+  console.log('--- 乙: 運営へ不具合報告 → 神様が返事');
+  await b.keyboard.press('Escape');
+  await b.click('#pf_back'); await b.click('#pf_back').catch(() => {});
+  await b.evaluate(() => { document.getElementById('rank').hidden = true; IssenProfile.close(); goTitle(); });
+  await b.click('#pf_corner [data-go="mail"]');
+  await b.click('#pf_tabs [data-tab="report"]');
+  await b.fill('#rf_body', '団体戦で観戦すると画面が止まる');
+  await b.click('[data-act="report"]');
+  await b.waitForFunction(() => /運営へ届けました/.test(document.getElementById('pf_body').textContent) && document.querySelectorAll('.pfrep li').length === 1, null, { timeout: 8000 });
+  ok(/iPhone|Mozilla|Chrome/.test(sql("select env from public.reports order by id desc limit 1")), '不具合報告に端末の様子が添えられた');
+  await b.screenshot({ path: OUT + '/report.png' });
+  await g.evaluate(() => IssenProfile.close()); await g.evaluate(() => goTitle());
+  await g.click('#pf_corner [data-go="mail"]');
+  await g.waitForFunction(() => /届いた/.test(document.getElementById('pf_tabs').textContent), null, { timeout: 8000 });
+  await g.click('#pf_tabs [data-tab="inbox"]');
+  await g.waitForFunction(() => /観戦すると画面が止まる/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
+  ok(true, '神様の「届いた」に報告が出る');
+  await g.click('[data-replyto]'); await g.fill('#rp_body', '直しました。ありがとう');
+  await g.screenshot({ path: OUT + '/report-god.png' });
+  await g.click('[data-reply]');
+  await g.waitForFunction(() => /済んだ/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
+  ok(sql("select count(*) from public.mail where to_id = :'b' and subject = '不具合報告へのお返事'", { b: USERS[B] }) === '1', '返事が乙の文箱に届いた');
+
   await browser.close();
   console.log(fails ? 'NG ' + fails + '件' : 'すべてOK');
   process.exit(fails ? 1 : 0);

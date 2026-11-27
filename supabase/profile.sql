@@ -453,6 +453,79 @@ create trigger saves_auto_gift after insert or update of owned, rec on public.sa
 -- いま条件を満たしている人にも届ける（何度実行しても一人一通まで）
 select public.auto_gift_check(s) from public.saves s;
 
+
+-- ---------- 運営へ（不具合報告・改善依頼）（2026-11-27） ----------
+-- 遊ぶ人が文箱の「運営へ」から送り、神様が文箱の「届いた」で読む。返事は手紙として文箱へ届く
+create table if not exists public.reports (
+  id bigint generated always as identity primary key,
+  from_id uuid not null references public.profiles(id) on delete cascade,
+  kind text not null check (kind in ('bug', 'request')),   -- 不具合報告・改善依頼
+  body text not null check (char_length(body) between 1 and 1000),
+  env text not null default '' check (char_length(env) <= 300),  -- 端末の様子（不具合を直す手がかり）
+  status text not null default 'new' check (status in ('new', 'seen', 'done')),
+  reply text,
+  created_at timestamptz not null default now(),
+  replied_at timestamptz
+);
+create index if not exists reports_from on public.reports (from_id, id desc);
+alter table public.reports enable row level security;
+revoke all on public.reports from anon, authenticated;
+
+-- 送る（1日10通まで）
+create or replace function public.send_report(p_kind text, p_body text, p_env text default '') returns bigint
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := auth.uid(); i bigint; b text := btrim(coalesce(p_body, ''));
+begin
+  if me is null then raise exception 'ログインしていません'; end if;
+  if p_kind not in ('bug', 'request') then raise exception '種類が正しくありません'; end if;
+  if char_length(b) = 0 then raise exception '中身を書いてください'; end if;
+  if char_length(b) > 1000 then raise exception '1000文字までです'; end if;
+  if (select count(*) from public.reports r where r.from_id = me and r.created_at > now() - interval '1 day') >= 10 then
+    raise exception '送れるのは1日10通までです。また明日お願いします';
+  end if;
+  insert into public.reports (from_id, kind, body, env) values (me, p_kind, b, left(coalesce(p_env, ''), 300)) returning id into i;
+  return i;
+end;
+$$;
+
+-- 自分が送ったもの（新しい順に30）
+create or replace function public.my_reports() returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'kind', r.kind, 'body', r.body, 'status', r.status, 'reply', r.reply, 'at', r.created_at) order by r.id desc), '[]')
+  from (select * from public.reports x where x.from_id = auth.uid() order by x.id desc limit 30) r;
+$$;
+
+-- 神様: 届いたもの（まだ済んでいないものを先に、新しい順に100）
+create or replace function public.god_reports() returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public.is_god(auth.uid()) then raise exception '神様だけが使えます'; end if;
+  return jsonb_build_object(
+    'new', (select count(*) from public.reports r where r.status = 'new'),
+    'items', coalesce((select jsonb_agg(jsonb_build_object('id', r.id, 'kind', r.kind, 'body', r.body, 'env', r.env, 'status', r.status,
+        'reply', r.reply, 'at', r.created_at, 'from', r.from_id, 'name', p.name, 'login', p.login) order by (r.status = 'done'), r.id desc)
+      from (select * from public.reports x order by (x.status = 'done'), x.id desc limit 100) r join public.profiles p on p.id = r.from_id), '[]'));
+end;
+$$;
+
+-- 神様: 読んだ・済んだにする。p_reply があれば、送った人の文箱へ返事の手紙を出す
+create or replace function public.god_report_mark(p_id bigint, p_status text, p_reply text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+declare r public.reports; t text := nullif(btrim(coalesce(p_reply, '')), '');
+begin
+  if not public.is_god(auth.uid()) then raise exception '神様だけが使えます'; end if;
+  if p_status not in ('new', 'seen', 'done') then raise exception '状態が正しくありません'; end if;
+  select * into r from public.reports x where x.id = p_id for update;
+  if r.id is null then raise exception 'その報告はありません'; end if;
+  update public.reports set status = p_status, reply = coalesce(t, reply), replied_at = case when t is not null then now() else replied_at end where id = p_id;
+  if t is not null then
+    insert into public.mail (to_id, batch, subject, body) values (r.from_id, gen_random_uuid(),
+      case r.kind when 'bug' then '不具合報告へのお返事' else '改善依頼へのお返事' end,
+      left(t, 600 - least(char_length(r.body), 200) - 12) || E'\n\n――あなたが送った文\n' || left(r.body, 200));
+  end if;
+end;
+$$;
+
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.is_god(uuid), public.profile_json(uuid), public.has_issen(public.saves), public.god_targets(text, text),
@@ -460,12 +533,14 @@ revoke execute on function
   public.my_mail(), public.read_mail(bigint), public.claim_mail(bigint), public.list_notices(),
   public.god_preview(text, text), public.god_send_mail(text, text, text, text, jsonb), public.god_info(),
   public.god_post_notice(text, text, text), public.god_delete_notice(bigint),
-  public.auto_gift_check(public.saves), public.auto_gift_trigger()
+  public.auto_gift_check(public.saves), public.auto_gift_trigger(),
+  public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text)
   from public, anon, authenticated;
 grant execute on function
   public.get_profile(uuid), public.profile_tags(uuid[]), public.set_profile(text, text, text, text),
   public.my_mail(), public.read_mail(bigint), public.claim_mail(bigint), public.list_notices(),
   public.god_preview(text, text), public.god_send_mail(text, text, text, text, jsonb), public.god_info(),
-  public.god_post_notice(text, text, text), public.god_delete_notice(bigint)
+  public.god_post_notice(text, text, text), public.god_delete_notice(bigint),
+  public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text)
   to authenticated;
 grant execute on function public.list_notices() to anon;

@@ -95,6 +95,24 @@ select public.claim_mail() ->> 'n';
 select case when (public.get_profile(null) ->> 'title_name') = '桜花一閃' and (public.get_profile(null) ->> 'title_style') = 'zetsu' then 'OK 桜花一閃を名乗る（絶の見た目）' else 'NG ' || public.get_profile(null)::text end;
 reset role;
 
+\echo '--- 運営へ: 不具合報告・改善依頼'
+select pg_temp.as_('33333333-3333-3333-3333-333333333333');
+select public.send_report('bug', '  画面が止まった  ', 'iPhone') > 0;
+select public.send_report('request', '刀帳を並べ替えたい') > 0;
+select pg_temp.expect_err($$select public.send_report('bug', '   ')$$, '中身を書いて');
+select pg_temp.expect_err($$select public.send_report('other', 'x')$$, '種類');
+select pg_temp.expect_err($$select public.god_reports()$$, '神様だけ');
+select case when jsonb_array_length(public.my_reports()) = 2 and public.my_reports() -> 1 ->> 'body' = '画面が止まった' then 'OK 送ったものが見える' else 'NG' end;
+select pg_temp.as_('99999999-9999-9999-9999-999999999999');
+select case when (public.god_reports() ->> 'new') = '2' and public.god_reports() -> 'items' -> 0 ->> 'login' = 'ccc' then 'OK 神様に届いた' else 'NG' end;
+select public.god_report_mark((select min(id) from public.reports), 'done', '直しました。ありがとう');
+select pg_temp.as_('33333333-3333-3333-3333-333333333333');
+select case when public.my_reports() -> 1 ->> 'status' = 'done' and public.my_reports() -> 1 ->> 'reply' = '直しました。ありがとう'
+            and exists (select 1 from public.mail where to_id = auth.uid() and subject = '不具合報告へのお返事' and body like '直しました%画面が止まった') then 'OK 返事が文箱に届く' else 'NG' end;
+do $$ begin for i in 1..8 loop perform public.send_report('request', 'たくさん'); end loop; end $$;
+select pg_temp.expect_err($$select public.send_report('request', 'もう一通')$$, '1日10通');
+reset role;
+
 \echo '--- お知らせ'
 select pg_temp.as_('99999999-9999-9999-9999-999999999999');
 select public.god_post_notice('maint', 'メンテナンスのお知らせ', '12月1日 2時から3時') > 0;

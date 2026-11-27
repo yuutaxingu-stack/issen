@@ -181,3 +181,26 @@
 .pftag.s-zetsu{color:#ffe9ec;background:linear-gradient(90deg,#14020a,#c0122f 60%,rgba(120,6,24,.7));box-shadow:0 0 10px rgba(235,20,55,.45);text-shadow:0 0 6px rgba(255,60,90,.8);}
 .pfchips button.s-zetsu{color:#ffd4dc;border-color:rgba(235,40,70,.6);background:linear-gradient(90deg,rgba(20,2,10,.6),rgba(140,8,30,.45));}
 .pfchips button.s-zetsu.on{box-shadow:inset 0 0 0 1px #eb2a4a, 0 0 12px rgba(235,20,55,.4);}
+
+/* 運営へ（不具合報告・改善依頼） */
+.pfl{text-align:left;}
+.pfdot{display:inline-block;margin-left:.35em;min-width:16px;padding:0 4px;border-radius:3px;background:#a8322a;color:#f2ede1;font-family:var(--ui);font-size:11px;line-height:16px;vertical-align:.2em;}
+.pfrep{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.pfrep li{padding:10px 2px 12px;border-bottom:1px solid rgba(233,226,207,.08);display:flex;flex-direction:column;gap:6px;}
+.pfrep li.s-done{opacity:.55;}
+.pfrep p{margin:0;font-size:14px;line-height:1.7;word-break:break-word;}
+.pfrh{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;}
+.pfrh b{font-family:var(--display);font-weight:400;font-size:16px;letter-spacing:.06em;}
+.pfrh small{opacity:.45;}
+.pfrh time{margin-left:auto;opacity:.45;font-size:11px;}
+.pfrep .pfkind{grid-row:auto;margin:0;}
+.pfkind.k-bug{border-color:#e85a4a;color:#f0a59a;}
+.pfkind.k-request{border-color:#8fb3a0;color:#a9cbb8;}
+.pfrs{font-size:11px;letter-spacing:.1em;opacity:.7;}
+.pfrs.s-new{color:#e8c35a;opacity:1;}
+.pfrs.s-done{color:#a9cbb8;}
+.pfenv{font-size:11px !important;opacity:.4;font-family:ui-monospace,Menlo,monospace;}
+.pfreply{padding:6px 10px;border-left:2px solid #a8322a;background:rgba(168,50,42,.1);}
+.pfreply b{display:block;font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.14em;opacity:.8;}
+.pfract{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;}
+.pfract textarea{flex:1 1 100%;}

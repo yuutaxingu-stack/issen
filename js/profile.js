@@ -116,6 +116,7 @@
   }
   async function loadMail(){
     if (!online() || !N.user) { S.mail = null; render(); badges(); return; }
+    if (I && I.isGod && I.isGod()) loadReports();
     try { S.mail = await rpc('my_mail'); S.mailErr = ''; }
     catch (e) { S.mailErr = missing(e) ? 'missing' : errText(e); }
     render(); badges();
@@ -140,7 +141,8 @@
     const un = unseenNews();
     nb.hidden = !un; nb.textContent = un ? '新' : '';
     const m = S.mail && N && N.user ? (S.mail.unclaimed || 0) + 0 : 0, unread = S.mail && N && N.user ? S.mail.unread || 0 : 0;
-    mb.hidden = !(m || unread); mb.textContent = m ? String(m) : unread ? '新' : '';
+    const nr = S.reports && N && N.user ? S.reports.new || 0 : 0;
+    mb.hidden = !(m || unread || nr); mb.textContent = m ? String(m) : (unread || nr) ? '新' : '';
     // 文箱は、ログインしていないときは薄く
     corner.querySelector('[data-go="mail"]').classList.toggle('dim', !(N && N.user));
     corner.querySelector('[data-go="me"]').classList.toggle('dim', !(N && N.user));
@@ -357,6 +359,58 @@
     '</div>';
   }
 
+  /* ---------- 運営へ（不具合報告・改善依頼） ---------- */
+  const RK = { bug: '不具合報告', request: '改善依頼' };
+  const RST = { new: '届いた', seen: '読まれた', done: '済んだ' };
+  const RF = { kind: 'bug', body: '' };
+  function envText(){
+    const n = navigator, w = window;
+    return [(n.userAgent || '').replace(/\s+/g, ' ').slice(0, 200), w.innerWidth + 'x' + w.innerHeight + '@' + (w.devicePixelRatio || 1), new Date().toISOString().slice(0, 16)].join(' / ');
+  }
+  function renderReport(){
+    const mine = S.myReports;
+    return '<div class="pfedit">' +
+      '<p class="gnote pfl">遊んでいて困ったことや、こうしてほしいことを運営に届けます。返事は文箱に届きます。</p>' +
+      '<div class="pff"><span>種類</span><div class="pfchips">' + Object.keys(RK).map(k => '<button type="button" data-rkind="' + k + '"' + (RF.kind === k ? ' class="on"' : '') + '>' + RK[k] + '</button>').join('') + '</div></div>' +
+      '<label class="pff">' + (RF.kind === 'bug' ? 'どの画面で、何をしたら、どうなったか' : 'どんなことが、どうなるとよいか') +
+        '<textarea id="rf_body" maxlength="1000" rows="6" placeholder="' + (RF.kind === 'bug' ? '例　CPU戦の三人目で居合を押したら、画面が止まった' : '例　刀帳で、持っている刀だけを並べられるようにしてほしい') + '">' + esc(RF.body) + '</textarea></label>' +
+      (RF.kind === 'bug' ? '<p class="gnote pfl">不具合報告には、直す手がかりとして端末の種類と画面の大きさが添えられます。</p>' : '') +
+      '<div class="pfacts"><button type="button" class="gpull" data-act="report"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? '送っています…' : '運営へ送る') + '</button></div>' +
+      '<p class="omsg">' + esc(S.msg) + '</p>' +
+      '<h3>送ったもの</h3>' +
+      (mine == null ? '<p class="gnote">読み込んでいます…</p>' : !mine.length ? '<p class="gnote">まだありません</p>' :
+        '<ul class="pfrep">' + mine.map(r => '<li><div class="pfrh"><span class="pfkind k-' + r.kind + '">' + RK[r.kind] + '</span><span class="pfrs s-' + r.status + '">' + RST[r.status] + '</span><time>' + day(r.at) + '</time></div>' +
+          '<p>' + esc(r.body).replace(/\n/g, '<br>') + '</p>' + (r.reply ? '<p class="pfreply"><b>運営より</b>' + esc(r.reply).replace(/\n/g, '<br>') + '</p>' : '') + '</li>').join('') + '</ul>') +
+    '</div>';
+  }
+  function renderInbox(){
+    const R = S.reports;
+    if (!R) return '<p class="rmsg">' + esc(S.err || '読み込んでいます…') + '</p>';
+    if (!R.items.length) return '<div class="pfempty"><p>まだ何も届いていません。</p></div>';
+    return '<ul class="pfrep god">' + R.items.map(r => '<li class="s-' + r.status + '">' +
+      '<div class="pfrh"><span class="pfkind k-' + r.kind + '">' + RK[r.kind] + '</span><b data-pid="' + esc(r.from) + '">' + esc(r.name) + '</b><small>' + esc(r.login) + '</small><span class="pfrs s-' + r.status + '">' + RST[r.status] + '</span><time>' + day(r.at) + '</time></div>' +
+      '<p>' + esc(r.body).replace(/\n/g, '<br>') + '</p>' +
+      (r.env ? '<p class="pfenv">' + esc(r.env) + '</p>' : '') +
+      (r.reply ? '<p class="pfreply"><b>返事</b>' + esc(r.reply).replace(/\n/g, '<br>') + '</p>' : '') +
+      '<div class="pfract">' +
+        (S.replying === r.id ? '<textarea id="rp_body" maxlength="380" rows="3" placeholder="返事（送った人の文箱に届きます）"></textarea><button type="button" class="obtn pri" data-reply="' + r.id + '">返事を送って済みにする</button><button type="button" class="obtn" data-replyoff="1">やめる</button>' :
+          '<button type="button" class="obtn" data-replyto="' + r.id + '">返事を書く</button>' +
+          (r.status !== 'done' ? '<button type="button" class="obtn" data-rmark="done" data-rid="' + r.id + '">済みにする</button>' : '<button type="button" class="obtn" data-rmark="seen" data-rid="' + r.id + '">未済に戻す</button>')) +
+      '</div></li>').join('') + '</ul>';
+  }
+  async function loadReports(){
+    if (!online() || !N.user) return;
+    try {
+      if (I && I.isGod && I.isGod()) {
+        S.reports = await rpc('god_reports');
+        // 開いて見たものは「読まれた」に
+        if (!scr.hidden && S.tab === 'inbox') S.reports.items.filter(r => r.status === 'new').forEach(r => { r.status = 'seen'; rpc('god_report_mark', { p_id: r.id, p_status: 'seen', p_reply: null }).catch(() => {}); });
+        if (!scr.hidden && S.tab === 'inbox') S.reports.new = 0;
+      } else S.myReports = await rpc('my_reports');
+    } catch (e) { if (!missing(e)) S.err = errText(e); }
+    render(); badges();
+  }
+
   /* ---------- 描く ---------- */
   function render(){
     if (scr.hidden) return;
@@ -366,8 +420,9 @@
     if (S.mode === 'card') { title = '名乗り'; body = renderCard(); }
     else if (S.mode === 'mail') {
       title = '文箱';
-      if (god) tl = [['box', '文箱'], ['send', '送る']];
-      body = S.tab === 'send' && god ? renderSend() : renderMail();
+      const nr = S.reports && S.reports.new ? '<span class="pfdot">' + S.reports.new + '</span>' : '';
+      tl = god ? [['box', '文箱'], ['send', '送る'], ['inbox', '届いた' + nr]] : (N && N.user ? [['box', '文箱'], ['report', '運営へ']] : []);
+      body = S.tab === 'send' && god ? renderSend() : S.tab === 'inbox' && god ? renderInbox() : S.tab === 'report' && N && N.user ? renderReport() : renderMail();
     } else if (S.mode === 'news') {
       title = 'お知らせ';
       if (god) tl = [['list', 'お知らせ'], ['write', '書く']];
@@ -391,6 +446,7 @@
     if (S.tab === 'send') {
       ['target', 'katana', 'logins', 'subject', 'body', 'coins', 'steel', 'title', 'plate'].forEach(k => { const x = v('gf_' + k); if (x != null) GF[k] = x; });
     }
+    if (S.tab === 'report') { const b = v('rf_body'); if (b != null) RF.body = b; }
     if (S.tab === 'write') { const t = v('nf_title'), b = v('nf_body'); if (t != null) NF.title = t; if (b != null) NF.body = b; }
   }
   let armTimer = 0;
@@ -419,6 +475,7 @@
     if (d.tab) {
       S.tab = d.tab; S.msg = ''; S.arm = 0;
       if (d.tab === 'send' && !S.god) loadGod();
+      if (d.tab === 'report' || d.tab === 'inbox') loadReports();
       render(); return;
     }
     if (d.act === 'login') { close(); const b = $('m_online'); if (b) b.click(); return; }
@@ -486,6 +543,27 @@
       S.busy = false; render(); return;
     }
     if (d.kind) { NF.kind = d.kind; render(); return; }
+    if (d.rkind) { RF.kind = d.rkind; render(); return; }
+    if (d.act === 'report') {
+      if (!RF.body.trim()) { S.msg = '中身を書いてください'; render(); return; }
+      S.busy = true; S.msg = ''; render();
+      try {
+        await rpc('send_report', { p_kind: RF.kind, p_body: RF.body, p_env: RF.kind === 'bug' ? envText() : '' });
+        RF.body = ''; S.msg = '運営へ届けました。ありがとうございます';
+        if (N.toast) N.toast('運営へ届けました', 2500);
+        await loadReports();
+      } catch (x) { S.msg = errText(x); }
+      S.busy = false; render(); return;
+    }
+    if (d.replyto) { S.replying = Number(d.replyto); render(); const t = $('rp_body'); if (t) t.focus(); return; }
+    if (d.replyoff) { S.replying = 0; render(); return; }
+    if (d.reply || d.rmark) {
+      const id = Number(d.reply || d.rid), text = d.reply ? (($('rp_body') || {}).value || '').trim() : null;
+      if (d.reply && !text) return;
+      try { await rpc('god_report_mark', { p_id: id, p_status: d.reply ? 'done' : d.rmark, p_reply: text }); S.replying = 0; if (d.reply && N.toast) N.toast('返事を送りました', 2500); }
+      catch (x) { if (N.toast) N.toast(errText(x), 5000); }
+      await loadReports(); return;
+    }
     if (d.act === 'post') {
       if (!NF.title.trim()) { S.msg = '題を書いてください'; render(); return; }
       if (!armOnce('post')) return;
@@ -524,7 +602,7 @@
   if (N && N.on) N.on(() => {
     const u = N.user ? N.user.id : null;
     if (u !== who) {
-      who = u; S.mail = null; S.mailErr = ''; S.god = null;
+      who = u; S.mail = null; S.mailErr = ''; S.god = null; S.reports = null; S.myReports = null;
       Object.keys(tags).forEach(k => delete tags[k]);
       clearInterval(mailTimer);
       if (u) { loadMail(); mailTimer = setInterval(() => { if (!menu || !menu.hidden) loadMail(); }, 120000); }

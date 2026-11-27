@@ -35,6 +35,12 @@ select e.id, t from public.profile_ext e, unnest(e.titles) t
 where exists (select 1 from public.title_catalog c where c.id = t)
 on conflict do nothing;
 
+-- その刀の箱が公開済みか（刀にまつわらない物は常に true）。公開前の箱の二つ名・背景は、神様と持っている人にだけ見せる
+create or replace function public.katana_shown(k text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select k is null or exists (select 1 from public.katana_catalog c join public.gacha_boxes b on b.id = c.box where c.id = k and b.open);
+$$;
+
 -- 図鑑の中身
 create or replace function public.zukan() returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
@@ -50,12 +56,14 @@ begin
                                   'have', g or t.id = any(coalesce(x.titles, '{}')), 'seen', s.id is not null)
           else jsonb_build_object('hidden', true, 'have', false, 'seen', false) end j
       from public.title_catalog t
-      left join public.title_seen s on s.id = me and s.title = t.id) q),
+      left join public.title_seen s on s.id = me and s.title = t.id
+      where g or s.id is not null or public.katana_shown(t.katana)) q),
     'plates', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name, 'note', p.note, 'free', p.free,
                  'have', g or p.free or p.id = any(coalesce(x.plates, '{}'))) order by p.ord, p.id), '[]')
-               from public.plate_catalog p));
+               from public.plate_catalog p
+               where g or p.id = any(coalesce(x.plates, '{}')) or public.katana_shown(p.katana)));
 end;
 $$;
 
-revoke execute on function public.title_seen_trigger(), public.zukan() from public, anon, authenticated;
+revoke execute on function public.title_seen_trigger(), public.katana_shown(text), public.zukan() from public, anon, authenticated;
 grant execute on function public.zukan() to authenticated;

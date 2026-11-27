@@ -41,3 +41,19 @@ select case when pg_temp.veiled(public.zukan()) = 0 and pg_temp.t(public.zukan()
 \echo '--- ログインしていなければ断る'
 select pg_temp.as_('');
 do $$ begin perform public.zukan(); raise exception 'NG 通った'; exception when others then if sqlerrm like 'NG%' then raise; end if; raise notice 'OK 断られた: %', sqlerrm; end $$;
+
+\echo '--- 八咫の二つ名・背景は、第二弾の箱が出るまで神様と持ち主にだけ見える'
+select pg_temp.as_('11111111-1111-1111-1111-111111111111');
+select case when pg_temp.t(public.zukan(), 'issen_yata') is null and not exists (select 1 from jsonb_array_elements(public.zukan() -> 'plates') p where p ->> 'id' = 'yata')
+            and pg_temp.t(public.zukan(), 'issen_ouka') is not null
+  then 'OK 箱が出る前は見えない' else 'NG' end;
+select pg_temp.as_('99999999-9999-9999-9999-999999999999');
+select case when pg_temp.t(public.zukan(), 'issen_yata') ->> 'have' = 'true' and exists (select 1 from jsonb_array_elements(public.zukan() -> 'plates') p where p ->> 'id' = 'yata' and (p ->> 'have')::boolean)
+  then 'OK 神様は八咫も持つ' else 'NG' end;
+select pg_temp.as_('');
+update public.gacha_boxes set open = true where id = 'b2';
+select pg_temp.as_('11111111-1111-1111-1111-111111111111');
+select case when pg_temp.t(public.zukan(), 'issen_yata') ->> 'have' = 'false' and exists (select 1 from jsonb_array_elements(public.zukan() -> 'plates') p where p ->> 'id' = 'yata')
+  then 'OK 箱が出たら皆に見える' else 'NG' end;
+select pg_temp.as_('');
+update public.gacha_boxes set open = false where id = 'b2';

@@ -87,8 +87,18 @@
   animation:pfdrift 18s linear infinite;opacity:.9;}
 .pfcard.pl-ouka .pfnick{background:linear-gradient(90deg,#c0122f,rgba(120,6,24,.8) 70%,rgba(120,6,24,0));}
 .pfcard.pl-ouka .pfseal{background:#1a0207;color:#eb2a4a;box-shadow:inset 0 0 0 1px #eb2a4a;}
+.pl-yata{color:#f4f4f8;background:
+  radial-gradient(circle at 84% 34%, #000 0 25px, rgba(255,255,255,.95) 26px, rgba(236,236,246,.55) 28px, rgba(220,224,240,.18) 40px, rgba(200,205,230,.06) 70px, transparent 110px),
+  radial-gradient(ellipse 60% 80% at 84% 34%, rgba(210,214,235,.10), transparent 70%),
+  linear-gradient(115deg,#121216,#08080a 55%,#020203);
+  box-shadow:0 0 0 1px rgba(240,240,248,.4), 0 0 30px rgba(230,232,245,.14), 0 14px 40px rgba(0,0,0,.7);}
+.pfcard.pl-yata .pfpetal{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 260 170'%3E%3Cg fill='%23f4f4f8'%3E%3Cpath d='M20 40c10-14 30-20 40-18-8 6-22 16-40 18z' fill-opacity='.22'/%3E%3Cpath d='M150 30c12-10 28-12 36-9-9 5-22 10-36 9z' fill-opacity='.14' transform='rotate(25 168 28)'/%3E%3Cpath d='M190 120c10-14 30-20 40-18-8 6-22 16-40 18z' fill-opacity='.18' transform='rotate(-30 210 112)'/%3E%3Cpath d='M80 130c9-9 22-11 29-8-7 5-17 9-29 8z' fill-opacity='.12'/%3E%3C/g%3E%3Cg stroke='%23f4f4f8' stroke-opacity='.25' stroke-width='.8' fill='none'%3E%3Cpath d='M22 39c12-6 25-12 36-16'/%3E%3Cpath d='M192 119c12-6 25-12 36-16' transform='rotate(-30 210 112)'/%3E%3C/g%3E%3C/svg%3E") 0 0/260px 170px repeat;
+  animation:pfdrift2 24s linear infinite;opacity:.9;}
+.pfcard.pl-yata .pfnick{background:linear-gradient(90deg,#000,rgba(40,40,48,.85) 70%,rgba(40,40,48,0));box-shadow:inset 0 1px 0 rgba(255,255,255,.35);}
+.pfcard.pl-yata .pfseal{background:#000;color:#f4f4f8;box-shadow:inset 0 0 0 1px #f4f4f8, 0 0 8px rgba(255,255,255,.35);}
+@keyframes pfdrift2{from{background-position:0 0;}to{background-position:260px 170px;}}
 @keyframes pfdrift{from{background-position:0 0;}to{background-position:-240px 160px;}}
-@media (prefers-reduced-motion: reduce){.pfcard,.pfcard.pl-ouka .pfpetal{animation:none;}}
+@media (prefers-reduced-motion: reduce){.pfcard,.pfcard.pl-ouka .pfpetal,.pfcard.pl-yata .pfpetal{animation:none;}}
 
 /* ---------- 書き換え・神様の欄 ---------- */
 .pfedit{display:flex;flex-direction:column;gap:12px;margin-top:14px;}
@@ -172,7 +182,7 @@
 .pfsave .omsg{margin:0 0 6px;text-align:center;color:#f0a59a;}
 
 /* 絶の二つ名（桜華一閃など）: 赤黒の帯に紅の光と花びら */
-.pfnick.s-zetsu,.pfcard.pl-ouka .pfnick.s-zetsu{position:relative;color:#ffe9ec;padding:3px 16px 3px 14px;letter-spacing:.34em;
+.pfnick.s-zetsu,.pfcard[class*="pl-"] .pfnick.s-zetsu{position:relative;color:#ffe9ec;padding:3px 16px 3px 14px;letter-spacing:.34em;
   background:linear-gradient(90deg,#14020a 0%,#4a0614 18%,#c0122f 55%,rgba(120,6,24,.85) 80%,rgba(20,2,10,0));
   box-shadow:inset 0 1px 0 rgba(255,90,120,.45), inset 0 -1px 0 rgba(255,40,80,.35), 0 0 18px rgba(235,20,55,.45);
   text-shadow:0 0 8px rgba(255,60,90,.9), 0 1px 0 #000;}
@@ -181,6 +191,17 @@
 .pftag.s-zetsu{color:#ffe9ec;background:linear-gradient(90deg,#14020a,#c0122f 60%,rgba(120,6,24,.7));box-shadow:0 0 10px rgba(235,20,55,.45);text-shadow:0 0 6px rgba(255,60,90,.8);}
 .pfchips button.s-zetsu{color:#ffd4dc;border-color:rgba(235,40,70,.6);background:linear-gradient(90deg,rgba(20,2,10,.6),rgba(140,8,30,.45));}
 .pfchips button.s-zetsu.on{box-shadow:inset 0 0 0 1px #eb2a4a, 0 0 12px rgba(235,20,55,.4);}
+
+/* 八咫の二つ名: 黒い帯に白く光る文字、左に日食の輪 */
+.pfnick.s-yata,.pfcard[class*="pl-"] .pfnick.s-yata{position:relative;color:#fff;padding:3px 16px 3px 16px;letter-spacing:.34em;
+  background:linear-gradient(90deg,#000 0%,#0c0c10 40%,rgba(60,60,72,.85) 75%,rgba(0,0,0,0));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(255,255,255,.25), 0 0 16px rgba(235,238,255,.3);
+  text-shadow:0 0 8px rgba(255,255,255,.95), 0 1px 0 #000;}
+.pfnick.s-yata::before{content:"";position:absolute;left:-8px;top:50%;width:11px;height:11px;margin-top:-6.5px;border-radius:50%;
+  background:#000;border:1.5px solid #fff;box-shadow:0 0 8px rgba(255,255,255,.95), 0 0 2px #fff inset;}
+.pftag.s-yata{color:#fff;background:linear-gradient(90deg,#000,#26262e 60%,rgba(60,60,72,.7));box-shadow:0 0 0 1px rgba(255,255,255,.35), 0 0 10px rgba(235,238,255,.3);text-shadow:0 0 6px rgba(255,255,255,.9);}
+.pfchips button.s-yata{color:#f4f4f8;border-color:rgba(240,240,248,.6);background:linear-gradient(90deg,rgba(0,0,0,.7),rgba(50,50,60,.5));}
+.pfchips button.s-yata.on{box-shadow:inset 0 0 0 1px #fff, 0 0 12px rgba(235,238,255,.4);}
 
 /* 運営へ（不具合報告・改善依頼） */
 .pfl{text-align:left;}

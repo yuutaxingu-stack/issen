@@ -30,6 +30,10 @@ create table if not exists public.plate_catalog (
   ord int not null default 100
 );
 
+-- その刀にまつわる二つ名・背景（その刀の箱が公開されるまで、神様と持っている人以外には図鑑で見せない。2026-11-27）
+alter table public.title_catalog add column if not exists katana text;
+alter table public.plate_catalog add column if not exists katana text;
+
 -- ---------- 一人ひとりの名乗り ----------
 create table if not exists public.profile_ext (
   id uuid primary key references public.profiles(id) on delete cascade,
@@ -81,17 +85,20 @@ revoke all on public.title_catalog, public.plate_catalog, public.profile_ext, pu
 -- ---------- 中身（名前とわけはここを書き換えて、もう一度実行すれば変わる） ----------
 -- style: 見た目。'' = 朱の帯、'zetsu' = 絶の赤黒（css/profile.css の .pfnick.s-zetsu）
 alter table public.title_catalog add column if not exists style text not null default '';
-insert into public.title_catalog (id, name, note, style, ord) values
-  ('issen', '一閃', '後のない刹那に、明鏡止水を決めた者', '', 2),
-  ('issen_ouka', '桜華一閃', '絶の一振り「桜華」で、一閃を決めた者', 'zetsu', 1)
-on conflict (id) do update set name = excluded.name, note = excluded.note, style = excluded.style, ord = excluded.ord;
+-- 'yata' = 八咫の白と黒
+insert into public.title_catalog (id, name, note, style, ord, katana) values
+  ('issen', '一閃', '後のない刹那に、明鏡止水を決めた者', '', 2, null),
+  ('issen_ouka', '桜華一閃', '絶の一振り「桜華」で、一閃を決めた者', 'zetsu', 1, 'ouka'),
+  ('issen_yata', '八咫一閃', '絶の一振り「八咫」で、一閃を決めた者', 'yata', 1, 'yata')
+on conflict (id) do update set name = excluded.name, note = excluded.note, style = excluded.style, ord = excluded.ord, katana = excluded.katana;
 
-insert into public.plate_catalog (id, name, note, free, ord) values
-  ('sumi',  '墨',   'はじめから使える', true, 1),
-  ('take',  '竹林', 'はじめから使える', true, 2),
-  ('tsuki', '月夜', 'はじめから使える', true, 3),
-  ('ouka',  '桜華', '絶の一振り「桜華」を手にした者', false, 50)
-on conflict (id) do update set name = excluded.name, note = excluded.note, free = excluded.free, ord = excluded.ord;
+insert into public.plate_catalog (id, name, note, free, ord, katana) values
+  ('sumi',  '墨',   'はじめから使える', true, 1, null),
+  ('take',  '竹林', 'はじめから使える', true, 2, null),
+  ('tsuki', '月夜', 'はじめから使える', true, 3, null),
+  ('ouka',  '桜華', '絶の一振り「桜華」を手にした者', false, 50, 'ouka'),
+  ('yata',  '八咫', '絶の一振り「八咫」を手にした者', false, 51, 'yata')
+on conflict (id) do update set name = excluded.name, note = excluded.note, free = excluded.free, ord = excluded.ord, katana = excluded.katana;
 
 -- ---------- 中で使う小さな処理 ----------
 create or replace function public.is_god(u uuid) returns boolean
@@ -417,7 +424,11 @@ insert into public.auto_gifts (id, cond, arg, gifts, subject, body, ord) values
   ('issen_title', 'issen', null, '{"titles":["issen"]}', '一閃の誉れ',
    E'後のない刹那に、明鏡止水を決めた者へ。\n二つ名を贈ります。名乗りの画面で名乗れます。', 1),
   ('ouka_plate', 'katana', 'ouka', '{"plates":["ouka"]}', '桜華の札',
-   E'絶の一振り「桜華」を手にした者へ。\n背景の札「桜華」を贈ります。名乗りの画面で使えます。', 2)
+   E'絶の一振り「桜華」を手にした者へ。\n背景の札「桜華」を贈ります。名乗りの画面で使えます。', 2),
+  ('issen_yata_title', 'issen_with', 'yata', '{"titles":["issen_yata"]}', '八咫一閃の誉れ',
+   E'絶の一振り「八咫」で、後のない刹那に明鏡止水を決めた者へ。\n二つ名「八咫一閃」を贈ります。名乗りの画面で名乗れます。', 0),
+  ('yata_plate', 'katana', 'yata', '{"plates":["yata"]}', '八咫の札',
+   E'絶の一振り「八咫」を手にした者へ。\n背景の札「八咫」を贈ります。名乗りの画面で使えます。', 3)
 on conflict (id) do update set cond = excluded.cond, arg = excluded.arg, gifts = excluded.gifts, subject = excluded.subject, body = excluded.body, ord = excluded.ord;
 
 -- その人が条件を満たす贈り物を、まだなら文箱へ入れる。返すのは送った通数
@@ -548,6 +559,7 @@ insert into public.title_catalog (id, name, note, style, ord, hidden) values
   ('top_meikyo',  '天下　明鏡止水', '明鏡止水を、誰よりも多く決めた者', 'crown', 10, true),
   ('top_issen',   '天下　一閃',     '一閃を、誰よりも多く決めた者',     'crown', 11, true),
   ('top_issen_ouka', '天下　桜華一閃', '絶の一振り「桜華」で、一閃を誰よりも多く決めた者', 'crown', 9, true),
+  ('top_issen_yata', '天下　八咫一閃', '絶の一振り「八咫」で、一閃を誰よりも多く決めた者', 'crown', 9, true),
   ('top_hayate', '天下　疾風', '疾風を、誰よりも多く決めた者', 'crown', 30, true),
   ('top_sennosen', '天下　先の先', '先の先を、誰よりも多く決めた者', 'crown', 31, true),
   ('top_sukiugachi', '天下　隙穿ち', '隙穿ちを、誰よりも多く決めた者', 'crown', 32, true),
@@ -569,6 +581,8 @@ insert into public.title_catalog (id, name, note, style, ord, hidden) values
   ('top_katana',  '刀狩り',         '誰よりも多くの刀を刀帳に記した者', 'crown', 14, true),
   ('top_rating',  '天下一',         '戦闘力が、誰よりも高い者',         'crown', 15, true)
 on conflict (id) do update set name = excluded.name, note = excluded.note, style = excluded.style, ord = excluded.ord, hidden = excluded.hidden;
+update public.title_catalog set katana = 'ouka' where id = 'top_issen_ouka' and katana is distinct from 'ouka';
+update public.title_catalog set katana = 'yata' where id = 'top_issen_yata' and katana is distinct from 'yata';
 
 create table if not exists public.crowns (
   title text primary key references public.title_catalog(id) on delete cascade,
@@ -585,7 +599,7 @@ revoke all on public.crowns from anon, authenticated;
 insert into public.crowns (title, kind, arg) values
   ('top_meikyo', 'finish', '明鏡止水'), ('top_issen', 'finish', '一閃'), ('top_wins', 'wins', null),
   ('top_cpu', 'cpu', null), ('top_katana', 'katana', null), ('top_rating', 'rating', null),
-  ('top_issen_ouka', 'finish_kat', 'ouka:一閃'),
+  ('top_issen_ouka', 'finish_kat', 'ouka:一閃'), ('top_issen_yata', 'finish_kat', 'yata:一閃'),
   ('top_hayate', 'finish', '疾風'), ('top_sennosen', 'finish', '先の先'), ('top_sukiugachi', 'finish', '隙穿ち'), ('top_kagero', 'finish', '陽炎'), ('top_ninotachi', 'finish', '二の太刀'), ('top_todome', 'finish', '止め'), ('top_shichukatsu', 'finish', '死中活'), ('top_ruten', 'finish', '流転'), ('top_kamihitoe', 'finish', '紙一重'), ('top_kagamigaeshi', 'finish', '鏡返し'), ('top_kirifuse', 'finish', '斬り伏せ'), ('top_haisui', 'finish', '背水'), ('top_rakka', 'finish', '落花'), ('top_setsuna', 'finish', '刹那'), ('top_hyakka', 'finish', '百花'), ('top_sange', 'finish', '散華')
 on conflict (title) do update set kind = excluded.kind, arg = excluded.arg;
 

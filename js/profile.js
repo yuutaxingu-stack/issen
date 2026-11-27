@@ -25,7 +25,7 @@
   const errText = e => missing(e) ? 'サーバーの準備がまだです（SQLの実行待ち）' : (N && N.jp ? N.jp(e) : String(e && e.message || e));
 
   // 背景の札。絵は css/profile.css の .pl-<id>
-  const PLATE_NAME = { sumi: '墨', take: '竹林', tsuki: '月夜', ouka: '桜華' };
+  const PLATE_NAME = { sumi: '墨', take: '竹林', tsuki: '月夜', ouka: '桜華', yata: '八咫' };
   const KIND = { maint: 'メンテナンス', important: '大事なお知らせ', update: '更新', special: '特別' };
   const SEEN = 'issen-news-seen-v1', POPPED = 'issen-news-pop-v1';
 

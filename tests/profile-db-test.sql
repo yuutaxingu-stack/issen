@@ -46,9 +46,9 @@ select case when (public.god_preview('login', '甲、ccc') ->> 'n') = '2' then '
 select case when public.god_send_mail('login', '甲', '銭を', '', '{"coins":100}') = 1 then 'OK 名前で銭を1通' else 'NG' end;
 select case when public.god_send_mail('all', null, 'お詫び', '', '{"coins":300,"steel":50,"bogus":1}') = 4 then 'OK 全員に銭と玉鋼' else 'NG' end;
 select case when (select gifts from public.mail where subject = 'お詫び' limit 1) = '{"coins":300,"steel":50}' then 'OK 知らない添え物は捨てる' else 'NG' end;
-select case when jsonb_array_length(public.god_info() -> 'sent') = 4 and jsonb_array_length(public.god_info() -> 'auto') = 3 then 'OK 送った記録と自動の贈り物' else 'NG' end;
+select case when jsonb_array_length(public.god_info() -> 'sent') = 4 and jsonb_array_length(public.god_info() -> 'auto') = (select count(*) from public.auto_gifts) then 'OK 送った記録と自動の贈り物' else 'NG' end;
 \echo '--- 神様は二つ名・背景・刀を全部持っている'
-select case when jsonb_array_length(public.get_profile(null) -> 'my_titles') >= 1 and jsonb_array_length(public.get_profile(null) -> 'my_plates') = 4
+select case when jsonb_array_length(public.get_profile(null) -> 'my_titles') >= 1 and jsonb_array_length(public.get_profile(null) -> 'my_plates') = (select count(*) from public.plate_catalog)
             and (public.set_profile('', 'geppaku', 'issen', 'ouka') ->> 'title_name') = '一閃' then 'OK 神様は何でも名乗れる' else 'NG' end;
 
 \echo '--- 甲: 文箱を見て受け取る'
@@ -185,3 +185,12 @@ select case when (select holder from public.crowns where title = 'top_kagero') =
             and (select count(*) from public.crowns where holder = '99999999-9999-9999-9999-999999999999') = 0
             and (select 'top_kagero' = any(titles) from public.profile_ext where id = '11111111-1111-1111-1111-111111111111')
   then 'OK 神様が持っても天下の持ち主はそのまま' else 'NG' end;
+\echo '--- 八咫: 持てば札、八咫で一閃を決めれば二つ名と天下　八咫一閃'
+reset role;
+insert into public.crowns (title, kind, arg) values ('top_issen_yata', 'finish_kat', 'yata:一閃') on conflict do nothing;
+update public.saves set owned = owned || '{"yata":1}', rec = rec || '{"yata":{"一閃":2}}' where id = '33333333-3333-3333-3333-333333333333';
+select case when exists (select 1 from public.mail where to_id = '33333333-3333-3333-3333-333333333333' and subject = '八咫の札')
+            and exists (select 1 from public.mail where to_id = '33333333-3333-3333-3333-333333333333' and subject = '八咫一閃の誉れ')
+            and (select holder from public.crowns where title = 'top_issen_yata') = '33333333-3333-3333-3333-333333333333'
+            and (select name from public.title_catalog where id = 'top_issen_yata') = '天下　八咫一閃'
+  then 'OK 八咫の札・八咫一閃・天下　八咫一閃が丙に' else 'NG' end;

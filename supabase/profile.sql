@@ -345,7 +345,10 @@ language plpgsql stable security definer set search_path = '' as $$
 begin
   if not public.is_god(auth.uid()) then raise exception '神様だけが使えます'; end if;
   return jsonb_build_object(
-    'titles', (select coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name) order by t.ord, t.id), '[]') from public.title_catalog t),
+    'titles', (select coalesce(jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name) order by t.ord, t.id), '[]') from public.title_catalog t
+               where not t.hidden),   -- 隠し二つ名は手で送らない（一番の人だけが持つ）
+    'crowns', (select coalesce(jsonb_agg(jsonb_build_object('name', t.name, 'note', t.note, 'holder', p.name, 'value', c.value, 'since', c.since) order by t.ord), '[]')
+               from public.crowns c join public.title_catalog t on t.id = c.title left join public.profiles p on p.id = c.holder),
     'plates', (select coalesce(jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name, 'free', p.free) order by p.ord, p.id), '[]') from public.plate_catalog p),
     'auto', (select coalesce(jsonb_agg(jsonb_build_object('subject', a.subject, 'cond', a.cond, 'arg', a.arg, 'active', a.active,
                'n', (select count(*) from public.auto_gifts_given d where d.gift_id = a.id)) order by a.ord), '[]') from public.auto_gifts a),
@@ -526,6 +529,134 @@ begin
 end;
 $$;
 
+
+-- ---------- 隠し二つ名（一番の人だけが持つ。記録を抜かれたら移る）（2026-11-27） ----------
+-- 二つ名そのものは title_catalog に hidden = true で入れる（手に入れるまで、条件も名前も一覧に出さない）
+-- kind: 'finish' = arg の決着を出した回数 / 'wins' = 勝ちの合計 / 'cpu' = CPU戦の最高の勝ち抜き
+--       'katana' = 刀帳の種類 / 'rating' = 戦闘力（オンライン対戦を1回以上した人）
+-- 一番が並んだときは、今の持ち主がそのまま持つ（抜いたときだけ移る）。神様は数えない
+alter table public.title_catalog add column if not exists hidden boolean not null default false;
+insert into public.title_catalog (id, name, note, style, ord, hidden) values
+  ('top_meikyo',  '明鏡止水の達人', '明鏡止水を、誰よりも多く決めた者', 'crown', 10, true),
+  ('top_issen',   '一閃の覇者',     '一閃を、誰よりも多く決めた者',     'crown', 11, true),
+  ('top_wins',    '剣聖',           '誰よりも多く勝った者',             'crown', 12, true),
+  ('top_cpu',     '無双',           'CPU戦で、誰よりも多く勝ち抜いた者', 'crown', 13, true),
+  ('top_katana',  '刀狩り',         '誰よりも多くの刀を刀帳に記した者', 'crown', 14, true),
+  ('top_rating',  '天下一',         '戦闘力が、誰よりも高い者',         'crown', 15, true)
+on conflict (id) do update set name = excluded.name, note = excluded.note, style = excluded.style, ord = excluded.ord, hidden = excluded.hidden;
+
+create table if not exists public.crowns (
+  title text primary key references public.title_catalog(id) on delete cascade,
+  kind text not null check (kind in ('finish', 'wins', 'cpu', 'katana', 'rating')),
+  arg text,
+  holder uuid references public.profiles(id) on delete set null,
+  value numeric not null default 0,
+  since timestamptz
+);
+alter table public.crowns enable row level security;
+revoke all on public.crowns from anon, authenticated;
+insert into public.crowns (title, kind, arg) values
+  ('top_meikyo', 'finish', '明鏡止水'), ('top_issen', 'finish', '一閃'), ('top_wins', 'wins', null),
+  ('top_cpu', 'cpu', null), ('top_katana', 'katana', null), ('top_rating', 'rating', null)
+on conflict (title) do update set kind = excluded.kind, arg = excluded.arg;
+
+-- 一人ひとりの値（神様は数えない）
+create or replace function public.crown_values(p_kind text, p_arg text) returns table (id uuid, v numeric, born timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select s.id,
+    case p_kind
+      when 'finish' then coalesce((select sum(case when jsonb_typeof(r.value -> p_arg) = 'number' then (r.value ->> p_arg)::numeric else 0 end)
+                                   from jsonb_each(s.rec) r where jsonb_typeof(r.value) = 'object'), 0)
+      when 'wins' then coalesce((select sum((f.value)::text::numeric) from jsonb_each(s.rec) r, jsonb_each(r.value) f
+                                 where jsonb_typeof(r.value) = 'object' and jsonb_typeof(f.value) = 'number'), 0)
+      when 'cpu' then s.cpu_best::numeric
+      when 'katana' then (select count(*) from jsonb_each(s.owned) o join public.katana_catalog c on c.id = o.key
+                          where jsonb_typeof(o.value) = 'number' and (o.value)::text::numeric > 0)::numeric
+      else 0 end,
+    s.created_at
+  from public.saves s
+  where p_kind <> 'rating' and not public.is_god(s.id)
+  union all
+  select r.id, r.rating::numeric, r.updated_at from public.ratings r
+  where p_kind = 'rating' and (r.wins + r.losses) > 0 and not public.is_god(r.id);
+$$;
+
+-- 一つの隠し二つ名の持ち主を確かめ直し、変わっていたら移して、二人の文箱に知らせる
+create or replace function public.crown_refresh(p_title text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare c public.crowns; t public.title_catalog; top uuid; topv numeric; holdv numeric; nm text;
+begin
+  select * into c from public.crowns x where x.title = p_title for update;
+  if c.title is null then return; end if;
+  select * into t from public.title_catalog x where x.id = p_title;
+  select v.id, v.v into top, topv from public.crown_values(c.kind, c.arg) v where v.v > 0 order by v.v desc, v.born, v.id limit 1;
+  if c.holder is not null then
+    select v.v into holdv from public.crown_values(c.kind, c.arg) v where v.id = c.holder;
+    -- 並んでいるなら今の持ち主のまま
+    if holdv is not null and topv is not null and holdv >= topv then top := c.holder; topv := holdv; end if;
+  end if;
+  if top is not distinct from c.holder then
+    update public.crowns set value = coalesce(topv, 0) where title = p_title;
+    return;
+  end if;
+  -- 前の持ち主から外す（名乗っていたら、残っている二つ名のうち一番上に名乗り替える）
+  if c.holder is not null then
+    update public.profile_ext e set titles = array_remove(e.titles, p_title),
+      title = case when e.title = p_title then
+        (select x.id from public.title_catalog x where x.id = any(array_remove(e.titles, p_title)) order by x.ord, x.id limit 1) else e.title end,
+      updated_at = now()
+    where e.id = c.holder;
+    select p.name into nm from public.profiles p where p.id = top;
+    insert into public.mail (to_id, batch, subject, body) values (c.holder, gen_random_uuid(), '「' || t.name || '」が移りました',
+      case when top is null then '隠し二つ名「' || t.name || '」は、あなたの手を離れました。'
+           else '隠し二つ名「' || t.name || '」は、' || coalesce(nm, '誰か') || 'さんの手に渡りました。' || E'\n取り返すには、もう一度一番になること。' end);
+  end if;
+  if top is not null then
+    insert into public.profile_ext (id) values (top) on conflict (id) do nothing;
+    update public.profile_ext e set titles = (select coalesce(array_agg(distinct v), '{}') from unnest(e.titles || array[p_title]) v), updated_at = now()
+    where e.id = top;
+    insert into public.mail (to_id, batch, subject, body) values (top, gen_random_uuid(), '隠し二つ名「' || t.name || '」',
+      t.note || 'へ。' || E'\n隠し二つ名「' || t.name || E'」を授けます。名乗りの画面で名乗れます。\nほかの誰かに抜かれたら、その人に移ります。');
+  end if;
+  update public.crowns set holder = top, value = coalesce(topv, 0), since = now() where title = p_title;
+end;
+$$;
+
+create or replace function public.crown_refresh_kinds(p_kinds text[]) returns void
+language plpgsql security definer set search_path = '' as $$
+declare k text;
+begin
+  for k in select x.title from public.crowns x where x.kind = any(p_kinds) order by x.title loop
+    perform public.crown_refresh(k);
+  end loop;
+end;
+$$;
+
+create or replace function public.crown_saves_trigger() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.crown_refresh_kinds(array['finish', 'wins', 'cpu', 'katana']);
+  return null;
+end;
+$$;
+drop trigger if exists saves_crowns on public.saves;
+create trigger saves_crowns after insert or update of rec, cpu_best, owned on public.saves
+  for each statement execute function public.crown_saves_trigger();
+
+create or replace function public.crown_rating_trigger() returns trigger
+language plpgsql security definer set search_path = '' as $$
+begin
+  perform public.crown_refresh_kinds(array['rating']);
+  return null;
+end;
+$$;
+drop trigger if exists ratings_crowns on public.ratings;
+create trigger ratings_crowns after insert or update on public.ratings
+  for each statement execute function public.crown_rating_trigger();
+
+-- いまの一番の人に授ける（何度実行しても、持ち主が変わらなければ何も届かない）
+select public.crown_refresh_kinds(array['finish', 'wins', 'cpu', 'katana', 'rating']);
+
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.is_god(uuid), public.profile_json(uuid), public.has_issen(public.saves), public.god_targets(text, text),
@@ -534,7 +665,8 @@ revoke execute on function
   public.god_preview(text, text), public.god_send_mail(text, text, text, text, jsonb), public.god_info(),
   public.god_post_notice(text, text, text), public.god_delete_notice(bigint),
   public.auto_gift_check(public.saves), public.auto_gift_trigger(),
-  public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text)
+  public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text),
+  public.crown_values(text, text), public.crown_refresh(text), public.crown_refresh_kinds(text[]), public.crown_saves_trigger(), public.crown_rating_trigger()
   from public, anon, authenticated;
 grant execute on function
   public.get_profile(uuid), public.profile_tags(uuid[]), public.set_profile(text, text, text, text),

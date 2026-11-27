@@ -204,3 +204,11 @@
 .pfreply b{display:block;font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.14em;opacity:.8;}
 .pfract{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;}
 .pfract textarea{flex:1 1 100%;}
+
+/* 隠し二つ名（一番の人だけが持つ）: 金箔の帯 */
+.pfnick.s-crown,.pfcard[class*="pl-"] .pfnick.s-crown{color:#1c1408;padding:3px 16px 3px 14px;letter-spacing:.3em;text-shadow:0 1px 0 rgba(255,244,210,.5);
+  background:linear-gradient(100deg,#7a5a1c 0%,#d8b25a 22%,#f4e2a6 42%,#c99a3c 62%,#e9cf86 80%,rgba(201,154,60,0));
+  box-shadow:inset 0 1px 0 rgba(255,248,220,.6), 0 0 16px rgba(232,195,90,.35);}
+.pftag.s-crown{color:#1c1408;background:linear-gradient(100deg,#b68a35,#f0d98f 50%,#c99a3c);text-shadow:none;}
+.pfchips button.s-crown{color:#f0d98f;border-color:rgba(232,195,90,.6);background:rgba(232,195,90,.08);}
+.pfchips button.s-crown.on{box-shadow:inset 0 0 0 1px #e8c35a, 0 0 12px rgba(232,195,90,.35);}

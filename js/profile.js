@@ -346,6 +346,7 @@
         (S.arm === 'send' ? 'もう一度触れて送る' + (pv ? '（' + pv.n + '人）' : '') : '送る') + '</button></div>' +
       '<p class="omsg">' + esc(S.msg) + '</p>' +
       (g.auto && g.auto.length ? '<h3>条件を満たすと自動で届く贈り物</h3><ul class="pfsent">' + g.auto.map(a => '<li><b>' + esc(a.subject) + '</b><span>' + esc(a.cond === 'issen' ? '一閃を決めたら' : a.cond === 'issen_with' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」で一閃を決めたら' : a.cond === 'katana' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」を手にしたら' : '') + '・' + a.n + '人に届いた</span></li>').join('') + '</ul>' : '') +
+      (g.crowns && g.crowns.length ? '<h3>隠し二つ名の持ち主（遊ぶ人には、手に入れるまで見えません）</h3><ul class="pfsent">' + g.crowns.map(c => '<li><b><span class="pftag s-crown">' + esc(c.name) + '</span></b><span>' + (c.holder ? esc(c.holder) + '・' + Number(c.value) : 'まだいない') + '</span><time>' + esc(c.note) + '</time></li>').join('') + '</ul>' : '') +
       '<h3>送った手紙</h3><ul class="pfsent">' + ((g.sent || []).map(x => '<li><b>' + esc(x.subject) + '</b><span>' + x.n + '人・受け取り ' + x.claimed + '</span><time>' + day(x.at) + '</time></li>').join('') || '<li class="none">まだありません</li>') + '</ul>' +
     '</div>';
   }

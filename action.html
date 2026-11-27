@@ -97,6 +97,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <label><input type="checkbox" id="a_refill">体力を戻す</label>
   <label><input type="checkbox" id="a_droll">ダッシュ中の守で回避</label>
   <label><input type="checkbox" id="a_wstick">技をスティックで</label>
+  <label><input type="checkbox" id="a_fstick">移動スティック固定</label>
   <button type="button" id="a_reset">位置を戻す</button>
   <button type="button" id="a_btns">ボタン配置</button>
   <button type="button" id="a_help">操作</button>
@@ -112,6 +113,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
     <button type="button" id="mn_train" class="mb"><span class="mk">稽古</span><span class="ms">技とフレームの確かめ</span></button>
   </div>
   <div class="kits"><span>持たせる刀</span><label style="color:#f3a294">朱 <select id="kt0"></select></label><label style="color:#a9c1f0">藍 <select id="kt1"></select></label></div>
+  <div class="kits"><label><input type="checkbox" id="mn_fstick">移動スティックを決まった場所に置く（ボタン配置で動かせる）</label></div>
   <div class="kits"><label><input type="checkbox" id="mn_wstick">技をスティックで出す（弾いた向きの技）</label></div>
   <div class="kits"><label><input type="checkbox" id="mn_droll">ダッシュ中の守で前方回避（切るとシールドで滑って止まる）</label></div>
   <div class="mlinks"><a href="index.html">タイトルへ</a><button type="button" id="mn_btns">ボタン配置</button><button type="button" id="mn_help">操作</button></div>
@@ -156,16 +158,16 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
 </div></div>
 <div id="rot">横向きにしてください</div>
 <script src="js/katana-image.js"></script>
-<script src="js/action/katlook-data.js?v=1795818873"></script>
-<script src="js/action/pose.js?v=1795818873"></script>
-<script src="js/action/boxes.js?v=1795818873"></script>
-<script src="js/action/sim.js?v=1795818873"></script>
-<script src="js/action/netplay.js?v=1795818873"></script>
-<script src="js/action/app.js?v=1795818873"></script>
+<script src="js/action/katlook-data.js?v=1795818987"></script>
+<script src="js/action/pose.js?v=1795818987"></script>
+<script src="js/action/boxes.js?v=1795818987"></script>
+<script src="js/action/sim.js?v=1795818987"></script>
+<script src="js/action/netplay.js?v=1795818987"></script>
+<script src="js/action/app.js?v=1795818987"></script>
 <script src="js/online-config.js"></script>
-<script src="js/no-link.js?v=1795818873"></script>
-<script src="js/net.js?v=1795818873"></script>
-<script src="js/action/online.js?v=1795818873"></script>
+<script src="js/no-link.js?v=1795818987"></script>
+<script src="js/net.js?v=1795818987"></script>
+<script src="js/action/online.js?v=1795818987"></script>
 <script>/* 招かれた人だけ: ログインしていなければタイトルへ（ネット対戦は online.js が確かめる） */
 (function(){var N=window.IssenNet;if(!N||!N.configured()||/[?&]match=/.test(location.search))return;N.init().then(function(){if(!N.user)location.replace('index.html');});})();</script>
 <script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>

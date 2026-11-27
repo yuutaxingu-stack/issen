@@ -40,7 +40,7 @@ function viewAt(sx, sy){
 }
 
 /* ---------- 設定 ---------- */
-const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false, wazaStick: false }; // wazaStick: 技ボタンをスティックにする // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
+const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false, wazaStick: false, fixStick: false }; // fixStick: 移動スティックを決まった場所に置く // wazaStick: 技ボタンをスティックにする // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('issen-action-opt') || '{}')); } catch (e) {}
 function saveOpt(){ try { localStorage.setItem('issen-action-opt', JSON.stringify(OPT)); } catch (e) {} }
 const DUMMY = [['stand', '立つだけ'], ['cguard', 'コンボ確認（当たったら守る）'], ['guard', '守り続ける'], ['jump', '跳び回る'], ['mash', '暴れる']];
@@ -70,6 +70,7 @@ function layoutPad(pd, w, h){
   const r = clamp(Math.min(w, h) * 0.085, 30, 54), sc = BLAY && BLAY.s ? BLAY.s : 1;
   pd.BTN = BDEF.map(([id, label, k]) => { const d = defaultPos(id, w, h, r), q = BLAY && BLAY[id];
     return { id, label, x: q ? q[0] * w : d[0], y: q ? q[1] * h : d[1], r: r * k * sc }; });
+  const m = BLAY && BLAY.M; pd.FS = { x: m ? m[0] * w : r * 2.6, y: m ? m[1] * h : h - r * 2.3 }; // 固定の移動スティックの場所
   pd.w = w; pd.h = h;
 }
 function inBtn(pd, x, y){ for (const b of pd.BTN) { const dx = x - b.x, dy = y - b.y; if (dx * dx + dy * dy <= (b.r * 1.25) ** 2) return b.id; } return null; }
@@ -79,10 +80,14 @@ cv.addEventListener('pointerdown', e => {
   const at = viewAt(e.clientX, e.clientY); if (!at) return;
   const pd = at.v.pad, x = at.x, y = at.y;
   const b = inBtn(pd, x, y);
+  if (EDIT && OPT.fixStick && !b && Math.hypot(x - pd.FS.x, y - pd.FS.y) < 70) { EDIT.sel = 'M'; OWN[e.pointerId] = { v: at.v, r: 'E', id: 'M', dx: x - pd.FS.x, dy: y - pd.FS.y }; return; }
   if (EDIT) { if (b) { EDIT.sel = b; OWN[e.pointerId] = { v: at.v, r: 'E', id: b, dx: x - pd.BTN.find(q => q.id === b).x, dy: y - pd.BTN.find(q => q.id === b).y }; } return; }
   if (b === 'A' && OPT.wazaStick) { const q = pd.BTN.find(z => z.id === 'A'); pd.wz = { ox: q.x, oy: q.y, x, y, fired: false }; OWN[e.pointerId] = { v: at.v, r: 'W' }; return; }
   if (b) { pd.btn[b] = true; OWN[e.pointerId] = { v: at.v, r: b }; return; }
-  if (x < at.v.w * 0.5 && !pd.stick) { pd.stick = { id: e.pointerId, ox: x, oy: y, x, y }; OWN[e.pointerId] = { v: at.v, r: 'S' }; }
+  if (x < at.v.w * 0.5 && !pd.stick) {
+    if (OPT.fixStick) { if (Math.hypot(x - pd.FS.x, y - pd.FS.y) > 120) return; pd.stick = { id: e.pointerId, ox: pd.FS.x, oy: pd.FS.y, x, y }; } // 固定: 輪の近くを押すと、輪の中心から指の向きへ
+    else pd.stick = { id: e.pointerId, ox: x, oy: y, x, y };
+    OWN[e.pointerId] = { v: at.v, r: 'S' }; }
 }, { passive: false });
 function localOf(v, sx, sy){ const [a, b, c, d, e, f] = v.m, det = a * d - b * c, X = sx - e, Y = sy - f; return [(d * X - c * Y) / det, (-b * X + a * Y) / det]; }
 cv.addEventListener('pointermove', e => {
@@ -1047,6 +1052,9 @@ function drawPad(v){
     cx.strokeStyle = 'rgba(20,21,18,.35)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(pd.stick.ox, pd.stick.oy, 46, 0, Math.PI * 2); cx.stroke();
     const dx = pd.stick.x - pd.stick.ox, dy = pd.stick.y - pd.stick.oy, d = Math.hypot(dx, dy), k = d > 46 ? 46 / d : 1;
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.beginPath(); cx.arc(pd.stick.ox + dx * k, pd.stick.oy + dy * k, 20, 0, Math.PI * 2); cx.fill();
+  } else if (OPT.fixStick) {
+    cx.strokeStyle = EDIT && EDIT.sel === 'M' ? 'rgba(179,20,42,.7)' : 'rgba(20,21,18,.3)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(pd.FS.x, pd.FS.y, 46, 0, Math.PI * 2); cx.stroke();
+    cx.fillStyle = 'rgba(20,21,18,.22)'; cx.beginPath(); cx.arc(pd.FS.x, pd.FS.y, 20, 0, Math.PI * 2); cx.fill();
   } else if (matchMedia('(pointer: coarse)').matches) {
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.font = `500 11px ${UIF}`; cx.textAlign = 'center'; cx.fillText('左半分を押して動かす', W * 0.22, H - 22);
   }
@@ -1216,6 +1224,8 @@ function setupBar(){
   const bx = document.getElementById('a_boxes'); bx.checked = OPT.boxes; bx.addEventListener('change', () => { OPT.boxes = bx.checked; saveOpt(); });
   for (const id of ['a_droll', 'mn_droll']) { const el = document.getElementById(id); el.checked = !!OPT.dashRoll;
     el.addEventListener('change', () => { OPT.dashRoll = el.checked; saveOpt(); ['a_droll', 'mn_droll'].forEach(q => { document.getElementById(q).checked = OPT.dashRoll; }); for (const p of sim.p) if (GAME.mode === 'train' || GAME.mode === 'vs' || p.i === 0) p.dashRoll = OPT.dashRoll; el.blur(); }); }
+  for (const id of ['a_fstick', 'mn_fstick']) { const el = document.getElementById(id); el.checked = !!OPT.fixStick;
+    el.addEventListener('change', () => { OPT.fixStick = el.checked; saveOpt(); ['a_fstick', 'mn_fstick'].forEach(q => { document.getElementById(q).checked = OPT.fixStick; }); el.blur(); }); }
   for (const id of ['a_wstick', 'mn_wstick']) { const el = document.getElementById(id); el.checked = !!OPT.wazaStick;
     el.addEventListener('change', () => { OPT.wazaStick = el.checked; saveOpt(); ['a_wstick', 'mn_wstick'].forEach(q => { document.getElementById(q).checked = OPT.wazaStick; }); el.blur(); }); }
   const rf = document.getElementById('a_refill'); rf.checked = OPT.refill; rf.addEventListener('change', () => { OPT.refill = rf.checked; saveOpt(); });

@@ -39,14 +39,23 @@
       <div class="gcoin"><span><b id="g_coins">0</b> 銭</span><span class="gst"><b id="g_steel">0</b> 玉鋼</span></div>
     </div>
     <section id="g_pull">
-      <div class="gbox" id="g_box"></div>
-      <div class="gstage"><canvas id="gc"></canvas><button type="button" id="g_skip" class="gskip" hidden>飛ばす</button>
-        <div class="gres" id="g_res" hidden><span class="gt" id="g_rt"></span><span class="gm" id="g_rm"></span><span class="gy" id="g_ry"></span><p id="g_rl"></p><p class="gd" id="g_rdup"></p><div class="gbatch" id="g_batch" hidden></div><span class="gtap" id="g_tap">触れて閉じる</span></div>
+      <nav class="gside" id="g_box" aria-label="ガチャの箱"></nav>
+      <div class="gmain">
+        <div class="gban" id="g_ban">
+          <canvas id="g_banc"></canvas>
+          <div class="gbt"><span class="gbm" id="g_bm">桜華</span><span class="gbc"><span class="gbs">絶</span><span class="gbk" id="g_bk">第一弾　目玉の絶</span></span></div>
+          <div class="gbr"><span>絶の出現</span><b id="g_bz">0.5%</b></div>
+          <div class="gbb"><span class="gbl">ピックアップ</span><span id="g_bn"></span></div>
+          <button type="button" class="gbd" id="g_bd">近くで見る</button>
+        </div>
+        <div class="gstage" id="g_stage" hidden><canvas id="gc"></canvas><button type="button" id="g_skip" class="gskip" hidden>飛ばす</button>
+          <div class="gres" id="g_res" hidden><span class="gt" id="g_rt"></span><span class="gm" id="g_rm"></span><span class="gy" id="g_ry"></span><p id="g_rl"></p><p class="gd" id="g_rdup"></p><div class="gbatch" id="g_batch" hidden></div><span class="gtap" id="g_tap">触れて閉じる</span></div>
+        </div>
+        <select id="g_pick" class="gpick" hidden aria-label="ピックアップする刀"></select>
+        <div class="gact"><button type="button" id="g_pull1" class="gpull"><b>一振り</b><small>10銭</small></button><button type="button" id="g_pull10" class="gpull"><b>十振り</b><small>100銭</small></button><button type="button" id="g_all" class="gpull sec"><b>全部</b><small></small></button></div>
+        <p class="gnote" id="g_msg"></p>
+        <details class="grate"><summary>出る確率と玉鋼</summary><p class="gnote"><span id="g_rate">出る確率　並 59.5%・上 28%・極 10%・幻 2%・絶 0.5%</span>。絶は箱ごとの目玉で、その箱でしか出ません。持っている刀が出たら玉鋼になります（並5・上10・極25・幻100・絶300）。玉鋼は刀帳で、まだ持っていない刀を鍛えるのに使えます（並50・上110・極300・幻1500・絶6000）。</p></details>
       </div>
-      <select id="g_pick" class="gpick" hidden aria-label="ピックアップする刀"></select>
-      <div class="gact"><button type="button" id="g_pull1" class="gpull">一振り引く　<small>10銭</small></button><button type="button" id="g_all" class="gpull sec">全部引く</button></div>
-      <p class="gnote" id="g_msg"></p>
-      <p class="gnote"><span id="g_rate">出る確率　並 59.5%・上 28%・極 10%・幻 2%・絶 0.5%</span>。絶は箱ごとの目玉で、その箱でしか出ません。持っている刀が出たら玉鋼になります（並5・上10・極25・幻100・絶300）。玉鋼は刀帳で、まだ持っていない刀を鍛えるのに使えます（並50・上110・極300・幻1500・絶6000）。</p>
     </section>
     <section id="g_book" hidden>
       <p class="gcount" id="g_count"></p>

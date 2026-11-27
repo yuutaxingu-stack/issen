@@ -1255,16 +1255,36 @@ function pct(v){ return (Math.round(v*10)/10)+'%'; }
 function boxName(b){ const f=KMAP[b.pick]; return b.mei+(f?'「'+f.mei+'」':''); }
 function renderBox(){ const el=document.getElementById('g_box'); if(!el) return; const b=curBox(), l=liveBoxes().slice().reverse(), f=KMAP[b.pick], z=boxZ(b), busy=gBusy();
   const key=b.id+'|'+l.length+'|'+busy; if(el.dataset.k===key) return; el.dataset.k=key;
-  el.innerHTML=(l.length>1?'<div class="gboxes">'+l.map(x=>'<button type="button" data-box="'+x.id+'"'+(x===b?' class="on"':'')+(busy?' disabled':'')+'>'+boxName(x)+(x===latestBox()?'<small>新</small>':'')+'</button>').join('')+'</div>':'')+
-    '<p class="gfeat">'+b.mei+'の目玉　<i>絶</i><b>'+(f?f.mei:'？')+'</b>'+pct(z)+(x=>x?'<em>'+x+'</em>':'')(b===latestBox()&&b.note&&b.zNew!=null&&b.zNew!==ZNEW?b.note+'・次の箱が出るまで':'')+'</p>';
-  el.querySelectorAll('button[data-box]').forEach(btn=>btn.addEventListener('click',()=>{ if(gBusy()) return; GA.box=BOXES.find(x=>x.id===btn.dataset.box); refreshCoins(); }));
+  // 左の札: 新しい箱ほど上
+  el.innerHTML=l.map(x=>{ const fk=KMAP[x.pick]; return '<button type="button" class="gbx'+(x===b?' on':'')+'" data-box="'+x.id+'"'+(busy?' disabled':'')+'><span class="n">'+x.mei+'</span><span class="m">'+(fk?fk.mei:'？')+'</span><span class="z"><i>絶</i>'+pct(boxZ(x))+'</span>'+(x===latestBox()?'<em>新</em>':'')+'</button>'; }).join('');
+  el.querySelectorAll('button[data-box]').forEach(btn=>btn.addEventListener('click',()=>{ if(gBusy()) return; const nb=BOXES.find(x=>x.id===btn.dataset.box); if(nb===GA.box) return; GA.box=nb; banStop(); refreshCoins(); }));
+  // 看板の文字
+  document.getElementById('g_bk').textContent=b.mei+'　目玉';
+  document.getElementById('g_bm').textContent=f?f.mei:'？';
+  document.getElementById('g_bz').textContent=pct(z);
+  document.getElementById('g_bn').textContent=(b===latestBox()&&b.note&&b.zNew!=null&&b.zNew!==ZNEW)?b.note+'　次の箱が出るまで 絶 '+pct(z):b===latestBox()?'最新の箱　絶 '+pct(z):'前の箱　絶 '+pct(z)+'・玉鋼でも鍛えられます';
   const rt=document.getElementById('g_rate'); if(rt) rt.textContent='出る確率（'+b.mei+'）　'+boxRates(b).map(([t,v])=>t+' '+pct(v)).join('・'); }
-function openGacha(tab){ gachaEl.hidden=false; uiCache=''; GA.box=null; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
-function closeGacha(){ gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
+/* 目玉の看板: 刀帳と同じ抜刀の舞台を、待っている間だけ動かす（開くたび・箱を替えるたびに抜き直す） */
+let BAN=null;
+function banStop(){ if(BAN){ BAN.stop(); BAN=null; } }
+function banSize(){ const c=document.getElementById('g_banc'), r=c.getBoundingClientRect(), d=Math.min(2,DPR||1);
+  const w=Math.max(2,Math.round(r.width*d)), h=Math.max(2,Math.round(r.height*d)); if(c.width!==w||c.height!==h){ c.width=w; c.height=h; } }
+function banSync(){
+  const on=!gachaEl.hidden&&!document.getElementById('g_pull').hidden&&(GA.phase==='idle'||GA.phase==='wait');
+  const ban=document.getElementById('g_ban'), st=document.getElementById('g_stage');
+  if(ban.hidden===on){ ban.hidden=!on; st.hidden=on; if(!on) gSize(); }
+  ban.classList.toggle('wait',GA.phase==='wait');
+  if(!on){ banStop(); return; }
+  if(!BAN&&KREADY){ const k=KMAP[curBox().pick]; if(k){ banSize(); BAN=zRun(document.getElementById('g_banc'),k,{ban:true}); } }
+}
+function openGacha(tab){ banStop(); gachaEl.hidden=false; uiCache=''; GA.box=null; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
+function closeGacha(){ banStop(); gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
 const GOD_N=10;   // 運営アカウントの「十振り引く」
 function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.floor(WALLET.coins/PULLCOST), busy=gBusy();
-  const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='一振り引く　<small>'+(GOD?'無料':PULLCOST+'銭')+'</small>'; const all=document.getElementById('g_all'); all.disabled=busy||n<2;
-  all.innerHTML=GOD?'十振り引く　<small>銭は減りません</small>':'全部引く　<small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>';
+  const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='<b>一振り</b><small>'+(GOD?'無料':PULLCOST+'銭')+'</small>';
+  const p10=document.getElementById('g_pull10'); p10.disabled=busy||n<10; p10.innerHTML='<b>十振り</b><small>'+(GOD?'無料':10*PULLCOST+'銭')+'</small>';
+  const all=document.getElementById('g_all'); all.hidden=GOD; all.disabled=busy||n<2;
+  all.innerHTML='<b>全部</b><small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>';
   renderBox();
   const pk=document.getElementById('g_pick'); if(pk){ pk.hidden=!GOD; if(GOD&&pk.options.length<2) fillPick(pk); pk.disabled=busy; } }
 // ピックアップ: 選んだ刀が必ず出る（運営アカウントだけ。サーバーでも確かめる）
@@ -1346,6 +1366,7 @@ function showSummary(){
 function drawKatanaAt(c,img,cx,cy,kw){ const kh=kw*KIMG_H/KIMG_W; c.drawImage(img,cx-kw/2,cy-kh/2,kw,kh); }
 function gLoop(){
   GA.raf=requestAnimationFrame(gLoop);
+  banSync();
   if(gachaEl.hidden||document.getElementById('g_pull').hidden) return;
   const c=gctx, W=GA.W, H=GA.H, now=performance.now(); c.setTransform(DPR,0,0,DPR,0,0);
   c.fillStyle='#0f100d'; c.fillRect(0,0,W,H);
@@ -1516,7 +1537,7 @@ function drawManga(x,W,H,rt,k){
   ];
   const split=ee((rt-ZSLASH)/0.5); // 斬線のあと、帯が上下に裂けて消える
   x.save();
-  if(rt<ZSLASH){ x.fillStyle='#050102'; x.fillRect(0,0,W,H); }
+  if(rt<ZSLASH){ x.fillStyle='#050102'; x.fillRect(-W,-H,W*3,H*3); }
   // 始まりの一筋（横一文字の細い紅）
   if(rt<0.5){ const a=ee(rt/0.12)*(1-ee((rt-0.25)/0.25)); x.fillStyle='rgba(220,30,55,'+a+')'; x.fillRect(W*0.5-W*0.5*ee(rt/0.15),H*0.5-1,W*ee(rt/0.15),2); }
   BANDS.forEach((b,bi)=>{ const lt=rt-b.at; if(lt<0) return;
@@ -1560,26 +1581,33 @@ function drawManga(x,W,H,rt,k){
 }
 function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
-  if(ZST){ cancelAnimationFrame(ZST.raf); ZST=null; }
+  if(ZST){ ZST.stop(); ZST=null; }
   c.hidden=!k; zw.hidden=!k; if(!k) return;
+  ZST=zRun(c,k,{});
+  c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
+}
+/* 絶の抜刀の舞台を canvas に描き続ける。刀帳の頁と、ガチャのピックアップの看板（o.ban）で使う
+   場面は 1040x420 で描き、canvas の幅に合わせる（縦が余れば闇と花びらが広がり、足りなければ上下を切る）
+   看板では刀を右へ寄せて小さくし、左を題字のために空ける。大きな「絶」と落款は描かない */
+function zRun(c,k,o){
   if(!ZHDreq){ ZHDreq=true; ZHD.src='assets/katana_ouka_hd.png'; }
-  const W=1040, H=420, x=c.getContext('2d'); // 描くのは1040x420、実際は2倍の細かさ
+  const W=1040, H=420, x=c.getContext('2d');
   const P=[]; for(let i=0;i<190;i++) P.push({x:Math.random()*W,y:Math.random()*H,v:20+Math.random()*50,s:3+Math.random()*8,r:Math.random()*6,w:Math.random()*6,d:Math.random()<.3,c:'rgba('+(170+Math.random()*60|0)+','+(14+Math.random()*40|0)+','+(36+Math.random()*30|0)+',.88)'});
   const t0=performance.now(); let last=t0;
-  ZST={raf:0,burst:0};
-  c.onclick=()=>zetsuZoom(k); // 触ると大きく見る
+  const ZS={raf:0,burst:0,dead:false,stop(){ ZS.dead=true; cancelAnimationFrame(ZS.raf); }};
   const frame=now=>{
-    if(!ZST) return; const rt=(now-t0)/1000*(window.__zslow||1), dt=Math.min(.05,(now-last)/1000); last=now;
+    if(ZS.dead) return; const rt=(now-t0)/1000*(window.__zslow||1), dt=Math.min(.05,(now-last)/1000); last=now;
     const t=rt<ZSLASH?0:2.9+(rt-ZSLASH); // 斬線で帯が裂けると、その下に抜き身が据わっている
-    x.setTransform(c.width/W,0,0,c.height/H,0,0);
+    const sc0=c.width/W, oy=(c.height-H*sc0)/2, vy0=-oy/sc0, vy1=H+oy/sc0; // 見えている縦の範囲（場面の座標）
+    x.setTransform(sc0,0,0,sc0,0,oy);
     const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,'#5a0d18'); g.addColorStop(.55,'#250609'); g.addColorStop(1,'#070203');
-    x.fillStyle=g; x.fillRect(0,0,W,H);
+    x.fillStyle=g; x.fillRect(0,vy0,W,vy1-vy0);
     // 朱の月
     x.save(); x.globalAlpha=.55; x.fillStyle='#b3122a'; x.shadowColor='#ff2a44'; x.shadowBlur=40; x.beginPath(); x.arc(W*.78,H*.3,64,0,7); x.fill(); x.restore();
     // 大きな「絶」
-    x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore();
+    if(!o.ban){ x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore(); }
     // 抜刀: 鞘に納まった桜華が現れ → 鯉口を切り → 刃が鞘から滑り出て → 鞘が消え、抜き身が中央に据わる
-    const kw=W*0.9, sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.56, cxF=(W-kw)/2;
+    const kw=W*(o.ban?0.68:0.9), sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.56, cxF=o.ban?W*0.29:(W-kw)/2;
     const A=0.8, B=1.3, Cd=2.3, D=2.9; // 現れる / 鯉口 / 抜き終わり / 据わる
     const eo=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),3), eio=v=>{v=Math.max(0,Math.min(1,v)); return v<.5?4*v*v*v:1-Math.pow(-2*v+2,3)/2;};
     let pull=0; if(t>A) pull=8*sc*eo((t-A)/(B-A)); if(t>B) pull=8*sc+(bladeI-8*sc)*eio((t-B)/(Cd-B));
@@ -1605,20 +1633,21 @@ function zetsuStage(k){
           x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(sx-60,kh*.25,120,kh*.3); x.globalCompositeOperation='source-over'; }
       }
       x.restore();
-      if(!ZST.burst&&t>Cd){ ZST.burst=1; for(const p of P){ p.x=W*.15+Math.random()*W*.7; p.y=ky+(Math.random()-.5)*60; p.v=-120+Math.random()*80; p.kx=(Math.random()-.5)*600; } }
+      if(!ZS.burst&&t>Cd){ ZS.burst=1; for(const p of P){ p.x=W*.15+Math.random()*W*.7; p.y=ky+(Math.random()-.5)*60; p.v=-120+Math.random()*80; p.kx=(Math.random()-.5)*600; } }
     }
     // 花びら
-    for(const p of P){ if(p.kx){ p.x+=p.kx*dt; p.kx*=0.96; if(Math.abs(p.kx)<5) p.kx=0; } if(p.v<20) p.v+=160*dt; p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>H+10){p.y=-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
+    for(const p of P){ if(p.kx){ p.x+=p.kx*dt; p.kx*=0.96; if(Math.abs(p.kx)<5) p.kx=0; } if(p.v<20) p.v+=160*dt; p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>vy1+10){p.y=vy0-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
       x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':p.c; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
     // 落款
-    x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore();
+    if(!o.ban){ x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore(); }
     drawManga(x,W,H,rt,k);
-    ZST.raf=requestAnimationFrame(frame);
+    ZS.raf=requestAnimationFrame(frame);
   };
-  ZST.raf=requestAnimationFrame(frame);
+  ZS.raf=requestAnimationFrame(frame);
+  return ZS;
 }
 /* 桜華を大きく見る: 指二本で拡大、なぞって動かす、二度触ると寄る/戻る */
-function zetsuZoom(k){
+function zetsuZoom(k,again){
   let v=document.getElementById('zzoom');
   if(!v){ v=document.createElement('div'); v.id='zzoom';
     v.innerHTML='<div class="zzst"><img alt="" draggable="false"></div><div class="zzbar"><button type="button" data-z="blade" class="on">抜き身</button><button type="button" data-z="saya">鞘</button><button type="button" data-z="again">抜刀をもう一度</button><button type="button" data-z="close">閉じる</button></div><p class="zzhint">指二本で拡大・なぞって動かす・二度触ると寄る</p>';
@@ -1631,7 +1660,7 @@ function zetsuZoom(k){
     S.x=ox-(ox-S.x)*nz/S.z; S.y=oy-(oy-S.y)*nz/S.z; S.z=nz; apply(); };
   const show=w=>{ im.src=w==='saya'?'assets/katana_ouka_saya_hd.png':'assets/katana_ouka_hd.png'; S.z=1; S.x=S.y=0; apply(); v.querySelectorAll('[data-z]').forEach(b=>b.classList.toggle('on',b.dataset.z===w)); };
   v.onclick=e=>{ const b=e.target.closest('[data-z]'); if(!b) return; const z=b.dataset.z;
-    if(z==='close'){ v.hidden=true; } else if(z==='again'){ v.hidden=true; zetsuStage(k); } else show(z); };
+    if(z==='close'){ v.hidden=true; } else if(z==='again'){ v.hidden=true; (again||zetsuStage)(k); } else show(z); };
   st.onpointerdown=e=>{ st.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
     if(pts.size===2){ const [a,b]=[...pts.values()]; pinch={d:Math.hypot(a.x-b.x,a.y-b.y),z:S.z}; }
     else { const now=performance.now(); if(now-lastTap<300){ zoomAt(S.z>1.5?1:3,e.clientX,e.clientY); } lastTap=now; } };
@@ -1681,9 +1710,12 @@ document.getElementById('gd_forge').addEventListener('click',doForge);
 document.getElementById('g_skip').addEventListener('click',skipAhead);
 document.querySelectorAll('.gtabs button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
 document.getElementById('g_pull1').addEventListener('click',()=>doPull(1));
+document.getElementById('g_pull10').addEventListener('click',()=>doPull(10));
+document.getElementById('g_ban').addEventListener('click',e=>{ if(e.target.closest('#g_bd')||gBusy()) return; banStop(); banSync(); }); // 触ると抜き直す
+document.getElementById('g_bd').addEventListener('click',()=>{ const k=KMAP[curBox().pick]; if(k) zetsuZoom(k,()=>{ banStop(); banSync(); }); });
 document.getElementById('g_all').addEventListener('click',()=>doPull(Infinity));
 document.getElementById('g_res').addEventListener('click',()=>{ if(GA.phase==='item'){ nextItem(); return; } document.getElementById('g_res').hidden=true; GA.phase='idle'; refreshCoins(); });
-window.addEventListener('resize',()=>{ if(!gachaEl.hidden) gSize(); });
+window.addEventListener('resize',()=>{ if(!gachaEl.hidden){ gSize(); if(BAN) banSize(); } });
 
 /* ---------- 調整パネル ---------- */
 const panel=document.getElementById('panel'), rows=document.getElementById('rows');

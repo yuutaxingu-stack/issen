@@ -72,6 +72,8 @@ const MV = {
   shoki: { n:'初虧', k:'g', s:8, a:4, r:20, land:16, dmg:[600, 1000], gd:[1200, 1800], hs:26, blk:-6, kb:[700,450], box:[0,30,110,70], arc:[150,-30], shoki:1, hover:1, lunge:[2,11,0], noLate:1, pose:'side' },
   shokujin:{ n:'食甚', k:'g', s:16, a:1, r:24, land:16, dmg:900, gd:2000, hs:30, blk:-14, kb:[800,700], noBox:1, sj:1, after:'air', noLate:1, arc:[150,-30], pose:'side' },
   fukuen:{ n:'復円', k:'g', s:4, a:1, r:12, land:12, noBox:1, fuku:1, arc:[100,100] },
+  yatagarasu:{ n:'八咫烏', k:'g', s:16, a:1, r:26, land:14, noBox:1, shot:'crow', arc:[120,-10] },
+  crowG: { n:'八咫烏（つかみ）', k:'p', s:1, a:1, r:0, dmg:600, gd:0, hs:34, kb:[-420,900], unblock:1 }, // ガードしていても捕まえる。手前へ引き寄せて浮かせる
   tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
   petalG:{ n:'天桜（落花・着地の花）', k:'p', s:1, a:1, r:0, dmg:250, gd:500, hs:12, blk:-2, kb:[160,0], flinch:1 },
   plant: { n:'植樹', k:'g', s:14, a:1, r:16, noBox:1, plant:1, arc:[-70,-85] },
@@ -96,7 +98,7 @@ function curBox(p){
 const SMASH_MIN = 12, SMASH_MAX = 40;
 /* 斬ボタン＋向きで出る特殊技。刀ごとに入れ替える（今は共通の一組だけ） */
 const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: 'rise', s3: 'counter', s3a: 'counter' },
-  yata: { n: '八咫', s1: 'ecl', s1a: 'ecl', s2: 'hane', s2a: 'hane', s3: 'counter', s3a: 'counter' },
+  yata: { n: '八咫', s1: 'ecl', s1a: 'ecl', s2: 'hane', s2a: 'hane', s3: 'yatagarasu', s3a: 'yatagarasu' },
   ouka: { n: '桜華', s1: 'hana', s1a: 'hana', s2: 'ten', s2a: 'ten', s3: 'plant', s3a: 'plant' } };
 /* 桜の木: 耐久は体力の4割。段階 1開花 2満開 3落花。u1/u2 = その段階の強化を花嵐/天桜で使ったか */
 const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [-22, 0, 44, 80], [-60, 0, 120, 170], [-60, 0, 120, 170]] };
@@ -107,6 +109,7 @@ const HANE = { sp: 3400, d1: 9, gap: 5, d2: 9, win: 5 }; // 羽跳: 速さ（1F�
 const ECL = ['shoki', 'shokujin', 'fukuen'], ECLN = ['初虧', '食甚', '復円'];
 const SHOKI = { max: 40, d0: 90, dPer: 5 };   // 初虧: 溜めは最大40F、踏み込みは 90px + 溜め1Fごとに5px
 const FUKU = { max: 90 };                    // 復円: 合わせて90F溜めると初虧に戻る（途中で離しても溜めは残る）
+const CROW = { speed: 700, life: 70, w: 64, h: 54, oy: 70 }; // 八咫烏: つかむ烏の速さ・飛ぶF・大きさ・高さ
 const SJ = { tight: 0, K: 1 };                     // 食甚: 羽跳の二度当ての後、最速で出せばちょうど当たる（tight = 余裕のF）
 const PETAL = { slow: 0.4, w: 76, h: 76, life: 900, grow: 500, maxW: 4, dmgPer: 800, maxDm: 250 };
 const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
@@ -420,7 +423,7 @@ Sim.prototype.update = function(p, o){
     else if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
     if (m.shoki && p.mvf === m.lunge[1] + 1) p.vx = 0; // 踏み込みはぴたりと止まる
     else if (p.ground && !m.hane && !m.sj) p.vx = toward(p.vx, 0, PH.gFric);
-    if (m.shot && p.mvf === m.s) { if (m.shot === 'hana') this.spawnPetals(p); else this.spawnShot(p); }
+    if (m.shot && p.mvf === m.s) { if (m.shot === 'hana') this.spawnPetals(p); else if (m.shot === 'crow') this.spawnCrow(p); else this.spawnShot(p); }
     if (m.plant && p.mvf === m.s) this.plant(p);
   }
   // 当たった・守った後の固まり
@@ -544,6 +547,10 @@ Sim.prototype.shokujin = function(p, o){
   p.sjHit = true;
   this.ev.push({ t: 'sj', p: p.i, x0, y0, x1: nx, y1: ny });
 };
+Sim.prototype.spawnCrow = function(p){
+  this.pj.push({ o: p.i, x: Math.min(WALL_R, Math.max(WALL_L, p.x + p.face * 50 * FP)), y: p.y + CROW.oy * FP, vx: p.face * CROW.speed, life: CROW.life, w: CROW.w, h: CROW.h, mv: 'crowG', crow: 1 });
+  this.ev.push({ t: 'shot', p: p.i, crow: 1 });
+};
 Sim.prototype.spawnShot = function(p){
   p.pjCut = false;
   this.pj.push({ o: p.i, x: Math.min(WALL_R, Math.max(WALL_L, p.x + p.face * SHOT.ox * FP)), y: p.y + SHOT.oy * FP, vx: p.face * SHOT.speed, life: SHOT.life });
@@ -666,7 +673,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   const hx = pj ? pj.x : Math.trunc((a.x + d.x) / 2), hy = d.y + 60 * FP;
 
   if (m.grab && !guarding) { a.hitDone = false; return; }       // 組み打ちはガード中の相手だけ
-  if (guarding && !m.iai) {
+  if (guarding && !m.iai && !m.unblock) {
     d.gd -= gdBase; d.touched = true; d.gdDelay = 0;
     if (d.gd <= 2000) d.gdLow = true;
     if (d.gd <= 0) {
@@ -824,7 +831,7 @@ Sim.prototype.hash = function(){
   return h;
 };
 
-const API = { ECL, ECLN, SHOKI, FUKU, SJ, HANE, GROW, curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
+const API = { CROW, ECL, ECLN, SHOKI, FUKU, SJ, HANE, GROW, curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 else root.IssenAction = API;
 })(typeof window !== 'undefined' ? window : globalThis);

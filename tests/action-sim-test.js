@@ -268,4 +268,13 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   const half = f.p[0].ecl; f.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < 60; k++) f.step([I({ H: 1 }), I()]);
   ok(half === 2 && f.p[0].ecl === 0, '復円: 途中で離しても溜めは残り、溜めきると初虧に戻る'); }
 
+// 八咫烏（下＋技）: 前へ飛ぶ烏がつかむ。ガードしていても捕まえ、手前へ引き寄せる。復円の溜めは相手の攻撃で止まる
+{ const mk = d => { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
+  for (const g of [0, 1]) { const s = mk(300), ev = []; s.step([I({ K: 'd' }), I({ G: g })]); for (let k = 0; k < 60; k++) { s.step([I(), I({ G: g })]); ev.push(...drain(s)); }
+    const h = ev.find(e => e.t === 'hit' && e.mv === 'crowG'), b = ev.find(e => e.t === 'block');
+    ok(h && !b && s.p[1].x < 900 * A.FP, '八咫烏が' + (g ? 'ガード中' : '立っている') + 'の相手を捕まえて引き寄せる (' + (s.p[1].x / 100 | 0) + 'px)'); }
+  const f = mk(70); f.p[0].ecl = 2; f.step([I({ K: 'r', H: 1 }), I()]); let hitIn = false;
+  for (let k = 0; k < 40; k++) { f.step([I({ H: 1 }), I(k === 5 ? { A: 1, C: 'n' } : {})]); if (f.p[0].st === 'hit' || f.p[0].st === 'tumble') hitIn = true; }
+  ok(hitIn && f.p[0].mv !== 'fukuen' && f.p[0].fuku > 0 && f.p[0].fuku < A.FUKU.max && f.p[0].ecl === 2, '復円の溜めは相手の攻撃で止まる（溜まった分は残る ' + f.p[0].fuku + 'F）'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

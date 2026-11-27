@@ -1184,6 +1184,14 @@ function drawView(v){
       for (let k = 0; k < 5; k++) { const a = FR * 0.25 + k * 1.2566, rr = r * (0.35 + 0.45 * ((k * 37) % 10) / 10);
         cx.save(); cx.translate(Math.cos(a) * rr, Math.sin(a) * rr); cx.rotate(a + FR * 0.1); cx.fillStyle = SAKURA[k % 3]; cx.beginPath(); cx.ellipse(0, 0, 7 * cam.z, 4 * cam.z, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); }
       cx.restore(); continue; }
+    if (q.crow) { // 八咫烏: 羽ばたく黒い烏（演出はあとで作り込む）
+      const x = wx(q.x / FP), y = wy(q.y / FP), d = Math.sign(q.vx) * MIR, z = cam.z, fl = Math.sin(FR * 0.5) * 14;
+      cx.save(); cx.translate(x, y); cx.scale(d * z, z); cx.fillStyle = '#0c0c0e'; cx.strokeStyle = 'rgba(255,255,255,.75)'; cx.lineWidth = 1.2;
+      cx.beginPath(); cx.ellipse(0, 0, 22, 9, 0, 0, Math.PI * 2); cx.fill(); cx.stroke();
+      cx.beginPath(); cx.arc(22, -3, 7, 0, Math.PI * 2); cx.fill(); cx.beginPath(); cx.moveTo(28, -4); cx.lineTo(38, -1); cx.lineTo(28, 1); cx.fill();
+      for (const sg of [1, -1]) { cx.beginPath(); cx.moveTo(-6, 0); cx.quadraticCurveTo(-2, -20 * sg - fl * sg * 0.3, -26, -24 * sg - fl * sg); cx.quadraticCurveTo(-14, -8 * sg, 8, 0); cx.closePath(); cx.fill(); cx.stroke(); }
+      cx.beginPath(); cx.moveTo(-20, 0); cx.lineTo(-34, -7); cx.lineTo(-32, 0); cx.lineTo(-34, 7); cx.closePath(); cx.fill();
+      cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(24, -5, 1.6, 0, Math.PI * 2); cx.fill(); cx.restore(); continue; }
     const x = wx(q.x / FP), y = wy(q.y / FP), d = Math.sign(q.vx) * MIR, r = 30 * cam.z;
     cx.save(); cx.globalCompositeOperation = 'lighter'; cx.translate(x, y); cx.scale(d, 1);
     for (let k = 0; k < 3; k++) { cx.fillStyle = `rgba(245,240,228,${0.6 - k * 0.18})`; cx.beginPath();
@@ -1293,7 +1301,7 @@ function setupMenu(){
   $('ed_small').onclick = () => editScale(1 / 1.12); $('ed_big').onclick = () => editScale(1.12);
   $('ed_reset').onclick = () => { BLAY = null; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); };
   $('ed_ok').onclick = () => endEdit(true); $('ed_cancel').onclick = () => endEdit(false);
-  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : k.id === 'yata' ? '　羽跳・初虧/食甚/復円（作りかけ）' : '')]);
+  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : k.id === 'yata' ? '　羽跳・初虧/食甚/復円・八咫烏（作りかけ）' : '')]);
   for (const [id, i] of [['kt0', 0], ['kt1', 1], ['a_kit', 0]]) { const el = $(id);
     const opts = KOPT.slice();
     opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });
@@ -1414,6 +1422,7 @@ const TF0 = [ // [鍵, 名前, 単位の説明, 刻み]
 const TX = { hane: [['hsp', '跳ぶ速さ（1Fに進む距離）', 'px', 2, A.HANE, 'sp', 100], ['hd1', '一度目に跳ぶ長さ', 'F', 1, A.HANE, 'd1'], ['hgap', '二度目までの間', 'F', 1, A.HANE, 'gap'], ['hd2', '二度目に跳ぶ長さ', 'F', 1, A.HANE, 'd2'], ['hwin', '二度目の向きの受付', 'F', 1, A.HANE, 'win']],
   shoki: [['smax', '溜めの最大', 'F', 1, A.SHOKI, 'max'], ['sd0', '踏み込み（溜めなし）', 'px', 5, A.SHOKI, 'd0'], ['sdp', '溜め1Fで伸びる', 'px', 1, A.SHOKI, 'dPer']],
   fukuen: [['fmax', '溜めきるまで', 'F', 5, A.FUKU, 'max']],
+  yatagarasu: [['csp', '烏の速さ（1Fに進む距離）', 'px', 1, A.CROW, 'speed', 100], ['clife', '烏が飛ぶ長さ', 'F', 5, A.CROW, 'life']],
   shokujin: [['sjt', '羽跳の二度当ての後の余裕', 'F', 1, A.SJ, 'tight']] };
 const TXO = new Map(); for (const id in TX) for (const f of TX[id]) if (!TXO.has(f[4])) TXO.set(f[4], Object.assign({}, f[4]));
 const txVal = f => f[6] ? f[4][f[5]] / f[6] : f[4][f[5]];

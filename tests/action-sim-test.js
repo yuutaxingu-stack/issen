@@ -164,4 +164,11 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 // 稽古は時間切れなし
 { const s = new A.Sim({ training: true }); for (let k = 0; k < A.C.roundF + A.C.sdF + 60; k++) s.step([I(), I()]); ok(!s.sd && !s.over, '稽古は時間切れにならない'); }
 
+// 弱斬りは当たったら途中で他の技に切り替えられる（キャンセル）
+{ const go = (lead, inp) => { const s = sim(60); s.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < lead; k++) s.step([I(), I()]); s.step([inp, I()]); const seen = []; for (let k = 0; k < 6; k++) { s.step([I(), I()]); if (s.p[0].mv && seen[seen.length - 1] !== s.p[0].mv) seen.push(s.p[0].mv); } return seen; };
+  ok(go(7, I({ A: 1, C: 'r' })).includes('ftilt'), '弱斬りが当たったら横斬りへ切り替え');
+  ok(go(7, I({ A: 1, S: 1 })).includes('shot'), '弱斬りが当たったら技（飛ぶ斬撃）へ切り替え');
+  ok(go(7, I({ K: 'u' })).includes('rise'), '弱斬りが当たったら技スティック上（昇り斬り）へ');
+  const nb = sim(400); nb.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 7; k++) nb.step([I(), I()]); nb.step([I({ A: 1, C: 'r' }), I()]); for (let k = 0; k < 6; k++) nb.step([I(), I()]); ok(nb.p[0].mv !== 'ftilt', '空振りの弱斬りは切り替えられない (' + nb.p[0].mv + ')'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

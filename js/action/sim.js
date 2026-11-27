@@ -33,9 +33,9 @@ const C = {
    dmg, gd は 1/100 単位。hit=ヒット時の有利F（決めると hs を計算）、blk=ガード時の有利F
    box=[前へのずれ, 足元からの高さ, 幅, 高さ](px)  kb=[横, 縦] 吹き飛ばし(1/100px/F) */
 const MV = {
-  jab1:  { n:'弱斬り（一段目）', k:'g', s:5, a:3, r:10, dmg:300, gd:600, hit:6, blk:-2, kb:[220,0], box:[6,58,60,34], arc:[-35,25], chain:'jab2' },
-  jab2:  { n:'弱斬り（二段目）', k:'g', s:5, a:3, r:12, dmg:300, gd:600, hit:5, blk:-3, kb:[220,0], box:[6,58,60,34], arc:[45,-20], chain:'jab3' },
-  jab3:  { n:'弱斬り（三段目・払い）', k:'g', s:7, a:4, r:20, dmg:500, gd:1000, hs:30, blk:-10, kb:[750,850], kd:1, box:[6,42,74,50], arc:[-60,60] },
+  jab1:  { n:'弱斬り（一段目）', k:'g', s:5, a:3, r:10, dmg:300, gd:600, hit:6, blk:-2, kb:[220,0], box:[6,58,60,34], arc:[-35,25], chain:'jab2', cancel:1 },
+  jab2:  { n:'弱斬り（二段目）', k:'g', s:5, a:3, r:12, dmg:300, gd:600, hit:5, blk:-3, kb:[220,0], box:[6,58,60,34], arc:[45,-20], chain:'jab3', cancel:1 },
+  jab3:  { n:'弱斬り（三段目・払い）', k:'g', s:7, a:4, r:20, dmg:500, gd:1000, hs:30, blk:-10, kb:[750,850], kd:1, box:[6,42,74,50], arc:[-60,60], cancel:1 },
   side:  { n:'踏み込み斬り', k:'g', s:14, a:4, r:22, dmg:700, gd:1800, hs:28, blk:-8, kb:[950,560], box:[8,38,100,64], arc:[150,-35], lunge:[2,14,900] },
   ftilt: { n:'横斬り', k:'g', s:8, a:3, r:18, dmg:600, gd:900, hs:22, blk:-6, kb:[620,240], box:[8,40,86,52], arc:[60,-30] },
   sideA: { n:'踏み込み斬り（空中）', k:'a', s:12, a:4, r:18, land:14, dmg:600, gd:1500, hs:24, kb:[850,500], box:[8,30,100,70], arc:[150,-35], lunge:[2,12,850], hover:1 },
@@ -316,6 +316,8 @@ Sim.prototype.think = function(p, o){
     }
     case 'atk': {
       const m = MV[p.mv];
+      // 弱斬り三段は、当たったら（ガードされても）途中で 横・上・下の斬り や 刀の技 に切り替えられる（2026-11-27）
+      if (m.cancel && p.hitDone && p.ground && p.mvf >= m.s && (p.wk || (p.buf.A && ((p.cb && p.cb.d !== 'n') || p.spB)))) { p.chainReq = false; return this.groundAttack(p); }
       if (m.chain && p.buf.A && !p.wk && p.mvf >= m.s) p.chainReq = true;
       return;
     }
@@ -684,7 +686,8 @@ Sim.prototype.step = function(inputs){
       for (const k of ['A', 'J', 'G']) if (inp[k] && !p.inp[k]) p.buf[k] = C.buf;
       if (inp.C) p.cb = { d: inp.C, n: C.buf + 1 }, p.buf.A = C.buf + 1;
       if (inp.K) p.wk = { d: inp.K, n: C.buf + 1 }, p.buf.A = C.buf + 1;
-      p.inp = Object.assign({}, p.inp, { A: inp.A, J: inp.J, G: inp.G });
+      if (inp.S && !p.inp.S) p.spB = C.buf + 1;
+      p.inp = Object.assign({}, p.inp, { A: inp.A, J: inp.J, G: inp.G, S: inp.S });
     }
     return;
   }

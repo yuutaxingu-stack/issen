@@ -130,7 +130,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <p>勝ち方は二つ。連撃で体力を削りきるか、ガードを削って気絶させ、朱く光った「居」で居合を当てるか。</p>
   <table>
     <tr><td>左半分を押して滑らす</td><td>ゆっくり倒す＝歩く　素早く倒す＝ダッシュ（キーボードは同じ向きを二回）　上・しゃがむ（キーボードは WASD か矢印）。向きは歩いた方を向く</td></tr>
-    <tr><td>斬（J / Z）</td><td>通常技。向きなし＝弱斬り三段　横＝横斬り　上＝上斬り　下＝下斬り。走りながら＝ダッシュ斬り。空中は 空中斬・空前・空後・空上・空下</td></tr>
+    <tr><td>斬（J / Z）</td><td>通常技。向きなし＝弱斬り三段（当たれば・ガードされれば途中で 横・上・下の斬り や 技 に切り替えられる）　横＝横斬り　上＝上斬り　下＝下斬り。走りながら＝ダッシュ斬り。空中は 空中斬・空前・空後・空上・空下</td></tr>
     <tr><td>技（U / V）</td><td>設定「技をスティックで」をオンにすると、技ボタンが小さなスティックになる（弾いた向きの技、弾かずに離すと向きなし）。刀の技。向きなし・横＝特殊技1　上＝特殊技2　下＝特殊技3（共通の刀は 飛ぶ斬撃・昇り斬り・カウンター）。昇り斬りの後は着地まで何もできない</td></tr>
     <tr><td>跳（K / X / Space）</td><td>軽く＝小跳び　長め＝大跳び　空中でもう一回　端の竹で壁蹴り</td></tr>
     <tr><td>守（L / C）</td><td>押している間シールドを張る（耐久が減るほど小さくなる）　守りながら下＝その場回避　守りながら前・後＝前方・後方回避　ダッシュ中に守＝勢いを残したシールド（0.1秒ごとに2割落ちて0.5秒で止まる。設定で前方回避にもできる）　守りながら斬＝組み打ち　空中で守＝空中回避（向きを入れると方向回避）　叩きつけられる直前＝受け身</td></tr>
@@ -154,15 +154,15 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <textarea id="tn_text" hidden readonly></textarea>
 </div></div>
 <div id="rot">横向きにしてください</div>
-<script src="js/action/pose.js?v=1795783891"></script>
-<script src="js/action/boxes.js?v=1795783891"></script>
-<script src="js/action/sim.js?v=1795783891"></script>
-<script src="js/action/netplay.js?v=1795783891"></script>
-<script src="js/action/app.js?v=1795783891"></script>
+<script src="js/action/pose.js?v=1795787056"></script>
+<script src="js/action/boxes.js?v=1795787056"></script>
+<script src="js/action/sim.js?v=1795787056"></script>
+<script src="js/action/netplay.js?v=1795787056"></script>
+<script src="js/action/app.js?v=1795787056"></script>
 <script src="js/online-config.js"></script>
-<script src="js/no-link.js?v=1795783891"></script>
-<script src="js/net.js?v=1795783891"></script>
-<script src="js/action/online.js?v=1795783891"></script>
+<script src="js/no-link.js?v=1795787056"></script>
+<script src="js/net.js?v=1795787056"></script>
+<script src="js/action/online.js?v=1795787056"></script>
 <script>/* 招かれた人だけ: ログインしていなければタイトルへ（ネット対戦は online.js が確かめる） */
 (function(){var N=window.IssenNet;if(!N||!N.configured()||/[?&]match=/.test(location.search))return;N.init().then(function(){if(!N.user)location.replace('index.html');});})();</script>
 <script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>

@@ -126,6 +126,7 @@
     try { S.notices = await rpc('list_notices'); S.newsErr = ''; }
     catch (e) { S.newsErr = missing(e) ? 'missing' : errText(e); }
     badges(); maybePop();
+    if (!scr.hidden && S.mode === 'news' && S.tab !== 'write') { markSeen(); render(); }
   }
   async function loadGod(){
     try { S.god = await rpc('god_info'); } catch (e) { S.err = errText(e); }
@@ -605,14 +606,19 @@
       who = u; S.mail = null; S.mailErr = ''; S.god = null; S.reports = null; S.myReports = null;
       Object.keys(tags).forEach(k => delete tags[k]);
       clearInterval(mailTimer);
-      if (u) { loadMail(); mailTimer = setInterval(() => { if (!menu || !menu.hidden) loadMail(); }, 120000); }
+      if (u) { loadMail(); mailTimer = setInterval(() => { if (!menu || !menu.hidden) loadMail(); }, 90000); }
       if (!scr.hidden) { if (S.mode === 'card') { S.pid = S.pid || u; loadProfile(); } else if (S.mode === 'mail') loadMail(); else render(); }
     }
     if (N.ready && !S.notices && !S.newsErr && online()) loadNews();
     badges();
   });
   // お知らせは時々読み直す（タイトルにいるときだけ）
-  setInterval(() => { if (menu && !menu.hidden && online()) loadNews(); }, 300000);
+  setInterval(() => { if (menu && !menu.hidden && online()) loadNews(); }, 90000);
+  // ほかのアプリから戻ってきたら、お知らせと文箱をすぐ読み直す
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible' || !online()) return;
+    loadNews(); if (N.user) loadMail();
+  });
   // 対戦が始まるときは閉じる
   if (N) { const prev = N.onMatchUi; N.onMatchUi = function(s){ if (s !== 'idle') { close(); pop.hidden = true; } if (prev) prev(s); }; }
   if (window.IssenZetsu) window.IssenZetsu.on(() => render());

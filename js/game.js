@@ -229,7 +229,20 @@ const KMAP={}; KATANA.forEach(k=>KMAP[k.id]=k);
 // 描いた絵がある刀（src）は、その絵を読み込んでから作り直す
 KATANA.forEach(k=>{ if(!k.src) return; k.img=new Image(); k.img.onload=()=>{ if(KREADY) try{ buildKatanas(); }catch(e){ console.error(e); } }; k.img.src=k.src; });
 const METAL={gold:null,silver:[198,204,214],copper:[206,122,82],black:[44,40,38]};
-const TIERRATE=[['並',59.5],['上',28],['極',10],['幻',2],['絶',0.5]];
+/* ガチャの箱。出た順に並べる（新しい箱ほど後ろ）。箱の刀は katana の box で決まる（書いていなければ b1 = 第一弾）
+   絶は箱ごとの目玉で、その箱の絶だけが出る。最新の箱は zNew%（ふつう0.3）、新しい箱が出たら古い箱は ZOLD%
+   第一弾はリリース記念で、次の箱が出るまで 0.5%。並は残り（100 − 上・極・幻 − 絶）
+   箱を足すとき: ここに1行、刀に box:'b2' を付け、node tools/katana-sql.js → save-data.sql を SQL Editor で実行 */
+const BOXES=[{id:'b1',mei:'第一弾',pick:'ouka',zNew:0.5,note:'リリース記念'}];
+const ZNEW=0.3, ZOLD=0.1;
+const TIERRATE=[['上',28],['極',10],['幻',2]];
+const boxOf=k=>k.box||'b1';
+const boxKats=b=>KATANA.filter(k=>boxOf(k)===b.id);
+function liveBoxes(){ return BOXES.filter(b=>boxKats(b).length); }
+function latestBox(){ const l=liveBoxes(); return l[l.length-1]; }
+function boxZ(b){ return b===latestBox()?(b.zNew!=null?b.zNew:ZNEW):ZOLD; }
+function boxRates(b){ const z=boxZ(b), has=t=>boxKats(b).some(k=>k.tier===t);
+  const r=[['並',100-TIERRATE.reduce((s,v)=>s+v[1],0)-z]].concat(TIERRATE,[['絶',z]]); return r.filter(([t])=>has(t)); }
 // 持っている刀が出たら玉鋼に変わる。玉鋼で好きな刀を鍛えられる（値段 ≒ その階級が出るまでの平均の銭 × 3）
 const STEEL={'並':5,'上':10,'極':25,'幻':100,'絶':300};
 const FORGE={'並':50,'上':110,'極':300,'幻':1500,'絶':6000};
@@ -275,8 +288,8 @@ function pickCpuKat(){ const x=clamp((RUN.n-1)/9); const w=[['並',lerp(1,0.25,x
   let r=Math.random()*w.reduce((s,v)=>s+v[1],0), t='並'; for(const [k,v] of w){ if((r-=v)<=0){ t=k; break; } }
   const pool=KATANA.filter(k=>k.tier===t); CPUKAT=pool[Math.floor(Math.random()*pool.length)].id; }
 function recordWin(i,name,coin){ if(G.mode==='cpu'&&i!==0) return; if(G.mode==='online'&&(NET.watch||i!==NET.me)) return; const id=katOf(i).id; ARM.rec[id]=ARM.rec[id]||{}; ARM.rec[id][name]=(ARM.rec[id][name]||0)+1; saveArm(); if(ACCT) ACCT.win(name,id,coin||0); }
-function rollKatana(){ let r=Math.random()*100, t='並'; for(const [k,v] of TIERRATE){ if((r-=v)<=0){ t=k; break; } }
-  const pool=KATANA.filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
+function rollKatana(b){ const rt=boxRates(b); let r=Math.random()*rt.reduce((s,v)=>s+v[1],0), t=rt[0][0]; for(const [k,v] of rt){ if((r-=v)<=0){ t=k; break; } }
+  const pool=boxKats(b).filter(k=>k.tier===t); return pool[Math.floor(Math.random()*pool.length)]; }
 
 /* ---------- 状態 ---------- */
 function mkPlayer(i){ return {i,side:i,state:'idle',start:0,end:0,counters:0,lastCancelAt:-1e9,mkStart:-1e9,counteredAt:null,resumeAt:0,score:0,J:clonePose('idle')}; }
@@ -1213,7 +1226,7 @@ document.getElementById('g_back').addEventListener('click',()=>closeGacha());
 /* ---------- 刀ガチャと刀帳 ---------- */
 const gcv=document.getElementById('gc'), gctx=gcv.getContext('2d');
 // phase: idle 待ち / wait サーバー待ち / forge 鍛える槌 / draw 一振りずつの抜刀 / quick 持っている刀を素早く / item 一振りの札 / shown まとめ
-const GA={phase:'idle',t0:0,kat:null,batch:[],idx:-1,steel:0,back:0,forge:false,silent:false,raf:0,W:0,H:0,cued:{}};
+const GA={box:null,phase:'idle',t0:0,kat:null,batch:[],idx:-1,steel:0,back:0,forge:false,silent:false,raf:0,W:0,H:0,cued:{}};
 const gBusy=()=>!(GA.phase==='idle'||GA.phase==='shown');
 const TORD={'並':0,'上':1,'極':2,'幻':3,'絶':4};
 const TIERGLOW={'並':'rgba(236,230,214,','上':'rgba(120,180,255,','極':'rgba(245,196,70,','幻':null,'絶':null};
@@ -1236,12 +1249,23 @@ const tierFill=(t,a,now,off)=>t==='幻'?rainbow(a,now,off):t==='絶'?sakura(a,no
 // 幻は白→金→虹と化ける（昇格演出）
 function shownTier(k,e){ if(k.tier==='絶') return e<1000?'並':e<1700?'極':e<2600?'幻':'絶'; if(k.tier!=='幻') return e<TP[k.tier].d0*0.8&&k.tier!=='並'?'並':k.tier; return e<1000?'並':e<1700?'極':'幻'; }
 function gSize(){ const r=gcv.getBoundingClientRect(); GA.W=Math.max(200,r.width); GA.H=Math.max(120,r.height); gcv.width=Math.round(GA.W*DPR); gcv.height=Math.round(GA.H*DPR); }
-function openGacha(tab){ gachaEl.hidden=false; uiCache=''; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
+// 箱の選び札と目玉の絶。箱が一つのうちは札を出さず、目玉だけを見せる
+function curBox(){ const l=liveBoxes(); if(!GA.box||!l.includes(GA.box)) GA.box=l[l.length-1]; return GA.box; }
+function pct(v){ return (Math.round(v*10)/10)+'%'; }
+function boxName(b){ const f=KMAP[b.pick]; return b.mei+(f?'「'+f.mei+'」':''); }
+function renderBox(){ const el=document.getElementById('g_box'); if(!el) return; const b=curBox(), l=liveBoxes().slice().reverse(), f=KMAP[b.pick], z=boxZ(b), busy=gBusy();
+  const key=b.id+'|'+l.length+'|'+busy; if(el.dataset.k===key) return; el.dataset.k=key;
+  el.innerHTML=(l.length>1?'<div class="gboxes">'+l.map(x=>'<button type="button" data-box="'+x.id+'"'+(x===b?' class="on"':'')+(busy?' disabled':'')+'>'+boxName(x)+(x===latestBox()?'<small>新</small>':'')+'</button>').join('')+'</div>':'')+
+    '<p class="gfeat">'+b.mei+'の目玉　<i>絶</i><b>'+(f?f.mei:'？')+'</b>'+pct(z)+(x=>x?'<em>'+x+'</em>':'')(b===latestBox()&&b.note&&b.zNew!=null&&b.zNew!==ZNEW?b.note+'・次の箱が出るまで':'')+'</p>';
+  el.querySelectorAll('button[data-box]').forEach(btn=>btn.addEventListener('click',()=>{ if(gBusy()) return; GA.box=BOXES.find(x=>x.id===btn.dataset.box); refreshCoins(); }));
+  const rt=document.getElementById('g_rate'); if(rt) rt.textContent='出る確率（'+b.mei+'）　'+boxRates(b).map(([t,v])=>t+' '+pct(v)).join('・'); }
+function openGacha(tab){ gachaEl.hidden=false; uiCache=''; GA.box=null; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
 const GOD_N=10;   // 運営アカウントの「十振り引く」
 function refreshCoins(){ document.getElementById('g_coins').textContent=GOD?'無限':WALLET.coins; document.getElementById('g_steel').textContent=WALLET.steel||0; const n=GOD?GOD_N:Math.floor(WALLET.coins/PULLCOST), busy=gBusy();
   const p1=document.getElementById('g_pull1'); p1.disabled=busy||n<1; p1.innerHTML='一振り引く　<small>'+(GOD?'無料':PULLCOST+'銭')+'</small>'; const all=document.getElementById('g_all'); all.disabled=busy||n<2;
   all.innerHTML=GOD?'十振り引く　<small>銭は減りません</small>':'全部引く　<small>'+(n>=2?n+'回・'+n*PULLCOST+'銭':'2回分から')+'</small>';
+  renderBox();
   const pk=document.getElementById('g_pick'); if(pk){ pk.hidden=!GOD; if(GOD&&pk.options.length<2) fillPick(pk); pk.disabled=busy; } }
 // ピックアップ: 選んだ刀が必ず出る（運営アカウントだけ。サーバーでも確かめる）
 function fillPick(pk){ pk.innerHTML='<option value="">ピックアップなし（ふつうのくじ）</option>'+['絶','幻','極','上','並'].map(t=>'<optgroup label="'+t+'">'+KATANA.filter(k=>k.tier===t).map(k=>'<option value="'+k.id+'">'+k.mei+'</option>').join('')+'</optgroup>').join(''); }
@@ -1254,13 +1278,13 @@ function doPull(n){
   msg.textContent=''; ensureAudio();
   if(ACCT){ // ログイン中: くじはサーバーが引く
     GA.phase='wait'; msg.textContent='引いています…'; refreshCoins();
-    ACCT.pull(n,GOD?(document.getElementById('g_pick').value||null):null).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
+    ACCT.pull(n,GOD?(document.getElementById('g_pick').value||null):null,curBox()===latestBox()?null:curBox().id).then(r=>{ if(GA.phase!=='wait') return; msg.textContent='';
       startDraw(r.got.map(g=>{ const k=KMAP[g.id]||KMAP.mumei; return {k,isNew:!!g.new,steel:g.new?0:(g.steel!=null?g.steel:STEEL[k.tier])}; }),r.back||0); },
       e=>{ if(GA.phase==='wait') GA.phase='idle'; msg.textContent=e.message; refreshCoins(); });
     return;
   }
   const batch=[]; let back=0;
-  for(let i=0;i<n;i++){ WALLET.coins-=PULLCOST; const k=rollKatana(); const had=ARM.owned[k.id]||0; ARM.owned[k.id]=had+1; const st=had?STEEL[k.tier]:0; WALLET.steel=(WALLET.steel||0)+st; batch.push({k,isNew:!had,steel:st}); }
+  for(let i=0;i<n;i++){ WALLET.coins-=PULLCOST; const k=rollKatana(curBox()); const had=ARM.owned[k.id]||0; ARM.owned[k.id]=had+1; const st=had?STEEL[k.tier]:0; WALLET.steel=(WALLET.steel||0)+st; batch.push({k,isNew:!had,steel:st}); }
   saveWallet(); saveArm();
   startDraw(batch,back);
 }
@@ -1331,7 +1355,7 @@ function gLoop(){
     c.beginPath(); c.moveTo(m,cy-kh*0.2); c.lineTo(m+sayaL,cy-kh*0.12); c.quadraticCurveTo(m+sayaL+kh*0.3,cy,m+sayaL,cy+kh*0.14); c.lineTo(m,cy+kh*0.22); c.closePath(); c.fill(); c.stroke();
     c.fillStyle='rgba(233,226,207,0.08)'; c.fillRect(m+sayaL*0.2,cy-kh*0.16,sayaL*0.6,kh*0.05); c.restore(); };
   if(GA.phase==='idle'||GA.phase==='wait'){
-    const k=KMAP[ARM.equip[0]]||KMAP.mumei; if(KREADY){ c.save(); c.globalAlpha=0.5+0.1*Math.sin(now/700); c.beginPath(); c.rect(0,0,mouth0,H); c.clip(); drawKatanaAt(c,k.shadow,cx,cy,kw); c.restore(); }
+    const k=KMAP[curBox().pick]||KMAP[ARM.equip[0]]||KMAP.mumei; if(KREADY){ c.save(); c.globalAlpha=0.5+0.1*Math.sin(now/700); c.beginPath(); c.rect(0,0,mouth0,H); c.clip(); drawKatanaAt(c,k.shadow,cx,cy,kw); c.restore(); }
     drawSaya(mouth0,1);
     txt(c,'鞘に手をかける',cx,H*0.86,Math.max(11,H*0.055),UIF,'rgba(233,226,207,0.4)','center');
     return;
@@ -1452,7 +1476,10 @@ function renderBook(){
   const grid=document.getElementById('g_grid'); grid.innerHTML='';
   const got=KATANA.filter(k=>ARM.owned[k.id]).length;
   document.getElementById('g_count').innerHTML='集めた刀　'+got+' / '+KATANA.length+'<small>玉鋼 <b>'+(WALLET.steel||0)+'</b>　まだ持っていない刀に触れると、玉鋼で鍛えられます</small>';
-  KATANA.map((k,i)=>[k,i]).sort((a,b)=>TORD[a[0].tier]-TORD[b[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
+  const bord=k=>{ const i=BOXES.findIndex(b=>b.id===boxOf(k)); return i<0?999:i; }; let hb=null;
+  KATANA.map((k,i)=>[k,i]).sort((a,b)=>bord(b[0])-bord(a[0])||TORD[a[0].tier]-TORD[b[0].tier]||a[1]-b[1]).forEach(([k])=>{ const own=!!ARM.owned[k.id];
+    if(boxOf(k)!==hb){ hb=boxOf(k); const bx=BOXES.find(b=>b.id===hb), ks=KATANA.filter(x=>boxOf(x)===hb);
+      const h=document.createElement('h3'); h.className='gbh'; h.innerHTML=(bx?boxName(bx):hb)+'の箱<small>'+ks.filter(x=>ARM.owned[x.id]).length+' / '+ks.length+'</small>'; grid.appendChild(h); }
     const b=document.createElement('button'); b.type='button'; b.className='gcard t'+TORD[k.tier]+(own?'':' unk');
     const cvs=document.createElement('canvas'); cvs.width=420; cvs.height=Math.round(420*KIMG_H/KIMG_W)+8;
     const x=cvs.getContext('2d'); if(KREADY) x.drawImage(own?k.canvas:k.shadow,0,4,420,420*KIMG_H/KIMG_W);

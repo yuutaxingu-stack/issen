@@ -75,9 +75,12 @@ alter table public.notices enable row level security;
 revoke all on public.title_catalog, public.plate_catalog, public.profile_ext, public.mail, public.notices from anon, authenticated;
 
 -- ---------- 中身（名前とわけはここを書き換えて、もう一度実行すれば変わる） ----------
-insert into public.title_catalog (id, name, note, ord) values
-  ('issen', '紫電一閃', '後のない刹那に、明鏡止水を決めた者', 1)
-on conflict (id) do update set name = excluded.name, note = excluded.note, ord = excluded.ord;
+-- style: 見た目。'' = 朱の帯、'zetsu' = 絶の赤黒（css/profile.css の .pfnick.s-zetsu）
+alter table public.title_catalog add column if not exists style text not null default '';
+insert into public.title_catalog (id, name, note, style, ord) values
+  ('issen', '一閃', '後のない刹那に、明鏡止水を決めた者', '', 2),
+  ('issen_ouka', '桜花一閃', '絶の一振り「桜華」で、一閃を決めた者', 'zetsu', 1)
+on conflict (id) do update set name = excluded.name, note = excluded.note, style = excluded.style, ord = excluded.ord;
 
 insert into public.plate_catalog (id, name, note, free, ord) values
   ('sumi',  '墨',   'はじめから使える', true, 1),
@@ -102,6 +105,7 @@ language sql stable security definer set search_path = '' as $$
     'fav', x.fav,
     'title', x.title,
     'title_name', t.name,
+    'title_style', t.style,
     'title_note', t.note,
     'plate', coalesce(x.plate, 'sumi'),
     'rating', coalesce(r.rating, (select c.start_rating from public.rating_config c where c.id = 1), 1000),
@@ -146,7 +150,7 @@ begin
     -- 自分なら、選べる二つ名・背景も返す
     select * into x from public.profile_ext e where e.id = me;
     j := j || jsonb_build_object('me', true,
-      'my_titles', coalesce((select jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name, 'note', t.note) order by t.ord, t.id)
+      'my_titles', coalesce((select jsonb_agg(jsonb_build_object('id', t.id, 'name', t.name, 'note', t.note, 'style', t.style) order by t.ord, t.id)
                              from public.title_catalog t where g or t.id = any(coalesce(x.titles, '{}'))), '[]'),
       'my_plates', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'name', p.name, 'note', p.note) order by p.ord, p.id)
                              from public.plate_catalog p where g or p.free or p.id = any(coalesce(x.plates, '{}'))), '[]'));
@@ -158,7 +162,7 @@ $$;
 -- 名前の横に添える二つ名（番付などの一覧用。最大64人）
 create or replace function public.profile_tags(p_ids uuid[]) returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select coalesce(jsonb_object_agg(x.id, jsonb_build_object('title', t.name, 'plate', x.plate)), '{}')
+  select coalesce(jsonb_object_agg(x.id, jsonb_build_object('title', t.name, 'style', t.style, 'plate', x.plate)), '{}')
   from public.profile_ext x left join public.title_catalog t on t.id = x.title
   where auth.uid() is not null and x.id = any(coalesce(p_ids[1:64], '{}')) and (x.title is not null or x.plate is not null);
 $$;
@@ -248,8 +252,8 @@ begin
   update public.profile_ext e set
     titles = (select coalesce(array_agg(distinct v), '{}') from unnest(e.titles || tl) v),
     plates = (select coalesce(array_agg(distinct v), '{}') from unnest(e.plates || pl) v),
-    -- 二つ名をまだ名乗っていなければ、もらった二つ名をそのまま名乗る
-    title = coalesce(e.title, tl[1]),
+        -- もらった二つ名が今の二つ名より上（ord が小さい）なら、そちらに名乗り替える
+    title = coalesce((select t.id from public.title_catalog t where t.id = any(array_append(tl, e.title)) order by t.ord, t.id limit 1), e.title),
     updated_at = now()
   where e.id = me;
   return jsonb_build_object('save', public.save_json(s), 'n', n,
@@ -372,12 +376,12 @@ $$;
 
 
 -- ---------- 条件を満たしたら自動で送る贈り物（2026-11-27） ----------
--- cond: 'issen' = 決着「一閃」を一度でも決めた / 'katana' = arg の刀を持っている
+-- cond: 'issen' = 決着「一閃」を一度でも決めた / 'issen_with' = arg の刀で一閃を決めた / 'katana' = arg の刀を持っている
 -- 条件を満たした瞬間（勝ちの記録・ガチャ・鍛えるで持ち物が変わったとき）に、その人の文箱へ一通だけ届く
 -- すでにその二つ名・背景を持っている人や、同じ物を手で送られている人には送らない（二重にならない）
 create table if not exists public.auto_gifts (
   id text primary key check (id ~ '^[a-z0-9_]{1,32}$'),
-  cond text not null check (cond in ('issen', 'katana')),
+  cond text not null,
   arg text,
   gifts jsonb not null,
   subject text not null,
@@ -391,11 +395,15 @@ create table if not exists public.auto_gifts_given (
   at timestamptz not null default now(),
   primary key (user_id, gift_id)
 );
+alter table public.auto_gifts drop constraint if exists auto_gifts_cond_check;
+alter table public.auto_gifts add constraint auto_gifts_cond_check check (cond in ('issen', 'issen_with', 'katana'));
 alter table public.auto_gifts enable row level security;
 alter table public.auto_gifts_given enable row level security;
 revoke all on public.auto_gifts, public.auto_gifts_given from anon, authenticated;
 
 insert into public.auto_gifts (id, cond, arg, gifts, subject, body, ord) values
+  ('issen_ouka_title', 'issen_with', 'ouka', '{"titles":["issen_ouka"]}', '桜花一閃の誉れ',
+   E'絶の一振り「桜華」で、後のない刹那に明鏡止水を決めた者へ。\n二つ名「桜花一閃」を贈ります。名乗りの画面で名乗れます。', 0),
   ('issen_title', 'issen', null, '{"titles":["issen"]}', '一閃の誉れ',
    E'後のない刹那に、明鏡止水を決めた者へ。\n二つ名を贈ります。名乗りの画面で名乗れます。', 1),
   ('ouka_plate', 'katana', 'ouka', '{"plates":["ouka"]}', '桜華の札',
@@ -412,9 +420,10 @@ begin
   for a in select * from public.auto_gifts g where g.active order by g.ord loop
     continue when exists (select 1 from public.auto_gifts_given d where d.user_id = s.id and d.gift_id = a.id);
     if a.cond = 'issen' then has := public.has_issen(s);
+    elsif a.cond = 'issen_with' then has := jsonb_typeof(s.rec -> a.arg -> '一閃') = 'number' and (s.rec -> a.arg ->> '一閃')::numeric > 0;
     elsif a.cond = 'katana' then has := coalesce((s.owned ->> a.arg)::numeric, 0) > 0;
     else has := false; end if;
-    continue when not has;
+    continue when not coalesce(has, false);
     insert into public.auto_gifts_given (user_id, gift_id) values (s.id, a.id) on conflict do nothing;
     -- 同じ物をもう持っている・手で送られている（受け取り前も含む）なら、送ったことにして手紙は出さない
     continue when exists (select 1 from jsonb_array_elements_text(coalesce(a.gifts -> 'titles', '[]')) t

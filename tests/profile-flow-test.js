@@ -164,11 +164,11 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   await a.click('.pfmh');
   await a.screenshot({ path: OUT + '/mail.png' });
   await a.click('[data-act="claimall"]');
-  await a.waitForFunction(() => /紫電一閃/.test((document.querySelector('.pfgot') || {}).textContent || '') && /銭 100/.test(document.querySelector('.pfgot').textContent), null, { timeout: 8000 });
+  await a.waitForFunction(() => /一閃/.test((document.querySelector('.pfgot') || {}).textContent || '') && /銭 100/.test(document.querySelector('.pfgot').textContent), null, { timeout: 8000 });
   ok(true, 'まとめて受け取った（二つ名と銭）');
   await a.click('.pfgot [data-act="me"]');
   await a.waitForSelector('.pfcard');
-  ok(/紫電一閃/.test(await a.textContent('.pfnick')) && /一閃/.test(await a.textContent('.pfstats')), '名乗りに二つ名と一閃の回数');
+  ok(/一閃/.test(await a.textContent('.pfnick')) && /一閃/.test(await a.textContent('.pfstats')), '名乗りに二つ名と一閃の回数');
   await a.click('[data-act="edit"]');
   await a.fill('#pf_word', '刹那に生きる');
   await a.selectOption('#pf_fav', 'nichirin');
@@ -201,7 +201,7 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   await b.setViewportSize({ width: 844, height: 390 });
   await b.click('#pf_back');
   await b.click('#m_rank');
-  await b.waitForFunction(() => /紫電一閃/.test(document.getElementById('r_list').textContent), null, { timeout: 8000 });
+  await b.waitForFunction(() => /一閃/.test(document.getElementById('r_list').textContent), null, { timeout: 8000 });
   ok(true, '番付の名前に二つ名が添えられる');
   await b.screenshot({ path: OUT + '/rank-tag.png' });
   await b.click('#r_list li[data-pid="' + USERS[A] + '"]');

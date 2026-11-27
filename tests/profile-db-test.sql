@@ -44,18 +44,18 @@ select case when (public.god_preview('login', '甲、ccc') ->> 'n') = '2' then '
 select case when public.god_send_mail('login', '甲', '銭を', '', '{"coins":100}') = 1 then 'OK 名前で銭を1通' else 'NG' end;
 select case when public.god_send_mail('all', null, 'お詫び', '', '{"coins":300,"steel":50,"bogus":1}') = 4 then 'OK 全員に銭と玉鋼' else 'NG' end;
 select case when (select gifts from public.mail where subject = 'お詫び' limit 1) = '{"coins":300,"steel":50}' then 'OK 知らない添え物は捨てる' else 'NG' end;
-select case when jsonb_array_length(public.god_info() -> 'sent') = 4 and jsonb_array_length(public.god_info() -> 'auto') = 2 then 'OK 送った記録と自動の贈り物' else 'NG' end;
+select case when jsonb_array_length(public.god_info() -> 'sent') = 4 and jsonb_array_length(public.god_info() -> 'auto') = 3 then 'OK 送った記録と自動の贈り物' else 'NG' end;
 \echo '--- 神様は二つ名・背景・刀を全部持っている'
 select case when jsonb_array_length(public.get_profile(null) -> 'my_titles') >= 1 and jsonb_array_length(public.get_profile(null) -> 'my_plates') = 4
-            and (public.set_profile('', 'geppaku', 'issen', 'ouka') ->> 'title_name') = '紫電一閃' then 'OK 神様は何でも名乗れる' else 'NG' end;
+            and (public.set_profile('', 'geppaku', 'issen', 'ouka') ->> 'title_name') = '一閃' then 'OK 神様は何でも名乗れる' else 'NG' end;
 
 \echo '--- 甲: 文箱を見て受け取る'
 select pg_temp.as_('11111111-1111-1111-1111-111111111111');
-select case when (public.my_mail() ->> 'unclaimed') = '3' and public.my_mail() -> 'items' -> 2 -> 'title_names' ->> 0 = '紫電一閃' then 'OK 甲の文箱は3通' else 'NG ' || public.my_mail()::text end;
+select case when (public.my_mail() ->> 'unclaimed') = '3' and public.my_mail() -> 'items' -> 2 -> 'title_names' ->> 0 = '一閃' then 'OK 甲の文箱は3通' else 'NG ' || public.my_mail()::text end;
 select pg_temp.expect_err($$select public.set_profile('', null, 'issen', null)$$, 'その二つ名は持っていません');
 select case when (public.claim_mail() -> 'got' ->> 'coins') = '400' then 'OK 全部受け取った' else 'NG' end;
 select case when (select coins from public.saves where id = auth.uid()) = 410 and (select steel from public.saves where id = auth.uid()) = 50 then 'OK 銭と玉鋼が入った' else 'NG' end;
-select case when (public.get_profile(null) ->> 'title_name') = '紫電一閃' then 'OK もらった二つ名をそのまま名乗る' else 'NG' end;
+select case when (public.get_profile(null) ->> 'title_name') = '一閃' then 'OK もらった二つ名をそのまま名乗る' else 'NG' end;
 select case when (public.claim_mail() ->> 'n') = '0' then 'OK 二度は受け取れない' else 'NG' end;
 select pg_temp.expect_err($$select public.claim_mail((select min(id) from public.mail))$$, 'もう受け取って');
 
@@ -74,7 +74,7 @@ select case when (public.set_profile('', 'ouka', null, 'ouka') ->> 'plate') = 'o
 select case when public.get_profile('11111111-1111-1111-1111-111111111111') ? 'my_titles' then 'NG 他人の持ち物が見えた'
             when (public.get_profile('11111111-1111-1111-1111-111111111111') ->> 'word') = '斬って 候' then 'OK 甲の名乗りが見える' else 'NG' end;
 select case when (public.profile_tags(array['11111111-1111-1111-1111-111111111111'::uuid, '33333333-3333-3333-3333-333333333333'::uuid])
-                  -> '11111111-1111-1111-1111-111111111111' ->> 'title') = '紫電一閃' then 'OK 一覧に添える二つ名' else 'NG' end;
+                  -> '11111111-1111-1111-1111-111111111111' ->> 'title') = '一閃' then 'OK 一覧に添える二つ名' else 'NG' end;
 select case when (select count(*) from public.mail where to_id = auth.uid() and claimed_at is null) = 1 then 'OK 一通だけ受け取った' else 'NG' end;
 
 \echo '--- あとから条件を満たしても届く。手で送られた人と、二度目には届かない'
@@ -86,6 +86,14 @@ update public.saves set rec = '{"mumei":{"一閃":2}}' where id = '22222222-2222
 select case when (select count(*) from public.mail where to_id = '22222222-2222-2222-2222-222222222222' and subject = '一閃の誉れ') = 1
             and (select count(*) from public.mail where to_id = '33333333-3333-3333-3333-333333333333' and gifts -> 'titles' ? 'issen') = 1
   then 'OK 乙に一通だけ自動で届き、手で送られた丙には重ねない' else 'NG' end;
+
+\echo '--- 絶の刀（桜華）で一閃を決めると「桜花一閃」が届き、受け取ると名乗り替える'
+update public.saves set rec = '{"mumei":{"一閃":2},"ouka":{"一閃":1}}' where id = '22222222-2222-2222-2222-222222222222';
+select pg_temp.as_('22222222-2222-2222-2222-222222222222');
+select case when (select count(*) from public.mail where to_id = auth.uid() and gifts -> 'titles' ? 'issen_ouka') = 1 then 'OK 桜花一閃が届いた' else 'NG' end;
+select public.claim_mail() ->> 'n';
+select case when (public.get_profile(null) ->> 'title_name') = '桜花一閃' and (public.get_profile(null) ->> 'title_style') = 'zetsu' then 'OK 桜花一閃を名乗る（絶の見た目）' else 'NG ' || public.get_profile(null)::text end;
+reset role;
 
 \echo '--- お知らせ'
 select pg_temp.as_('99999999-9999-9999-9999-999999999999');

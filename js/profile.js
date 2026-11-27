@@ -110,7 +110,7 @@
       const d = await rpc('get_profile', { p_id: want });
       if (S.pid !== want) return;
       S.prof = d; S.err = '';
-      if (d && d.id) tags[d.id] = { title: d.title_name, plate: d.plate };
+      if (d && d.id) tags[d.id] = { title: d.title_name, style: d.title_style, plate: d.plate };
     } catch (e) { S.err = errText(e); }
     render();
   }
@@ -176,7 +176,8 @@
   /* ---------- 名乗りの札（カード） ---------- */
   function cardHtml(p, ed){
     const v = ed ? Object.assign({}, p, ed) : p;
-    const title = ed ? ((p.my_titles || []).find(t => t.id === ed.title) || {}).name : p.title_name;
+    const tt = ed ? ((p.my_titles || []).find(t => t.id === ed.title) || {}) : { name: p.title_name, style: p.title_style };
+    const title = tt.name, tstyle = tt.style ? ' s-' + esc(tt.style) : '';
     const fav = v.fav ? kat(v.fav) : null;
     const stats = [
       ['戦闘力', String(v.rating)],
@@ -187,7 +188,7 @@
     return '<div class="pfcard pl-' + esc(v.plate || 'sumi') + '">' +
       '<div class="pfpetal" aria-hidden="true"></div>' +
       '<div class="pfmain">' +
-        (title ? '<span class="pfnick">' + esc(title) + '</span>' : '<span class="pfnick none">二つ名なし</span>') +
+        (title ? '<span class="pfnick' + tstyle + '">' + esc(title) + '</span>' : '<span class="pfnick none">二つ名なし</span>') +
         '<span class="pfname">' + esc(v.name) + zmark(v.id) + '</span>' +
         '<p class="pfword">' + (v.word ? '「' + esc(v.word) + '」' : '<span class="none">一言はまだない</span>') + '</p>' +
       '</div>' +
@@ -235,7 +236,7 @@
           '<label class="pff">一言<input id="pf_word" maxlength="30" value="' + esc(ed.word) + '" placeholder="30文字まで" autocomplete="off"></label>' +
           '<div class="pff"><span>二つ名</span><div class="pfchips">' +
             '<button type="button" data-title=""' + (!ed.title ? ' class="on"' : '') + '>名乗らない</button>' +
-            titles.map(t => '<button type="button" data-title="' + esc(t.id) + '"' + (ed.title === t.id ? ' class="on"' : '') + ' title="' + esc(t.note) + '">' + esc(t.name) + '</button>').join('') +
+            titles.map(t => '<button type="button" data-title="' + esc(t.id) + '" class="' + (ed.title === t.id ? 'on' : '') + (t.style ? ' s-' + esc(t.style) : '') + '"' + ' title="' + esc(t.note) + '">' + esc(t.name) + '</button>').join('') +
             (titles.length ? '' : '<span class="pfnone">まだ持っていません</span>') +
           '</div></div>' +
           '<div class="pff"><span>背景の札</span><div class="pfchips pfplates">' +
@@ -341,7 +342,7 @@
       '<div class="pfacts"><button type="button" class="gpull' + (S.arm === 'send' ? ' arm' : '') + '" data-act="send"' + (S.busy ? ' disabled' : '') + '>' +
         (S.arm === 'send' ? 'もう一度触れて送る' + (pv ? '（' + pv.n + '人）' : '') : '送る') + '</button></div>' +
       '<p class="omsg">' + esc(S.msg) + '</p>' +
-      (g.auto && g.auto.length ? '<h3>条件を満たすと自動で届く贈り物</h3><ul class="pfsent">' + g.auto.map(a => '<li><b>' + esc(a.subject) + '</b><span>' + esc(a.cond === 'issen' ? '一閃を決めたら' : a.cond === 'katana' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」を手にしたら' : '') + '・' + a.n + '人に届いた</span></li>').join('') + '</ul>' : '') +
+      (g.auto && g.auto.length ? '<h3>条件を満たすと自動で届く贈り物</h3><ul class="pfsent">' + g.auto.map(a => '<li><b>' + esc(a.subject) + '</b><span>' + esc(a.cond === 'issen' ? '一閃を決めたら' : a.cond === 'issen_with' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」で一閃を決めたら' : a.cond === 'katana' ? '「' + (((I && I.KMAP && I.KMAP[a.arg]) || {}).mei || a.arg) + '」を手にしたら' : '') + '・' + a.n + '人に届いた</span></li>').join('') + '</ul>' : '') +
       '<h3>送った手紙</h3><ul class="pfsent">' + ((g.sent || []).map(x => '<li><b>' + esc(x.subject) + '</b><span>' + x.n + '人・受け取り ' + x.claimed + '</span><time>' + day(x.at) + '</time></li>').join('') || '<li class="none">まだありません</li>') + '</ul>' +
     '</div>';
   }
@@ -430,7 +431,7 @@
       try {
         const ed = S.edit;
         S.prof = await rpc('set_profile', { p_word: ed.word || '', p_fav: ed.fav || null, p_title: ed.title || null, p_plate: ed.plate || null });
-        if (S.prof && S.prof.id) tags[S.prof.id] = { title: S.prof.title_name, plate: S.prof.plate };
+        if (S.prof && S.prof.id) tags[S.prof.id] = { title: S.prof.title_name, style: S.prof.title_style, plate: S.prof.plate };
         tagFns.forEach(f => { try { f(); } catch (x) {} });
         S.edit = null; if (N.toast) N.toast('名乗りを改めました', 2500);
       } catch (x) { S.msg = errText(x); if (N.toast) N.toast('名乗りを改められませんでした：' + S.msg, 6000); console.warn('set_profile', x); }
@@ -516,7 +517,7 @@
       tagFns.forEach(f => { try { f(); } catch (x) {} });
     } catch (e) {}
   }
-  const tag = id => tags[id] && tags[id].title ? '<span class="pftag">' + esc(tags[id].title) + '</span>' : '';
+  const tag = id => tags[id] && tags[id].title ? '<span class="pftag' + (tags[id].style ? ' s-' + esc(tags[id].style) : '') + '">' + esc(tags[id].title) + '</span>' : '';
 
   /* ---------- ログインの変化 ---------- */
   let who = null, mailTimer = 0;

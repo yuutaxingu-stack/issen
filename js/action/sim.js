@@ -33,18 +33,18 @@ const C = {
    dmg, gd は 1/100 単位。hit=ヒット時の有利F（決めると hs を計算）、blk=ガード時の有利F
    box=[前へのずれ, 足元からの高さ, 幅, 高さ](px)  kb=[横, 縦] 吹き飛ばし(1/100px/F) */
 const MV = {
-  jab1:  { n:'弱斬り（一段目）', k:'g', s:5, a:3, r:10, dmg:300, gd:600, hit:6, blk:-2, kb:[220,0], box:[6,58,60,34], arc:[-35,25], chain:'jab2', cancel:1 },
+  jab1:  { n:'弱斬り（一段目）', k:'g', s:5, a:3, r:10, dmg:300, gd:600, hit:6, blk:-2, kb:[220,0], kd:1, dfall:1, box:[6,58,60,34], arc:[-35,25], chain:'jab2', cancel:1 },
   jab2:  { n:'弱斬り（二段目）', k:'g', s:5, a:3, r:12, dmg:300, gd:600, hit:5, blk:-3, kb:[220,0], box:[6,58,60,34], arc:[45,-20], chain:'jab3', cancel:1 },
   jab3:  { n:'弱斬り（三段目・払い）', k:'g', s:7, a:4, r:20, dmg:500, gd:1000, hs:30, blk:-10, kb:[750,850], kd:1, box:[6,42,74,50], arc:[-60,60], cancel:1 },
   side:  { n:'踏み込み斬り', k:'g', s:14, a:4, r:22, dmg:700, gd:1800, hs:28, blk:-8, kb:[950,560], box:[8,38,100,64], arc:[150,-35], lunge:[2,14,900] },
   ftilt: { n:'横斬り', k:'g', s:8, a:3, r:18, dmg:600, gd:900, hs:22, blk:-6, kb:[620,240], box:[8,40,86,52], arc:[60,-30] },
   sideA: { n:'踏み込み斬り（空中）', k:'a', s:12, a:4, r:18, land:14, dmg:600, gd:1500, hs:24, kb:[850,500], box:[8,30,100,70], arc:[150,-35], lunge:[2,12,850], hover:1 },
-  rise:  { n:'昇り斬り', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, kb:[150,1250], box:[-24,40,76,120], arc:[-60,95], rise:1, kd:1, after:'fall', dfall:1 },
+  rise:  { n:'昇り斬り', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:26, blk:-1, kb:[150,1250], box:[-24,40,76,120], arc:[-60,95], rise:1, kd:1, after:'fall', dfall:1 },
   sweep: { n:'足払い', k:'g', s:12, a:5, r:24, dmg:600, gd:1200, hs:30, blk:-12, kb:[420,650], kd:1, box:[4,0,112,26], arc:[-20,-5], crouch:1 },
   plunge:{ n:'落とし', k:'a', s:8, a:90, r:1, land:22, dmg:800, gd:1400, hs:28, kb:[350,800], kd:1, box:[-26,-30,52,84], arc:[-90,-90], plunge:1, ext:20, pad:12 },
-  shot:  { n:'飛ぶ斬撃', k:'g', s:18, a:1, r:35, noBox:1, shot:1, arc:[150,-30] },
+  shot:  { n:'飛ぶ斬撃', k:'g', s:15, a:1, r:35, noBox:1, shot:1, arc:[150,-30] },
   shotP: { n:'飛ぶ斬撃', k:'p', s:1, a:1, r:0, dmg:500, gd:900, hs:14, blk:-4, kb:[260,0], flinch:1 },
-  dashatk:{ n:'ダッシュ斬り', k:'g', s:7, a:6, r:22, dmg:700, gd:1000, hs:26, blk:-10, kb:[700,550], box:[4,30,92,70], arc:[160,-20], lunge:[1,10,700] },
+  dashatk:{ n:'ダッシュ斬り', k:'g', s:7, a:6, r:22, dmg:700, gd:1000, hs:27, blk:-10, kb:[700,550], box:[4,30,92,70], arc:[160,-20], lunge:[1,10,700] },
   counter:{ n:'カウンター', k:'g', s:7, a:23, r:40, noBox:1, counter:1, arc:[95,95] },
   ctrHit:{ n:'カウンター（反撃）', k:'g', s:4, a:3, r:36, dmg:1000, gd:2000, hs:30, blk:-20, kb:[950,650], box:[-24,16,140,104], arc:[170,-40] },
   utilt: { n:'上斬り', k:'g', s:7, a:5, r:16, dmg:500, gd:800, hs:34, blk:-6, kb:[90,1500], box:[-14,72,84,92], arc:[-40,125] },
@@ -62,17 +62,17 @@ const MV = {
   petal: { n:'花嵐', k:'p', s:1, a:1, r:0, dmg:400, gd:800, hs:14, blk:-4, kb:[220,0], flinch:1 },
   petalS:{ n:'花嵐（落花）', k:'p', s:1, a:1, r:0, dmg:200, gd:400, hs:10, blk:-2, kb:[120,0], flinch:1 },
   // 天桜を当てたら、天桜を使った側が着地して動けるまで相手は落ちてこない（確定反撃を受けない。2026-11-27）
-  ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:60, kb:[150,1750], arc:[-60,95], rise:1, kd:1, after:'fall', dfall:1, pose:'rise' },
+  ten:   { n:'天桜', k:'a', s:5, a:10, r:12, land:20, dmg:600, gd:1000, hs:69, kb:[150,1750], arc:[-60,95], rise:1, kd:1, after:'fall', dfall:1, pose:'rise' },
   tenK:  { n:'天桜（開花）', k:'a', s:5, a:12, r:12, land:20, dmg:600, gd:1000, hs:86, kb:[150,2300], arc:[-60,95], rise:1, kd:1, riseV:2300, after:'fall', dfall:1, pose:'rise' },
   tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:86, kb:[150,2300], arc:[-60,95], rise:1, kd:1, riseV:2300, after:'fall', dfall:1, pose:'rise', aura:[-75,0,150,160] },
   tenR:  { n:'天桜（落花）', k:'a', s:5, a:12, r:6, land:20, dmg:700, gd:1200, hs:54, kb:[150,1850], arc:[-60,95], rise:1, dfall:1, kd:1, riseV:2300, pose:'rise', aura:[-75,0,150,160], next:'tenFall' },
   // 八咫（2026-11-28）: 羽跳 = 8方向へまっすぐ二度跳ぶ。二度目は跳び終わりに向きを入れたときだけ。二度とも当てると相手に大きい硬直（haneX）
-  hane:  { n:'羽跳', k:'a', s:6, a:23, r:14, land:14, dmg:400, gd:700, hs:24, blk:-4, kb:[120,320], box:[-38,6,76,104], arc:[0,0], hane:1, after:'fall', noLate:1 },
-  haneX: { n:'羽跳（二度当て）', k:'a', s:6, a:23, r:14, land:14, dmg:500, gd:900, hs:60, blk:-4, kb:[320,900], box:[-38,6,76,104], arc:[0,0], hane:1, noBox:1, noLate:1 },
+  hane:  { n:'羽跳', k:'a', s:9, a:23, r:14, land:14, dmg:400, gd:700, hs:24, blk:-4, kb:[0,0], kd:0, hold:1, box:[-38,6,76,104], arc:[0,0], hane:1, after:'fall', noLate:1 },
+  haneX: { n:'羽跳（二度当て）', k:'a', s:9, a:23, r:14, land:14, dmg:500, gd:900, hs:60, blk:-4, kb:[320,900], box:[-38,6,76,104], arc:[0,0], hane:1, noBox:1, noLate:1 },
   shoki: { n:'初虧', k:'g', s:8, a:4, r:20, land:16, dmg:[600, 1000], gd:[1200, 1800], hs:26, blk:-6, kb:[700,450], box:[0,30,110,70], arc:[150,-30], shoki:1, hover:1, lunge:[2,11,0], noLate:1, pose:'side' },
   shokujin:{ n:'食甚', k:'g', s:16, a:1, r:24, land:16, dmg:900, gd:2000, hs:30, blk:-14, kb:[800,700], noBox:1, sj:1, after:'air', noLate:1, arc:[150,-30], pose:'side' },
   fukuen:{ n:'復円', k:'g', s:4, a:1, r:12, land:12, noBox:1, fuku:1, arc:[100,100] },
-  yatagarasu:{ n:'八咫烏', k:'g', s:16, a:1, r:26, land:14, noBox:1, shot:'crow', arc:[120,-10] },
+  yatagarasu:{ n:'八咫烏', k:'g', s:25, a:1, r:26, land:14, noBox:1, shot:'crow', arc:[120,-10] },
   crowG: { n:'八咫烏（つかみ）', k:'p', s:1, a:1, r:0, dmg:600, gd:0, hs:34, kb:[-420,900], unblock:1 }, // ガードしていても捕まえる。手前へ引き寄せて浮かせる
   tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
   petalG:{ n:'天桜（落花・着地の花）', k:'p', s:1, a:1, r:0, dmg:250, gd:500, hs:12, blk:-2, kb:[160,0], flinch:1 },
@@ -104,10 +104,10 @@ const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: '
 const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [-22, 0, 44, 80], [-60, 0, 120, 170], [-60, 0, 120, 170]] };
 // 花嵐の当たる大きさ（2026-11-26 面積で3倍に）。射程は無限で壁まで飛ぶ。飛んだ距離 grow px ごとに大きさ +1倍（最大 maxW 倍）、
 // dmgPer px ごとに威力 +100%（最大 maxDm%）。遠いほど花が散って広く、重くなる
-const HANE = { sp: 3400, d1: 9, gap: 5, d2: 9, win: 5 }; // 羽跳: 速さ（1Fに進むpx×100）、一度目・間・二度目のF（d1+gap+d2 = hane の持続）、win = 二度目の向きを受け付けるF（間の終わりから数える。間より長ければ一度目の終わりも含む）
+const HANE = { sp: 3400, d1: 9, gap: 5, d2: 9, win: 9 }; // 羽跳: 速さ（1Fに進むpx×100）、一度目・間・二度目のF（d1+gap+d2 = hane の持続）、win = 二度目の向きを受け付けるF（間の終わりから数える。間より長ければ一度目の終わりも含む）
 /* 八咫の横＋技は使うたびに 初虧 → 食甚 → 復円 と変わる。復円を溜めきると初虧に戻る */
 const ECL = ['shoki', 'shokujin', 'fukuen'], ECLN = ['初虧', '食甚', '復円'];
-const SHOKI = { max: 40, d0: 90, dPer: 5 };   // 初虧: 溜めは最大40F、踏み込みは 90px + 溜め1Fごとに5px
+const SHOKI = { max: 56, d0: 90, dPer: 7 };   // 初虧: 溜めは最大56F、踏み込みは 90px + 溜め1Fごとに7px（2026-11-28 ユーザーの調整）
 const FUKU = { max: 90 };                    // 復円: 合わせて90F溜めると初虧に戻る（途中で離しても溜めは残る）
 const CROW = { speed: 700, life: 70, w: 64, h: 54, oy: 70 }; // 八咫烏: つかむ烏の速さ・飛ぶF・大きさ・高さ
 const SJ = { tight: 0, K: 1 };                     // 食甚: 羽跳の二度当ての後、最速で出せばちょうど当たる（tight = 余裕のF）
@@ -137,7 +137,7 @@ function newPlayer(i){
   return { i, x: (i ? 1000 : 600) * FP, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, ground: true, plat: -1,
     st: 'idle', f: 0, mv: null, mvf: 0, hitDone: false, chainReq: false, chargeF: 0, power: 0,
     jumps: 1, adUsed: false, ff: false, dropF: 0,
-    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0, hq: null, ecl: 0, fuku: 0, chg: 0, sjOK: false, sjHit: false,
+    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0, hq: null, ecl: 0, fuku: 0, chg: 0, sjOK: false, sjHit: false, hold: 0, keep: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
     stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
@@ -446,6 +446,7 @@ Sim.prototype.update = function(p, o){
 };
 
 Sim.prototype.physics = function(p){
+  if (p.hold > 0) { p.hold--; if (p.st === 'hit' || p.st === 'tumble') { p.vx = 0; p.vy = 0; return; } p.hold = 0; } // 羽跳の一度目を食らった側はその場に止まる
   if (!p.ground) {
     p.vy -= PH.grav;
     const lim = (p.st === 'atk' && MV[p.mv].plunge) ? 2400 : p.ff ? PH.ffall : PH.fallMax;
@@ -489,7 +490,8 @@ Sim.prototype.land = function(p, y, plat){
     if (m.landBurst) this.fallBurst(p);
     if (m.k === 'a') { p.st = 'land'; p.f = m.land; this.ev.push({ t: 'land', p: p.i, lag: m.land }); }
   } else if (p.st === 'tumble') {
-    if (p.dfall && !p.kd) { p.st = 'land'; p.f = 20; p.hs = 0; } // 無防備落下のまま着地: 受け身は取れず、落ちた側と同じ着地の硬直
+    if (p.keep && p.hs > 0) { p.st = 'hit'; p.vx = 0; } // 羽跳の二度当て: 着地しても硬直は縮まず倒れもしない（食甚がちょうど当たるように）
+    else if (p.dfall && !p.kd) { p.st = 'land'; p.f = 20; p.hs = 0; } // 無防備落下のまま着地: 受け身は取れず、落ちた側と同じ着地の硬直
     else if (!p.nokd && (p.hs > 8 || p.kd || vy < -900)) { // nokd: ダウンしない技
       if (p.lastG <= C.techWin && !p.dfall) {
         const h = horiz(p);
@@ -497,7 +499,8 @@ Sim.prototype.land = function(p, y, plat){
         this.ev.push({ t: 'tech', p: p.i, x: p.x, y: p.y });
       } else { p.st = 'down'; p.f = C.downF; p.downT = 0; p.vx = Math.trunc(p.vx / 3); this.ev.push({ t: 'down', p: p.i, x: p.x, y: p.y }); }
       p.kd = false; p.hs = 0;
-    } else { p.st = 'land'; p.f = 4; p.hs = 0; }
+    }
+    else { p.st = 'land'; p.f = 4; p.hs = 0; }
     p.nokd = false; p.dfall = false;
   } else if (p.st === 'adodge') { p.st = 'land'; p.f = DG[p.ak].land; }
   else if (p.st === 'fall') {
@@ -524,7 +527,7 @@ function haneDir(p){
 Sim.prototype.haneMove = function(p, m){
   const f = p.mvf, a = m.s, b = a + HANE.d1, c = b + HANE.gap, e = m.s + m.a;
   const go = () => { p.vx = Math.trunc(p.hdx * HANE.sp / 1000); p.vy = Math.trunc(p.hdy * HANE.sp / 1000);
-    if (p.ground && p.hdy > 0) { p.ground = false; p.plat = -1; } if (p.ground) p.vy = 0; else p.vy += PH.grav; p.ff = false; };
+    if (p.ground && p.hdy > 0) { p.ground = false; p.plat = -1; } if (p.ground) p.vy = 0; else p.vy += PH.grav; p.ff = false; if (!p.ground) p.dropF = Math.max(p.dropF, 2); }; // 跳んでいる間は足場に乗らずに抜ける
   const nd = haneDir(p);
   if (f < a) { p.vx = toward(p.vx, 0, 200); if (!p.ground) p.vy = PH.grav; if (nd) p.hq = nd; }          // 構え: 宙に止まる。向きは構えの間に入れた最後のもの
   if (f === a) { const d = nd || p.hq || [0, 1000]; p.hq = null; p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); this.ev.push({ t: 'hane', p: p.i, n: 1 }); }
@@ -652,7 +655,7 @@ Sim.prototype.hits = function(){
     if (inCounter(d) && !m.grab && !m.iai) { a.hitDone = true; this.triggerCounter(d, a); continue; }
     if (m.hane) { const two = a.hane2 && a.haneN > 0; a.haneN++;
       if (two) { a.sjOK = true; todo.push([a, d, Object.assign({}, MV.haneX, { hs: Math.max(1, MV.hane.s + MV.hane.a - a.mvf + MV.shokujin.s + SJ.K + SJ.tight) })]); } // 二度当て: 最速の食甚がちょうど当たる硬直
-      else todo.push([a, d, m]); continue; } // 二度とも当てたら大きい硬直
+      else todo.push([a, d, Object.assign({}, m, { hs: Math.max(m.hs, m.s + m.a - a.mvf + 4) })]); continue; } // 一度目: 二度目の終わりまで止めておく（向きを入れれば二度目が必ず届く） // 二度とも当てたら大きい硬直
     todo.push([a, d, m]);
   }
   // 相打ちも両方当てる（同じFに決めるので順番に依らない）
@@ -733,7 +736,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
     } else if (m.kb[1] < 0) { // 地上の相手に叩きつけ
       d.st = 'tumble'; d.ground = false; d.plat = -1; d.vy = 500; d.vx = dir * 200; d.kd = true;
     } else { d.st = 'hit'; d.vx = dir * kx; }
-    d.hs = m.hs + late; d.s1Used = false; d.nokd = m.kd === 0; d.dfall = !!m.dfall && d.st === 'tumble'; if (d.st === 'tumble') d.jumps = 1;
+    d.hs = m.hs + late; d.s1Used = false; d.hold = m.hold ? d.hs : 0; d.keep = m.id === 'haneX'; if (m.hold) { d.vx = 0; if (!d.ground) d.vy = 0; } d.nokd = m.kd === 0; d.dfall = !!m.dfall && d.st === 'tumble'; if (d.st === 'tumble') d.jumps = 1;
     const adv = (d.st === 'hit' && mvRem != null) ? m.hs + late - mvRem : null;
     ev.push({ t: 'hit', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, dmg, combo: a.combo, adv, counter: a.combo === 1 && a.comboFirst.counter });
   }

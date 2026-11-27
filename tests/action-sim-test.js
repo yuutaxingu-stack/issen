@@ -68,7 +68,7 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
 // 19) ダッシュ中に守で前方回避（設定オン）、前方回避の後は振り返る
 { const s = sim(600); s.p[0].dashRoll = true; run(s, 1, () => I({ R: 1, F: 1 })); run(s, 3, () => I({ R: 1 })); run(s, 1, () => I({ R: 1, G: 1 })); ok(s.p[0].st === 'roll' && s.p[0].rk === 'fwd', 'ダッシュ中の守は前方回避'); run(s, 40); ok(s.p[0].face === -1, '前方回避の後は反対を向く'); }
 // 20) 飛ぶ斬撃: 18Fで出て、54F目に動ける。離れた相手に当たる
-{ const s = sim(900); run(s, 1, () => I({ A: 1, R: 1 })); let born = 0, n = 1; while (s.p[0].st === 'atk') { if (!born && s.pj.length) born = s.frame; s.step([I(), I()]); n++; } ok(born === 18 && n === 53, '飛ぶ斬撃 発生18F・54F目に動ける (' + born + ',' + (n + 1) + ')');
+{ const s = sim(900); run(s, 1, () => I({ A: 1, R: 1 })); let born = 0, n = 1; while (s.p[0].st === 'atk') { if (!born && s.pj.length) born = s.frame; s.step([I(), I()]); n++; } ok(born === 15 && n === 50, '飛ぶ斬撃 発生15F・51F目に動ける (' + born + ',' + (n + 1) + ')');
 }
 { const s = sim(350); run(s, 1, () => I({ A: 1, R: 1 })); let hit = false; for (let k = 0; k < 120; k++) { s.step([I(), I()]); if (drain(s).some(e => e.t === 'hit')) hit = true; } ok(hit, '飛ぶ斬撃が離れた相手に当たる'); }
 // 21) カウンター: 受付7〜29F、失敗すると69F、受けると反撃（発生4F・全体42F）
@@ -258,8 +258,8 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   const sj = late => { const c = mk(55); c.p[0].ecl = 1; const go = (inp, n) => { c.step([I(inp), I()]); for (let k = 0; k < n; k++) c.step([I(), I()]); };
     go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'u' }, 11); c.step([I({ K: 'u' }), I()]); const ev = []; let at = -1;
     const aim = () => { const dx = c.p[1].x - c.p[0].x, dy = c.p[1].y - c.p[0].y, q = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); const D = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]][(q + 8) % 8]; return { R: D[0] > 0 ? 1 : 0, L: D[0] < 0 ? 1 : 0, U: D[1] > 0 ? 1 : 0, D: D[1] < 0 ? 1 : 0 }; };
-    for (let k = 0; k < 120; k++) { let inp = c.p[0].st === 'atk' && c.p[0].mv === 'hane' && c.p[0].mvf < 29 ? aim() : {};
-      if (at < 0 && c.p[0].mv === 'hane' && c.p[0].mvf >= 28) at = k; if (at >= 0 && k === at + 1 + late) inp = { K: 'r' };
+    for (let k = 0; k < 120; k++) { let inp = c.p[0].st === 'atk' && c.p[0].mv === 'hane' && c.p[0].mvf < A.MV.hane.s + A.MV.hane.a ? aim() : {};
+      if (at < 0 && c.p[0].mv === 'hane' && c.p[0].mvf >= A.MV.hane.s + A.MV.hane.a - 1) at = k; if (at >= 0 && k === at + 1 + late) inp = { K: 'r' };
       c.step([I(inp), I()]); ev.push(...drain(c)); }
     return ev.filter(e => e.t === 'hit').map(e => e.mv + '#' + e.combo); };
   const a = sj(0), b = sj(1);
@@ -284,9 +284,9 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
 
 // 八咫烏は自分の烏が飛んでいる間は出せない（消えたらまた出せる）
 { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 300 * A.FP; s.p[1].x = 1500 * A.FP; s.p[0].face = 1;
-  s.step([I({ K: 'd' }), I()]); for (let k = 0; k < 45; k++) s.step([I(), I()]);
+  s.step([I({ K: 'd' }), I()]); for (let k = 0; k < 60; k++) s.step([I(), I()]);
   const flying = s.pj.some(q => q.crow); s.step([I({ K: 'd' }), I()]); const blocked = s.p[0].st !== 'atk';
-  for (let k = 0; k < 80; k++) s.step([I(), I()]); s.step([I({ K: 'd' }), I()]);
+  for (let k = 0; k < 60; k++) s.step([I(), I()]); s.step([I({ K: 'd' }), I()]);
   ok(flying && blocked && s.p[0].mv === 'yatagarasu', '烏が飛んでいる間は八咫烏を出せず、消えたら出せる'); }
 
 // 羽跳の二度目は一度目と同じ向きには跳べない
@@ -298,5 +298,15 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
 { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 500 * A.FP; s.p[1].x = 620 * A.FP; let hit = false;
   s.step([I({ K: 'u', R: 1 }), I()]); for (let k = 0; k < 30; k++) { s.step([I({ R: 1 }), I()]); if (drain(s).some(e => e.t === 'hit')) hit = true; }
   ok(hit && s.p[0].x > s.p[1].x, '横への羽跳が当たって相手の向こうへ抜ける (' + (s.p[0].x / 100 | 0) + ' > ' + (s.p[1].x / 100 | 0) + ')'); }
+
+// 羽跳: 一度目が当たったら、来た道を戻る向きに入れれば二度目も必ず当たる
+{ const dirs = { r: { R: 1 }, l: { L: 1 }, u: { U: 1 }, d: { D: 1 }, ur: { U: 1, R: 1 }, dl: { D: 1, L: 1 }, ul: { U: 1, L: 1 }, dr: { D: 1, R: 1 } }, opp = { r: 'l', u: 'd', ur: 'dl', ul: 'dr' };
+  let n = 0, good = 0;
+  for (const [d1, gx, gy] of [['r', 60, 0], ['r', 250, 0], ['ur', 120, 150], ['u', 0, 200], ['ul', -100, 150]]) {
+    const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + gx) * A.FP; if (gy) { s.p[1].y = gy * A.FP; s.p[1].ground = false; s.p[1].st = 'air'; }
+    let hit1 = false, two = false; s.step([I(Object.assign({ K: 'u' }, dirs[d1])), I()]);
+    for (let k = 0; k < 60; k++) { s.step([I(hit1 ? dirs[opp[d1]] : dirs[d1]), I()]); for (const e of drain(s)) { if (e.t === 'hit') { if (e.mv === 'haneX' && e.combo === 2) two = true; hit1 = true; } } }
+    n++; if (two) good++; }
+  ok(good === n, '羽跳の一度目→二度目が続けて当たる ' + good + '/' + n); }
 
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

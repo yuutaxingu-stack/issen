@@ -57,6 +57,7 @@
       const { data: d, error } = await N.sb.rpc('friend_ranking');
       if (error) throw error;
       data = d;
+      if (window.IssenProfile && d && d.rows) window.IssenProfile.loadTags(d.rows.map(r => r.id));
     } catch (e) {
       err = e && (e.code === 'PGRST202' || e.code === '42883') ? '番付はまだ準備中です' : N.jp(e);
     }
@@ -89,9 +90,9 @@
     const rows = loggedIn && data && !err ? data.rows || [] : [];
     const list = ranked(rows, T.val);
     $('r_list').innerHTML = list.map(({ r, no }, i) =>
-      '<li class="' + (r.me ? 'me ' : '') + (no <= 3 ? 'top' + no : '') + '" style="animation-delay:' + Math.min(i, 12) * 45 + 'ms">' +
+      '<li data-pid="' + esc(r.id) + '" class="' + (r.me ? 'me ' : '') + (no <= 3 ? 'top' + no : '') + '" style="animation-delay:' + Math.min(i, 12) * 45 + 'ms">' +
         '<span class="rno"><span>' + kn(no) + '</span></span>' +
-        '<span class="rwho"><span class="onm">' + esc(r.name) + (window.IssenZetsu ? window.IssenZetsu.mark(r.id) : '') + '</span>' + (T.sub(r) ? '<small>' + esc(T.sub(r)) + '</small>' : '') + '</span>' +
+        '<span class="rwho"><span class="onm">' + esc(r.name) + (window.IssenZetsu ? window.IssenZetsu.mark(r.id) : '') + (window.IssenProfile ? window.IssenProfile.tag(r.id) : '') + '</span>' + (T.sub(r) ? '<small>' + esc(T.sub(r)) + '</small>' : '') + '</span>' +
         '<span class="rval">' + T.cell(r) + '</span>' +
       '</li>').join('');
 
@@ -121,5 +122,7 @@
     N.on(() => { if (!el.hidden) { if (N.user && !data && !loading && !err) load(); else render(); } if (!N.user) data = null; });
   }
   const ok = $('o_invok'); if (ok) ok.addEventListener('click', close);
+  // 名乗りの二つ名が届いたら描き直す（profile.js は後から読まれる）
+  setTimeout(() => { if (window.IssenProfile) window.IssenProfile.onTags(() => render()); }, 0);
   window.IssenRank = { open, close, load };
 })();

@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="css/online.css">
 <link rel="stylesheet" href="css/team.css">
 <link rel="stylesheet" href="css/chat.css">
+<link rel="stylesheet" href="css/profile.css">
 </head>
 <body>
 
@@ -140,7 +141,7 @@
     </section>
     <section id="o_main" hidden>
       <div class="ome">
-        <div><span class="omyname" id="o_myname"></span> <button type="button" class="olink" id="o_rename">名前を変える</button></div>
+        <div><span class="omyname" id="o_myname"></span> <button type="button" class="olink" id="o_rename">名前を変える</button> <button type="button" class="olink" id="o_prof" onclick="window.IssenProfile&&IssenProfile.open()">名乗り</button></div>
         <div class="oid">あなたのID <b id="o_mycode"></b> <button type="button" class="obtn" id="o_copy">写す</button></div>
         <div class="olog"><span id="o_mylogin"></span> <button type="button" class="olink" id="o_logout">ログアウト</button></div>
         <p class="osave" id="o_save" hidden></p>
@@ -285,5 +286,6 @@
 <script src="js/ranking-ui.js"></script>
 <script src="js/team.js"></script>
 <script src="js/chat.js"></script>
+<script src="js/profile.js"></script>
 </body>
 </html>

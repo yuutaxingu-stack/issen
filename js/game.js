@@ -342,7 +342,7 @@ function importAction(){
 }
 setInterval(importAction,3000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) importAction(); });
 function useGuest(){ ACCT=null; GOD=false; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; setTimeout(importAction,0); if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
-window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT};
+window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT,KATANA,KMAP,TIER,arm:()=>ARM,isGod:()=>GOD};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
 function startMatch(mode,base){

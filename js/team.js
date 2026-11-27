@@ -291,7 +291,7 @@
       });
     }
     if (isHost() && !mine) btns += '<button type="button" class="obtn" data-ta="kick" data-id="' + m.user_id + '">外す</button>';
-    return '<li class="' + (mine ? 'me' : '') + '"><span class="onm">' + esc(m.name) + (window.IssenZetsu ? window.IssenZetsu.mark(m.user_id) : '') + '</span>' + (host ? '<span class="thmark">主</span>' : '') + '<span class="ost"></span>' + btns + '</li>';
+    return '<li class="' + (mine ? 'me' : '') + '"><span class="onm" data-pid="' + esc(m.user_id) + '">' + esc(m.name) + (window.IssenZetsu ? window.IssenZetsu.mark(m.user_id) : '') + '</span>' + (host ? '<span class="thmark">主</span>' : '') + '<span class="ost"></span>' + btns + '</li>';
   }
 
   function renderLobby(){

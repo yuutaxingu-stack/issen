@@ -1,0 +1,166 @@
+/* ---------- 名乗り・文箱・お知らせ（js/profile.js） ---------- */
+
+/* タイトル左上の三つの札 */
+#pf_corner{position:fixed;top:max(12px,env(safe-area-inset-top,0px));left:max(20px,env(safe-area-inset-left,0px));z-index:6;display:flex;gap:14px;}
+#pf_corner button{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:2px;color:#e9e2cf;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+#pf_corner .pfk{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid rgba(233,226,207,.32);
+  font-family:var(--display);font-size:17px;line-height:1;background:rgba(14,15,12,.35);transition:border-color .3s, background .3s;}
+#pf_corner .pfl{font-size:10px;letter-spacing:.12em;opacity:.55;}
+#pf_corner button:hover .pfk,#pf_corner button:active .pfk{border-color:#a8322a;background:rgba(168,50,42,.18);}
+#pf_corner button.dim{opacity:.55;}
+.pfbadge{position:absolute;top:-3px;right:-5px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:3px;background:#a8322a;color:#f2ede1;
+  font-family:var(--display);font-weight:400;font-size:11px;line-height:17px;text-align:center;transform:rotate(-6deg);box-shadow:0 0 0 1px rgba(14,15,12,.6);}
+
+/* 画面 */
+#pf{position:fixed;inset:0;z-index:23;background:#0e0f0c;color:#e9e2cf;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;
+  background-image:radial-gradient(ellipse at 50% -10%, rgba(168,50,42,.10), transparent 55%);}
+#pf .gwrap{max-width:720px;}
+#pf .pfsp{width:60px;}
+.pftabs{flex:none;}
+#pf h3{margin:14px 0 4px;font-size:12px;font-weight:700;letter-spacing:.14em;opacity:.6;}
+.pfempty{display:flex;flex-direction:column;align-items:center;gap:14px;padding:40px 10px;text-align:center;}
+.pfempty p{margin:0;font-size:14px;opacity:.7;line-height:1.7;}
+.pfacts{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;margin:8px 0 2px;}
+.pfnote{margin-top:4px;}
+.gpull.arm{background:#c4392f;box-shadow:0 0 18px rgba(200,60,50,.45);}
+
+/* ---------- 名乗りの札 ---------- */
+.pfcard{position:relative;overflow:hidden;border-radius:6px;aspect-ratio:2.1/1;min-height:200px;max-height:calc(100dvh - 130px);padding:18px 20px 14px;box-sizing:border-box;
+  display:grid;grid-template-columns:1fr;grid-template-rows:1fr auto;gap:6px 14px;
+  box-shadow:0 0 0 1px rgba(233,226,207,.16), 0 14px 40px rgba(0,0,0,.5);isolation:isolate;animation:pfin .6s ease both;}
+@keyframes pfin{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+.pfmain{position:relative;z-index:2;max-width:56%;display:flex;flex-direction:column;justify-content:center;gap:4px;min-width:0;}
+.pfnick{align-self:flex-start;font-family:var(--display);font-size:clamp(14px,3.6vw,18px);letter-spacing:.3em;color:#f2ede1;padding:2px 10px 2px 12px;
+  background:linear-gradient(90deg, #a8322a, rgba(168,50,42,.75) 70%, rgba(168,50,42,0));text-shadow:0 1px 0 rgba(0,0,0,.35);}
+.pfnick.none{background:none;padding-left:0;color:inherit;opacity:.35;font-size:12px;letter-spacing:.2em;}
+.pfname{font-family:var(--display);font-size:clamp(30px,8.6vw,46px);line-height:1.15;letter-spacing:.12em;color:#f2ede1;text-shadow:0 2px 10px rgba(0,0,0,.55);word-break:break-all;}
+.pfname .zmark{font-size:.42em;vertical-align:.5em;}
+.pfword{margin:2px 0 0;font-family:var(--display);font-size:clamp(14px,3.6vw,17px);letter-spacing:.08em;opacity:.9;line-height:1.5;}
+.pfword .none,.pfcard .none{opacity:.4;font-size:.85em;}
+.pfcard .pfnick.none{background:none;}
+.pffav{position:absolute;z-index:1;right:10px;top:8px;bottom:52px;width:46%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;pointer-events:none;}
+.pfkat{width:100%;height:auto;transform:rotate(-16deg);filter:drop-shadow(0 6px 10px rgba(0,0,0,.6));}
+.pfkm{margin-top:6px;font-family:var(--display);font-size:16px;letter-spacing:.14em;white-space:nowrap;text-shadow:0 1px 6px rgba(0,0,0,.8);}
+.pfkm i{font-style:normal;font-size:11px;margin-right:6px;padding:1px 4px;border:1px solid currentColor;border-radius:2px;vertical-align:.15em;}
+.pfkc{font-size:10px;letter-spacing:.2em;opacity:.5;text-shadow:0 1px 4px rgba(0,0,0,.8);}
+.pfstats{position:relative;z-index:2;display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end;padding-top:8px;border-top:1px solid rgba(233,226,207,.16);}
+.pfstats span{display:flex;flex-direction:column;gap:1px;}
+.pfstats small{font-size:9.5px;letter-spacing:.2em;opacity:.55;}
+.pfstats b{font-family:var(--display);font-weight:400;font-size:20px;line-height:1;font-variant-numeric:tabular-nums;}
+.pfstats b small{font-family:var(--ui);font-size:10px;opacity:.6;margin-left:2px;letter-spacing:0;}
+.pfstats .iss b{color:#e85a4a;text-shadow:0 0 10px rgba(232,90,74,.45);}
+.pfseal{position:absolute;z-index:2;right:12px;bottom:10px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:2px;
+  background:#a8322a;color:#f2ede1;font-family:var(--display);font-size:13px;transform:rotate(-5deg);opacity:.85;}
+.pfpetal{position:absolute;inset:0;z-index:1;pointer-events:none;}
+@media (max-width:520px){
+  .pfcard{aspect-ratio:auto;max-height:none;grid-template-rows:auto auto auto;min-height:0;}
+  .pfmain{max-width:none;}
+  .pffav{position:relative;inset:auto;width:100%;margin:4px 0 2px;}
+  .pfkat{width:92%;transform:rotate(-8deg);}
+}
+
+
+/* ---------- 背景の札（プレート）。名前は supabase/profile.sql の plate_catalog ---------- */
+/* 墨: 墨のにじみと円相 */
+.pl-sumi{color:#e9e2cf;background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M150 40a64 64 0 1 1-96 18' fill='none' stroke='%23e9e2cf' stroke-opacity='.10' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E") right -30px center/auto 130% no-repeat,
+  radial-gradient(ellipse 60% 70% at 18% 75%, rgba(233,226,207,.07), transparent 70%),
+  linear-gradient(105deg,#25261f,#121310 60%,#0b0c09);}
+/* 竹林: 薄い竹と節 */
+.pl-take{color:#e9e2cf;background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 300 160' preserveAspectRatio='none'%3E%3Cg fill='%2398b088' fill-opacity='.13'%3E%3Crect x='170' width='14' height='160'/%3E%3Crect x='212' width='9' height='160'/%3E%3Crect x='250' width='18' height='160'/%3E%3Crect x='286' width='7' height='160'/%3E%3C/g%3E%3Cg fill='%230d120c' fill-opacity='.5'%3E%3Crect x='170' y='38' width='14' height='2'/%3E%3Crect x='170' y='104' width='14' height='2'/%3E%3Crect x='212' y='70' width='9' height='2'/%3E%3Crect x='250' y='22' width='18' height='2'/%3E%3Crect x='250' y='96' width='18' height='2'/%3E%3Crect x='286' y='56' width='7' height='2'/%3E%3C/g%3E%3C/svg%3E") center/100% 100% no-repeat,
+  radial-gradient(ellipse at 85% 0%, rgba(200,220,170,.12), transparent 60%),
+  linear-gradient(100deg,#1c2519,#121a12 55%,#0b100b);}
+/* 月夜: 藍の夜と月 */
+.pl-tsuki{color:#e9e2cf;background:
+  radial-gradient(circle at 82% 26%, #ece6d2 0 26px, rgba(236,230,210,.28) 28px, rgba(170,180,220,.10) 60px, transparent 120px),
+  linear-gradient(180deg, transparent 62%, rgba(10,12,24,.6)),
+  linear-gradient(110deg,#1b2033,#121627 55%,#0a0c16);}
+/* 桜華: 赤黒と散る花びら（絶） */
+.pl-ouka{color:#f6e9ea;background:
+  radial-gradient(ellipse 70% 90% at 88% 30%, rgba(235,20,55,.38), transparent 65%),
+  radial-gradient(ellipse 50% 60% at 10% 110%, rgba(120,6,24,.55), transparent 70%),
+  linear-gradient(115deg,#2a050c,#14020a 55%,#060104);
+  box-shadow:0 0 0 1px rgba(235,40,70,.45), 0 0 34px rgba(235,20,55,.22), 0 14px 40px rgba(0,0,0,.6);}
+.pfcard.pl-ouka .pfpetal{background:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 240 160'%3E%3Cg fill='%23eb2a4a'%3E%3Cpath d='M30 30c6-8 16-6 16 2-4 6-12 6-16-2z' fill-opacity='.7'/%3E%3Cpath d='M150 20c5-7 14-5 14 2-4 5-11 5-14-2z' fill-opacity='.5' transform='rotate(30 157 22)'/%3E%3Cpath d='M200 90c6-8 16-6 16 2-4 6-12 6-16-2z' fill-opacity='.8' transform='rotate(-40 208 92)'/%3E%3Cpath d='M90 120c4-6 11-4 11 2-3 4-8 4-11-2z' fill-opacity='.45'/%3E%3Cpath d='M120 70c5-7 13-5 13 2-3 5-10 5-13-2z' fill-opacity='.35' transform='rotate(70 126 72)'/%3E%3Cpath d='M220 140c4-6 11-4 11 2-3 4-8 4-11-2z' fill-opacity='.6'/%3E%3C/g%3E%3C/svg%3E") 0 0/240px 160px repeat;
+  animation:pfdrift 18s linear infinite;opacity:.9;}
+.pfcard.pl-ouka .pfnick{background:linear-gradient(90deg,#c0122f,rgba(120,6,24,.8) 70%,rgba(120,6,24,0));}
+.pfcard.pl-ouka .pfseal{background:#1a0207;color:#eb2a4a;box-shadow:inset 0 0 0 1px #eb2a4a;}
+@keyframes pfdrift{from{background-position:0 0;}to{background-position:-240px 160px;}}
+@media (prefers-reduced-motion: reduce){.pfcard,.pfcard.pl-ouka .pfpetal{animation:none;}}
+
+/* ---------- 書き換え・神様の欄 ---------- */
+.pfedit{display:flex;flex-direction:column;gap:12px;margin-top:14px;}
+.pff{display:flex;flex-direction:column;gap:5px;font-size:12px;letter-spacing:.1em;}
+.pff > span{opacity:.65;}
+.pfrow{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+#pf input,#pf select,#pf textarea{font-family:var(--ui);font-size:16px;color:#e9e2cf;background:rgba(233,226,207,.06);border:1px solid rgba(233,226,207,.25);border-radius:4px;
+  padding:9px 10px;box-sizing:border-box;width:100%;user-select:text;-webkit-user-select:text;letter-spacing:.02em;}
+#pf select option{background:#1a1b16;}
+#pf textarea{resize:vertical;line-height:1.6;}
+#pf input:focus,#pf select:focus,#pf textarea:focus{outline:none;border-color:#a8322a;}
+.pfchips{display:flex;flex-wrap:wrap;gap:8px;}
+.pfchips button{display:flex;align-items:center;gap:7px;font-family:var(--display);font-size:16px;letter-spacing:.08em;color:#e9e2cf;background:rgba(233,226,207,.05);
+  border:1px solid rgba(233,226,207,.25);border-radius:4px;padding:6px 12px;cursor:pointer;}
+.pfchips button.on{border-color:#a8322a;background:rgba(168,50,42,.28);box-shadow:inset 0 0 0 1px #a8322a;}
+.pfnone{font-size:12px;opacity:.45;align-self:center;}
+.pfsw{display:inline-block;width:34px;height:20px;border-radius:2px;box-shadow:0 0 0 1px rgba(233,226,207,.25);}
+.pfpv{margin:0;font-size:13px;line-height:1.7;opacity:.85;}
+.pfpv b{font-family:var(--display);font-weight:400;font-size:18px;color:#e8c35a;}
+.pfpv small{opacity:.5;margin-left:1px;}
+.pfsent{list-style:none;margin:0;padding:0;}
+.pfsent li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 2px;border-bottom:1px solid rgba(233,226,207,.08);font-size:12px;}
+.pfsent li b{font-family:var(--display);font-weight:400;font-size:15px;}
+.pfsent li time{grid-column:1 / 3;opacity:.45;font-size:11px;}
+.pfsent li.none{opacity:.5;display:block;}
+
+/* ---------- 文箱 ---------- */
+.pfmail{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.pfmail li{border-bottom:1px solid rgba(233,226,207,.08);}
+.pfmh{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;color:#e9e2cf;padding:12px 2px;cursor:pointer;}
+.pfseal2{flex:none;display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid rgba(233,226,207,.3);border-radius:2px;
+  font-family:var(--display);font-size:17px;transform:rotate(-3deg);}
+.pfmail li.new .pfseal2{background:#a8322a;border-color:#a8322a;color:#f2ede1;}
+.pfms{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.pfms b{font-family:var(--display);font-weight:400;font-size:18px;letter-spacing:.08em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pfms small{font-size:11px;opacity:.5;letter-spacing:.06em;}
+.pfnew{font-style:normal;font-family:var(--display);font-size:12px;color:#e85a4a;}
+.pfmb{padding:0 4px 16px 48px;font-size:14px;line-height:1.8;animation:pfin .35s ease both;}
+.pfmb p{margin:0 0 8px;}
+.pfgifts{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 12px;}
+.pfg{font-family:var(--display);font-size:15px;letter-spacing:.06em;padding:3px 10px;border:1px solid rgba(232,195,90,.5);color:#e8c35a;border-radius:3px;background:rgba(232,195,90,.06);}
+.pfg.nick,.pfg.plate{border-color:rgba(232,90,74,.6);color:#f0a59a;background:rgba(168,50,42,.12);}
+.pfdone{margin:0;font-size:12px;opacity:.5;letter-spacing:.14em;}
+.pfgot{margin:4px 0;padding:10px 12px;border-left:2px solid #a8322a;background:rgba(168,50,42,.12);font-size:14px;line-height:1.7;}
+.pfgot b{font-family:var(--display);font-weight:400;font-size:17px;letter-spacing:.1em;}
+
+/* ---------- お知らせ ---------- */
+.pfnews{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;}
+.pfnews li{border-bottom:1px solid rgba(233,226,207,.08);}
+.pfnh{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;width:100%;text-align:left;background:none;border:none;color:#e9e2cf;padding:12px 2px;cursor:pointer;align-items:center;}
+.pfnh b{font-family:var(--display);font-weight:400;font-size:18px;letter-spacing:.06em;}
+.pfnh time{grid-column:2;font-size:11px;opacity:.45;}
+.pfkind{grid-row:1 / 3;font-size:10.5px;letter-spacing:.1em;padding:3px 6px;border-radius:2px;border:1px solid rgba(233,226,207,.35);white-space:nowrap;align-self:start;margin-top:3px;}
+.k-important .pfkind{background:#a8322a;border-color:#a8322a;color:#f2ede1;}
+.k-maint .pfkind{border-color:#e8c35a;color:#e8c35a;}
+.k-update .pfkind{border-color:#8fb3a0;color:#a9cbb8;}
+.pfnb{padding:0 4px 16px;font-size:14px;line-height:1.85;animation:pfin .35s ease both;}
+.pfnb p{margin:0 0 10px;}
+
+/* 大事なお知らせ（タイトルで一度だけ） */
+#pf_pop{position:fixed;inset:0;z-index:25;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(6,6,5,.72);}
+#pf_pop[hidden]{display:none;}
+.pfpsheet{position:relative;max-width:520px;width:100%;max-height:calc(100dvh - 32px);overflow:auto;box-sizing:border-box;padding:26px 24px 20px;color:#e9e2cf;
+  background:linear-gradient(160deg,#1d1e18,#0f100d);border:1px solid rgba(233,226,207,.2);box-shadow:0 20px 60px rgba(0,0,0,.6), inset 3px 0 0 #a8322a;animation:pfin .45s ease both;}
+.pfpk{display:inline-block;font-size:11px;letter-spacing:.2em;padding:3px 8px;background:#a8322a;color:#f2ede1;border-radius:2px;}
+.pfpsheet h2{margin:12px 0 2px;font-family:var(--display);font-weight:400;font-size:24px;letter-spacing:.1em;line-height:1.35;}
+.pfpsheet time{font-size:11px;opacity:.45;}
+.pfpb{margin:14px 0 8px;font-size:14px;line-height:1.85;}
+.pfpb p{margin:0 0 10px;}
+.pfpact{display:flex;align-items:center;justify-content:center;gap:16px;}
+
+/* 一覧の名前に添える二つ名と、触れる名前 */
+.pftag{display:inline-block;margin-left:.5em;font-family:var(--display);font-size:11px;letter-spacing:.12em;padding:1px 6px;color:#f2ede1;
+  background:linear-gradient(90deg,#a8322a,rgba(168,50,42,.6));vertical-align:.2em;}
+[data-pid]{cursor:pointer;}

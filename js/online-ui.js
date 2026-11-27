@@ -104,7 +104,7 @@
       const busy = !!N.waiting || !!(window.IssenMatch && IssenMatch.active);
       $('o_list').innerHTML = N.friends.length ? N.friends.map(f => {
         const s = N.statusOf(f.id), [lab, cls] = STATUS[s];
-        return '<li><span class="odot ' + cls + '"></span><span class="onm">' + esc(f.name) + '</span><span class="ost">' + lab + '</span>' +
+        return '<li><span class="odot ' + cls + '"></span><span class="onm" data-pid="' + esc(f.id) + '">' + esc(f.name) + '</span><span class="ost">' + lab + '</span>' +
           '<button type="button" class="obtn pri" data-act="inv" data-id="' + f.id + '"' + (s === 'online' && !busy ? '' : ' disabled') + '>招待</button>' +
           '<button type="button" class="obtn pri" data-act="inv2" data-id="' + f.id + '"' + (s === 'online' && !busy ? '' : ' disabled') + ' title="新・一閃（動いて斬り合う）で招待">新・一閃</button>' +
           '<button type="button" class="obtn" data-act="del" data-id="' + f.id + '">削除</button></li>';

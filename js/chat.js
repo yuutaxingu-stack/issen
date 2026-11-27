@@ -237,6 +237,7 @@
   function msgSheet(m){
     const mine = m.author === me(), friend = N.friends.some(f => f.id === m.author);
     let h = '<div class="csh">' + (mine ? '自分の発言' : esc(nameOf(m.author)) + 'さん') + '</div><div class="cops">';
+    if (window.IssenProfile) h += '<button type="button" class="obtn" data-pid="' + esc(m.author) + '">名乗りを見る</button>';
     if (mine) h += '<button type="button" class="obtn" data-op="del" data-id="' + m.id + '">この発言を消す</button>';
     else {
       if (friend && !isDm(m)) h += '<button type="button" class="obtn" data-op="at" data-id="' + m.author + '">@名指しする</button>';

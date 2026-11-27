@@ -126,5 +126,6 @@
     if (u) { uid = u; start(u); }
   });
 
-  window.IssenSave = { status: () => ({ uid, loaded, pending: queue().length, last }), flush };
+  window.IssenSave = { status: () => ({ uid, loaded, pending: queue().length, last }), flush,
+    applyServer: d => apply(d) };   // 文箱で受け取った銭・玉鋼など、サーバーが返した持ち物を画面に入れる
 })();

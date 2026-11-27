@@ -33,7 +33,7 @@ function drain(s){ const e = s.ev; s.ev = []; return e; }
   const play = () => { const s = new A.Sim(); const r = R(7); for (let k = 0; k < 3000; k++) { const g = () => I({ L: r() < .2, R: r() < .3, U: r() < .1, D: r() < .1, A: r() < .25, J: r() < .08, G: r() < .15 }); s.step([g(), g()]); if (s.over) s.resetRound(); } return s.hash(); };
   ok(play() === play(), '同じ操作で同じ盤面（ずれない）'); }
 // 9) 時間切れでサドンデス、一発で刹那
-{ const s = sim(60); s.frame = A.C.roundF - 1; run(s, 2); ok(s.sd, 'サドンデスに入る'); run(s, 1, () => I({ A: 1 })); run(s, 20); ok(s.result && s.result.name === '刹那', 'サドンデスは一発で刹那'); }
+{ const s = new A.Sim({ toWin: 2 }); s.p[0].x = 600 * A.FP; s.p[1].x = 660 * A.FP; s.frame = A.C.roundF - 1; run(s, 2); ok(s.sd, 'サドンデスに入る'); run(s, 1, () => I({ A: 1 })); run(s, 20); ok(s.result && s.result.name === '刹那', 'サドンデスは一発で刹那'); }
 // 10) 素早く倒すとダッシュ、歩きより速い
 { const s = sim(600); run(s, 1, () => I({ R: 1, F: 1 })); ok(s.p[0].st === 'dash', 'ダッシュに入る'); const x0 = s.p[0].x; run(s, 10, () => I({ R: 1 })); ok(s.p[0].x - x0 === 10 * A.PH.dash, 'ダッシュの速さ'); run(s, 1); ok(s.p[0].st === 'idle', '離すと止まる'); }
 // 11) 相手の後ろに回っても自動で振り向かない
@@ -160,5 +160,8 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
     for (let f = 1; f < 400 && (a < 0 || d < 0); f++) { s.step([I(), I()]); for (const e of s.ev) if (e.t === 'hit' && e.by === 0) { hit = true; used = used || e.mv; } s.ev = [];
       if (!hit) continue; if (a < 0 && FREE.includes(s.p[0].st) && s.p[0].ground && !s.hitstop) a = f; if (d < 0 && FREE.includes(s.p[1].st) && !s.hitstop) d = f; }
     ok(used === mv && d > a, `${mv} 相手の体力${hp / 100}: 使った側が先に動ける（${d - a}F 早い）`); } }
+
+// 稽古は時間切れなし
+{ const s = new A.Sim({ training: true }); for (let k = 0; k < A.C.roundF + A.C.sdF + 60; k++) s.step([I(), I()]); ok(!s.sd && !s.over, '稽古は時間切れにならない'); }
 
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

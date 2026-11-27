@@ -713,6 +713,7 @@ Sim.prototype.step = function(inputs){
     }
   }
   if (this.over) return;
+  if (this.opts.training) return; // 稽古は時間切れなし
   if (!this.sd && this.frame >= C.roundF) { this.sd = true; this.sdStart = this.frame; this.ev.push({ t: 'sd' }); }
   if (this.sd && this.frame - this.sdStart >= C.sdF) {
     this.over = true; this.result = { winner: -1, how: 'draw', name: '睨み合い', tier: '分', frame: this.frame, matchOver: false };

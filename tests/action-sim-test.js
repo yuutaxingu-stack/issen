@@ -282,4 +282,11 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   for (let t = 0; t < 3; t++) { s.step([I({ K: 'u' }), I()]); got.push(s.p[0].mv); for (let k = 0; k < 150; k++) s.step([I({ R: 1 }), I()]); s.p[0].x = 400 * A.FP; }
   ok(got.every(m => m === 'hane'), '地上で横へ羽跳しても、次もまた出せる ' + got); }
 
+// 八咫烏は自分の烏が飛んでいる間は出せない（消えたらまた出せる）
+{ const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 300 * A.FP; s.p[1].x = 1500 * A.FP; s.p[0].face = 1;
+  s.step([I({ K: 'd' }), I()]); for (let k = 0; k < 45; k++) s.step([I(), I()]);
+  const flying = s.pj.some(q => q.crow); s.step([I({ K: 'd' }), I()]); const blocked = s.p[0].st !== 'atk';
+  for (let k = 0; k < 80; k++) s.step([I(), I()]); s.step([I({ K: 'd' }), I()]);
+  ok(flying && blocked && s.p[0].mv === 'yatagarasu', '烏が飛んでいる間は八咫烏を出せず、消えたら出せる'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

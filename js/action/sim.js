@@ -226,6 +226,7 @@ Sim.prototype.startMove = function(p, id){
     if (t && !t[k]) { t[k] = true; p.boost = t.stage; }
     if (id === 'ten' && p.boost) id = ['ten', 'tenK', 'tenM', 'tenR'][p.boost];
   }
+  if (id === 'yatagarasu' && this.pj.some(q => q.crow && q.o === p.i)) { p.buf.A = 0; p.wk = null; p.spB = 0; return; } // 自分の烏が飛んでいる間は次の八咫烏を出せない
   if (id === 'ecl') id = ECL[p.ecl] || 'shoki';
   p.sjOK = false;
   if (id === 'shoki') { p.ecl = 1; p.chg = 0; } else if (id === 'shokujin') { p.ecl = 2; } else if (id === 'fukuen') p.chg = 0;

@@ -268,11 +268,11 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   const half = f.p[0].ecl; f.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < 60; k++) f.step([I({ H: 1 }), I()]);
   ok(half === 2 && f.p[0].ecl === 0, '復円: 途中で離しても溜めは残り、溜めきると初虧に戻る'); }
 
-// 八咫烏（下＋技）: 前へ飛ぶ烏がつかむ。ガードしていても捕まえ、手前へ引き寄せる。復円の溜めは相手の攻撃で止まる
+// 八咫烏（下＋技）: 烏が捕まえたら演出で二人とも止まり、終わると同時に動ける。捕まった側は必ずダウン（ガード中でも捕まえる）
 { const mk = d => { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };
-  for (const g of [0, 1]) { const s = mk(300), ev = []; s.step([I({ K: 'd' }), I({ G: g })]); for (let k = 0; k < 60; k++) { s.step([I(), I({ G: g })]); ev.push(...drain(s)); }
-    const h = ev.find(e => e.t === 'hit' && e.mv === 'crowG'), b = ev.find(e => e.t === 'block');
-    ok(h && !b && s.p[1].x < 900 * A.FP, '八咫烏が' + (g ? 'ガード中' : '立っている') + 'の相手を捕まえて引き寄せる (' + (s.p[1].x / 100 | 0) + 'px)'); }
+  for (const g of [0, 1]) { const s = mk(300), ev = []; s.step([I({ K: 'd' }), I({ G: g })]); let locked = 0, endK = -1, st = '';
+    for (let k = 0; k < 140; k++) { s.step([I({ R: 1 }), I({ G: g, L: 1 })]); ev.push(...drain(s)); if (s.lock) locked++; else if (locked && endK < 0) { endK = k; st = s.p[0].st + '/' + s.p[1].st; } }
+    ok(ev.some(e => e.t === 'crowLock') && locked >= A.CROW.lock - 1 && (st.startsWith('walk') || st.startsWith('idle')) && st.endsWith('down'), '八咫烏が' + (g ? 'ガード中' : '立っている') + 'の相手を捕まえ、演出' + locked + 'Fの後 当てた側は動けて相手はダウン (' + st + ')'); }
   const f = mk(70); f.p[0].ecl = 2; f.step([I({ K: 'r', H: 1 }), I()]); let hitIn = false;
   for (let k = 0; k < 40; k++) { f.step([I({ H: 1 }), I(k === 5 ? { A: 1, C: 'n' } : {})]); if (f.p[0].st === 'hit' || f.p[0].st === 'tumble') hitIn = true; }
   ok(hitIn && f.p[0].mv !== 'fukuen' && f.p[0].fuku > 0 && f.p[0].fuku < A.FUKU.max && f.p[0].ecl === 2, '復円の溜めは相手の攻撃で止まる（溜まった分は残る ' + f.p[0].fuku + 'F）'); }

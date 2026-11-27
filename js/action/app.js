@@ -728,6 +728,21 @@ function drawOukaFx(){
     cx.restore();
   }
 }
+function drawCrow(x, y, d, z, fr){ // 羽ばたく黒い烏
+  const fl = Math.sin(fr * 0.5) * 14;
+  cx.save(); cx.translate(x, y); cx.scale(d * z, z); cx.fillStyle = '#0c0c0e'; cx.strokeStyle = 'rgba(255,255,255,.75)'; cx.lineWidth = 1.2;
+  cx.beginPath(); cx.ellipse(0, 0, 22, 9, 0, 0, Math.PI * 2); cx.fill(); cx.stroke();
+  cx.beginPath(); cx.arc(22, -3, 7, 0, Math.PI * 2); cx.fill(); cx.beginPath(); cx.moveTo(28, -4); cx.lineTo(38, -1); cx.lineTo(28, 1); cx.fill();
+  for (const sg of [1, -1]) { cx.beginPath(); cx.moveTo(-6, 0); cx.quadraticCurveTo(-2, -20 * sg - fl * sg * 0.3, -26, -24 * sg - fl * sg); cx.quadraticCurveTo(-14, -8 * sg, 8, 0); cx.closePath(); cx.fill(); cx.stroke(); }
+  cx.beginPath(); cx.moveTo(-20, 0); cx.lineTo(-34, -7); cx.lineTo(-32, 0); cx.lineTo(-34, 7); cx.closePath(); cx.fill();
+  cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(24, -5, 1.6, 0, Math.PI * 2); cx.fill(); cx.restore();
+}
+function drawCrowLock(){ // 八咫烏の演出（仮）: 暗くなり、捕まった相手のまわりを烏が回る
+  const L = sim.lock; if (!L) return; const d = sim.p[L.d], t = A.CROW.lock - L.f, u = t / A.CROW.lock, k = Math.min(1, t / 8) * Math.min(1, L.f / 8);
+  cx.save(); cx.fillStyle = `rgba(6,6,8,${0.45 * k})`; cx.fillRect(0, 0, W, H); cx.restore();
+  const x = wx(d.x / FP), y = wy(d.y / FP + 60);
+  for (let n = 0; n < 7; n++) { const a = n * 0.8976 + t * 0.16, R = (90 - 50 * u) * cam.z; drawCrow(x + Math.cos(a) * R, y + Math.sin(a) * R * 0.6, Math.sin(a) > 0 ? -1 : 1, cam.z * 0.8, t + n * 3); }
+}
 function drawTrails(){
   const fr0 = GAME.t || 0;
   for (let i = 0; i < 2; i++) {
@@ -1184,20 +1199,14 @@ function drawView(v){
       for (let k = 0; k < 5; k++) { const a = FR * 0.25 + k * 1.2566, rr = r * (0.35 + 0.45 * ((k * 37) % 10) / 10);
         cx.save(); cx.translate(Math.cos(a) * rr, Math.sin(a) * rr); cx.rotate(a + FR * 0.1); cx.fillStyle = SAKURA[k % 3]; cx.beginPath(); cx.ellipse(0, 0, 7 * cam.z, 4 * cam.z, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); }
       cx.restore(); continue; }
-    if (q.crow) { // 八咫烏: 羽ばたく黒い烏（演出はあとで作り込む）
-      const x = wx(q.x / FP), y = wy(q.y / FP), d = Math.sign(q.vx) * MIR, z = cam.z, fl = Math.sin(FR * 0.5) * 14;
-      cx.save(); cx.translate(x, y); cx.scale(d * z, z); cx.fillStyle = '#0c0c0e'; cx.strokeStyle = 'rgba(255,255,255,.75)'; cx.lineWidth = 1.2;
-      cx.beginPath(); cx.ellipse(0, 0, 22, 9, 0, 0, Math.PI * 2); cx.fill(); cx.stroke();
-      cx.beginPath(); cx.arc(22, -3, 7, 0, Math.PI * 2); cx.fill(); cx.beginPath(); cx.moveTo(28, -4); cx.lineTo(38, -1); cx.lineTo(28, 1); cx.fill();
-      for (const sg of [1, -1]) { cx.beginPath(); cx.moveTo(-6, 0); cx.quadraticCurveTo(-2, -20 * sg - fl * sg * 0.3, -26, -24 * sg - fl * sg); cx.quadraticCurveTo(-14, -8 * sg, 8, 0); cx.closePath(); cx.fill(); cx.stroke(); }
-      cx.beginPath(); cx.moveTo(-20, 0); cx.lineTo(-34, -7); cx.lineTo(-32, 0); cx.lineTo(-34, 7); cx.closePath(); cx.fill();
-      cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(24, -5, 1.6, 0, Math.PI * 2); cx.fill(); cx.restore(); continue; }
+    if (q.crow) { drawCrow(wx(q.x / FP), wy(q.y / FP), Math.sign(q.vx) * MIR, cam.z, FR); continue; } // 八咫烏（演出はあとで作り込む）
     const x = wx(q.x / FP), y = wy(q.y / FP), d = Math.sign(q.vx) * MIR, r = 30 * cam.z;
     cx.save(); cx.globalCompositeOperation = 'lighter'; cx.translate(x, y); cx.scale(d, 1);
     for (let k = 0; k < 3; k++) { cx.fillStyle = `rgba(245,240,228,${0.6 - k * 0.18})`; cx.beginPath();
       cx.arc(-k * 14 * cam.z, 0, r, -1.2, 1.2); cx.arc(-k * 14 * cam.z - r * 0.45, 0, r * 0.82, 1.1, -1.1, true); cx.closePath(); cx.fill(); }
     cx.restore();
   }
+  drawCrowLock();
   // カウンターの構え（受付中は刃が光る）
   for (const p of sim.p) if (p.st === 'atk' && p.mv === 'counter') { const m = MV.counter; if (p.mvf >= m.s && p.mvf < m.s + m.a) {
     cx.strokeStyle = `rgba(255,246,220,${0.5 + Math.sin(FR * 0.6) * 0.3})`; cx.lineWidth = 3; cx.beginPath(); cx.arc(wx(p.x / FP), wy(p.y / FP + 70), 44 * cam.z, 0, Math.PI * 2); cx.stroke(); } }

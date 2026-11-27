@@ -109,7 +109,7 @@ const HANE = { sp: 3400, d1: 9, gap: 5, d2: 9, win: 9 }; // 羽跳: 速さ（1F�
 const ECL = ['shoki', 'shokujin', 'fukuen'], ECLN = ['初虧', '食甚', '復円'];
 const SHOKI = { max: 56, d0: 90, dPer: 7, dw: 90, dh: 100 }; // dw・dh = 前の索敵の幅・高さ（相手が入ったら斬る）   // 初虧: 溜めは最大56F、踏み込みは 90px + 溜め1Fごとに7px（2026-11-28 ユーザーの調整）
 const FUKU = { max: 90 };                    // 復円: 合わせて90F溜めると初虧に戻る（途中で離しても溜めは残る）
-const CROW = { speed: 700, life: 70, w: 64, h: 54, oy: 70 }; // 八咫烏: つかむ烏の速さ・飛ぶF・大きさ・高さ
+const CROW = { speed: 700, life: 70, w: 64, h: 54, oy: 70, lock: 60 }; // lock = 当たってからの演出のF（二人とも動けず、終わると同時に動ける。食らった側はダウン） // 八咫烏: つかむ烏の速さ・飛ぶF・大きさ・高さ
 const SJ = { tight: 0, K: 1 };                     // 食甚: 羽跳の二度当ての後、最速で出せばちょうど当たる（tight = 余裕のF）
 const PETAL = { slow: 0.4, w: 76, h: 76, life: 900, grow: 500, maxW: 4, dmgPer: 800, maxDm: 250 };
 const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
@@ -154,7 +154,7 @@ Sim.prototype.resetRound = function(){
   if (this.opts.kits) this.p.forEach((p, i) => { p.kit = this.opts.kits[i] || 'common'; });
   if (this.opts.dashRoll) this.p.forEach((p, i) => { p.dashRoll = !!this.opts.dashRoll[i]; });
   this.frame = 0; this.hitstop = 0; this.sd = false; this.sdStart = 0;
-  this.over = false; this.result = null; this.ev = []; this.pj = [];
+  this.over = false; this.result = null; this.ev = []; this.pj = []; this.lock = null;
   this.roundNo++;
 };
 
@@ -640,6 +640,7 @@ Sim.prototype.moveShots = function(){
     // 花嵐・飛ぶ斬撃: 撃った側の硬直が12F以上残っているうちに当たったら（ガードでも）、残りの硬直を2F減らす（一つの技で一度）
     if (a.st === 'atk' && (a.mv === 'hana' || a.mv === 'shot') && !a.pjCut && MV[a.mv].total - a.mvf >= 12) { a.mvf += 2; a.pjCut = true; }
     this.applyHit(a, d, MV[q.mv || 'shotP'], { a: a.i, dst: d.st, dmv: d.mv, dmvf: d.mvf, dground: d.ground }, q);
+    if (q.crow && !this.over) { this.lock = { f: CROW.lock, a: a.i, d: d.i }; d.vx = d.vy = 0; this.hitstop = 0; this.ev.push({ t: 'crowLock', p: d.i, by: a.i, x: d.x, y: d.y }); } // 八咫烏: 捕まえたら演出へ
   }
   this.pj = this.pj.filter(q => q.life > 0 && !q.out);
 };
@@ -786,6 +787,15 @@ Sim.prototype.finish = function(w, l, how, m, s){
 Sim.prototype.step = function(inputs){
   if (this.over) return;
   const P = this.p;
+  if (this.lock) { // 八咫烏の演出: 二人とも止まる。終わると当てた側は動け、食らった側は必ずダウン
+    if (--this.lock.f <= 0) { const a = P[this.lock.a], d = P[this.lock.d]; this.lock = null;
+      if (a.st === 'atk') { a.st = a.ground ? 'idle' : 'air'; a.mv = null; a.power = 0; }
+      if (!d.ground) { d.y = 0; d.plat = -1; d.ground = true; }
+      d.st = 'down'; d.f = C.downF; d.downT = 0; d.vx = 0; d.vy = 0; d.hs = 0; d.kd = false; d.hold = 0;
+      this.ev.push({ t: 'down', p: d.i, x: d.x, y: d.y }); this.ev.push({ t: 'crowEnd', p: a.i }); }
+    for (const p of P) p.inp = inputs[p.i] || NOIN;
+    return;
+  }
   if (this.hitstop > 0) {
     this.hitstop--;
     for (const p of P) { // 止まっている間も押した瞬間は覚えておく
@@ -836,7 +846,7 @@ Sim.prototype.step = function(inputs){
 Sim.prototype.hash = function(){
   let h = 2166136261 >>> 0;
   const mix = v => { h ^= (v | 0); h = Math.imul(h, 16777619) >>> 0; };
-  mix(this.frame); mix(this.hitstop); for (const q of this.pj) { mix(q.x); mix(q.y); mix(q.life); }
+  mix(this.frame); mix(this.hitstop); mix(this.lock ? this.lock.f : 0); for (const q of this.pj) { mix(q.x); mix(q.y); mix(q.life); }
   for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); mix(p.tree.n); mix(p.tree.big); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
   return h;
 };

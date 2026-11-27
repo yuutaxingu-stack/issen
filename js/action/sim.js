@@ -66,6 +66,9 @@ const MV = {
   tenK:  { n:'天桜（開花）', k:'a', s:5, a:12, r:12, land:20, dmg:600, gd:1000, hs:86, kb:[150,2300], arc:[-60,95], rise:1, kd:1, riseV:2300, after:'fall', dfall:1, pose:'rise' },
   tenM:  { n:'天桜（満開）', k:'a', s:5, a:12, r:12, land:20, dmg:700, gd:1200, hs:86, kb:[150,2300], arc:[-60,95], rise:1, kd:1, riseV:2300, after:'fall', dfall:1, pose:'rise', aura:[-75,0,150,160] },
   tenR:  { n:'天桜（落花）', k:'a', s:5, a:12, r:6, land:20, dmg:700, gd:1200, hs:54, kb:[150,1850], arc:[-60,95], rise:1, dfall:1, kd:1, riseV:2300, pose:'rise', aura:[-75,0,150,160], next:'tenFall' },
+  // 八咫（2026-11-28）: 羽跳 = 8方向へまっすぐ二度跳ぶ。二度目は跳び終わりに向きを入れたときだけ。二度とも当てると相手に大きい硬直（haneX）
+  hane:  { n:'羽跳', k:'a', s:6, a:19, r:14, land:14, dmg:400, gd:700, hs:24, blk:-4, kb:[120,320], box:[-38,6,76,104], arc:[0,0], hane:1, after:'fall', noLate:1 },
+  haneX: { n:'羽跳（二度当て）', k:'a', s:6, a:19, r:14, land:14, dmg:500, gd:900, hs:60, blk:-4, kb:[320,900], box:[-38,6,76,104], arc:[0,0], hane:1, noBox:1, noLate:1 },
   tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
   petalG:{ n:'天桜（落花・着地の花）', k:'p', s:1, a:1, r:0, dmg:250, gd:500, hs:12, blk:-2, kb:[160,0], flinch:1 },
   plant: { n:'植樹', k:'g', s:14, a:1, r:16, noBox:1, plant:1, arc:[-70,-85] },
@@ -90,11 +93,13 @@ function curBox(p){
 const SMASH_MIN = 12, SMASH_MAX = 40;
 /* 斬ボタン＋向きで出る特殊技。刀ごとに入れ替える（今は共通の一組だけ） */
 const KIT = { common: { n: '共通', s1: 'shot', s1a: 'shot', s2: 'rise', s2a: 'rise', s3: 'counter', s3a: 'counter' },
+  yata: { n: '八咫', s1: 'shot', s1a: 'shot', s2: 'hane', s2a: 'hane', s3: 'counter', s3a: 'counter' },
   ouka: { n: '桜華', s1: 'hana', s1a: 'hana', s2: 'ten', s2a: 'ten', s3: 'plant', s3a: 'plant' } };
 /* 桜の木: 耐久は体力の4割。段階 1開花 2満開 3落花。u1/u2 = その段階の強化を花嵐/天桜で使ったか */
 const TREE = { hp: 4000, name: ['', '開花', '満開', '落花'], box: [null, [-22, 0, 44, 80], [-60, 0, 120, 170], [-60, 0, 120, 170]] };
 // 花嵐の当たる大きさ（2026-11-26 面積で3倍に）。射程は無限で壁まで飛ぶ。飛んだ距離 grow px ごとに大きさ +1倍（最大 maxW 倍）、
 // dmgPer px ごとに威力 +100%（最大 maxDm%）。遠いほど花が散って広く、重くなる
+const HANE = { sp: 2600, d1: 7, gap: 5, d2: 7 }; // 羽跳: 速さ（1Fに進むpx×100）、一度目・間・二度目のF（d1+gap+d2 = hane の持続）
 const PETAL = { slow: 0.4, w: 76, h: 76, life: 900, grow: 500, maxW: 4, dmgPer: 800, maxDm: 250 };
 const SHOT = { speed: 900, life: 45, w: 48, h: 56, ox: 60, oy: 62 };
 /* 回避（2026-11-26 ユーザーの表） i0〜i1 が無敵、total が全体 */
@@ -121,7 +126,7 @@ function newPlayer(i){
   return { i, x: (i ? 1000 : 600) * FP, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, ground: true, plat: -1,
     st: 'idle', f: 0, mv: null, mvf: 0, hitDone: false, chainReq: false, chargeF: 0, power: 0,
     jumps: 1, adUsed: false, ff: false, dropF: 0,
-    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false,
+    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
     stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
@@ -211,6 +216,7 @@ Sim.prototype.startMove = function(p, id){
     if (id === 'ten' && p.boost) id = ['ten', 'tenK', 'tenM', 'tenR'][p.boost];
   }
   p.treeHit = false;
+  if (id === 'hane') { p.haneUsed = true; p.haneN = 0; p.hane2 = false; p.hdx = 0; p.hdy = 1000; }
   p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null; p.wk = null; p.spB = 0;
   if (id === 'iai' || id === 'airiai') { p.buf.G = 0; const o = this.p[1 - p.i]; if (o.x !== p.x) p.face = sgn(o.x - p.x); }
   this.ev.push({ t: 'start', p: p.i, mv: id });
@@ -220,7 +226,7 @@ Sim.prototype.startMove = function(p, id){
 /* 技スティック（設定）: 弾いた向きの刀の技。向きなし＝特殊技1、横＝その向きへ特殊技1、上＝特殊技2、下＝特殊技3 */
 Sim.prototype.kitByStick = function(p, air){
   const kit = KIT[p.kit] || KIT.common, k = p.wk.d; p.wk = null;
-  if (k === 'u') return this.startMove(p, air ? kit.s2a : kit.s2);
+  if (k === 'u') { const id = air ? kit.s2a : kit.s2; if (id === 'hane' && p.haneUsed) { p.buf.A = 0; return; } return this.startMove(p, id); }
   if (k === 'd') { const id = air ? kit.s3a : kit.s3; if (id === 'plant' && p.tree) { p.buf.A = 0; return; } return this.startMove(p, id); }
   if (air) { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; }
   if (k === 'l' || k === 'r') p.face = k === 'r' ? 1 : -1;
@@ -254,7 +260,7 @@ Sim.prototype.airAttack = function(p){
   }
   const dv = adir(p, true);
   if (dv === 'h' || (dv === 'n' && p.spB)) { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; p.face = horiz(p) || p.face; return this.startMove(p, kit.s1a); }
-  if (dv === 'u') return this.startMove(p, kit.s2a);
+  if (dv === 'u') { if (kit.s2a === 'hane' && p.haneUsed) { p.buf.A = 0; return; } return this.startMove(p, kit.s2a); }
   if (dv === 'd') { if (kit.s3a === 'plant' && p.tree) { p.buf.A = 0; return; } return this.startMove(p, kit.s3a); }
   return this.startMove(p, 'nair');
 };
@@ -325,6 +331,7 @@ Sim.prototype.think = function(p, o){
       const m = MV[p.mv];
       // 弱斬り三段は、当たったら（ガードされても）途中で 横・上・下の斬り や 刀の技 に切り替えられる（2026-11-27）
       if (m.cancel && p.hitDone && p.ground && p.mvf >= m.s && (p.wk || (p.buf.A && ((p.cb && p.cb.d !== 'n') || p.spB)))) { p.chainReq = false; return this.groundAttack(p); }
+      if (p.kit === 'yata' && p.mv === 'utilt' && p.hitDone && p.mvf >= m.s && (p.wk || (p.buf.A && !p.cb && adir(p, false) === 'u'))) return this.groundAttack(p); // 八咫: 上斬りが当たったら技へつなげる
       if (m.chain && p.buf.A && !p.wk && !p.spB && (!p.cb || p.cb.d === 'n') && p.mvf >= m.s) p.chainReq = true; // 向きなしの斬だけ次の段へ
       return;
     }
@@ -382,11 +389,12 @@ Sim.prototype.update = function(p, o){
   if (p.st === 'atk') {
     const m = MV[p.mv];
     p.mvf++;
+    if (m.hane) this.haneMove(p, m);
     if (m.rise && p.mvf === 3) { p.ground = false; p.plat = -1; p.vy = m.riseV || 1750; p.vx = p.face * 250; p.ff = false; }
     if (m.plunge) { if (p.mvf < m.s) { p.vy = 0; p.vx = toward(p.vx, 0, 60); } else { p.vy = -2200; p.vx = 0; } }
     if (m.hover && p.mvf <= m.lunge[1]) p.vy = 0;
     if (m.lunge && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1]) p.vx = p.face * m.lunge[2];
-    else if (p.ground) p.vx = toward(p.vx, 0, PH.gFric);
+    else if (p.ground && !m.hane) p.vx = toward(p.vx, 0, PH.gFric);
     if (m.shot && p.mvf === m.s) { if (m.shot === 'hana') this.spawnPetals(p); else this.spawnShot(p); }
     if (m.plant && p.mvf === m.s) this.plant(p);
   }
@@ -445,7 +453,7 @@ Sim.prototype.physics = function(p){
 
 Sim.prototype.land = function(p, y, plat){
   const vy = p.vy;
-  p.y = y; p.vy = 0; p.ground = true; p.plat = plat; p.jumps = 1; p.adUsed = false; p.ff = false; p.s1Used = false;
+  p.y = y; p.vy = 0; p.ground = true; p.plat = plat; p.jumps = 1; p.adUsed = false; p.haneUsed = false; p.ff = false; p.s1Used = false;
   if (p.st === 'atk') {
     const m = MV[p.mv];
     if (m.landBurst) this.fallBurst(p);
@@ -477,6 +485,25 @@ function box(p, b){
 function hbox(p){ const b = hurt(p); return [p.x + b[0] * FP, p.y + b[1] * FP, p.x + (b[0] + b[2]) * FP, p.y + (b[1] + b[3]) * FP]; }
 const overlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
+/* 羽跳の動き。向きはその時のスティック（8方向、向きなし＝上） */
+function haneDir(p){
+  const h = horiz(p), v = (p.inp.U ? 1 : 0) - (p.inp.D ? 1 : 0);
+  if (!h && !v) return null;
+  const n = h && v ? 707 : 1000; return [h * n, v * n];
+}
+Sim.prototype.haneMove = function(p, m){
+  const f = p.mvf, a = m.s, b = a + HANE.d1, c = b + HANE.gap, e = m.s + m.a;
+  const go = () => { p.vx = Math.trunc(p.hdx * HANE.sp / 1000); p.vy = Math.trunc(p.hdy * HANE.sp / 1000);
+    if (p.ground && p.hdy > 0) { p.ground = false; p.plat = -1; } if (p.ground) p.vy = 0; else p.vy += PH.grav; p.ff = false; };
+  if (f < a) { p.vx = toward(p.vx, 0, 200); if (!p.ground) p.vy = PH.grav; }          // 構え: 宙に止まる
+  if (f === a) { const d = haneDir(p) || [0, 1000]; p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); this.ev.push({ t: 'hane', p: p.i, n: 1 }); }
+  if (f >= a && f < b) go();
+  else if (f >= b && f < c) { p.vx = 0; p.vy = p.ground ? 0 : PH.grav;                // 間: 止まって次の向きを待つ
+    if (f === c - 1) { const d = haneDir(p); if (!d) { p.mvf = e; p.vy = 0; }          // 向きを入れていなければ一度で終わり
+      else { p.hdx = d[0]; p.hdy = d[1]; if (d[0]) p.face = sgn(d[0]); p.hane2 = true; p.hitDone = false; p.treeHit = false; this.ev.push({ t: 'hane', p: p.i, n: 2 }); } } }
+  else if (f >= c && f < e) go();
+  else if (f === e) { p.vx = Math.trunc(p.vx / 3); p.vy = p.ground ? 0 : Math.min(p.vy, 400); }
+};
 Sim.prototype.spawnShot = function(p){
   p.pjCut = false;
   this.pj.push({ o: p.i, x: Math.min(WALL_R, Math.max(WALL_L, p.x + p.face * SHOT.ox * FP)), y: p.y + SHOT.oy * FP, vx: p.face * SHOT.speed, life: SHOT.life });
@@ -567,11 +594,13 @@ Sim.prototype.hits = function(){
     if (a.st !== 'atk' || a.hitDone) continue;
     const m = MV[a.mv];
     if (m.noBox || a.mvf < m.s || a.mvf >= m.s + m.a) continue;
+    if (m.hane && a.mvf >= m.s + HANE.d1 && a.mvf < m.s + HANE.d1 + HANE.gap) continue; // 羽跳の間は当たらない
     const d = P[1 - a.i], ab = box(a, curBox(a));
     if (d.tree && !a.treeHit && !m.grab && overlap(ab, treeBox(d.tree))) { a.treeHit = true; this.hitTree(a, d, m.dmg, Math.trunc((ab[0] + ab[2]) / 2), Math.trunc((ab[1] + ab[3]) / 2)); }
     if (invuln(d)) continue;
     if (!overlap(ab, hbox(d))) continue;
     if (inCounter(d) && !m.grab && !m.iai) { a.hitDone = true; this.triggerCounter(d, a); continue; }
+    if (m.hane) { const two = a.hane2 && a.haneN > 0; a.haneN++; todo.push([a, d, two ? MV.haneX : m]); continue; } // 二度とも当てたら大きい硬直
     todo.push([a, d, m]);
   }
   // 相打ちも両方当てる（同じFに決めるので順番に依らない）
@@ -584,7 +613,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   const dir = pj ? sgn(pj.vx) : (sgn(d.x - a.x) || a.face);
   const mvRem = pj ? null : m.total - a.mvf;
   // 持続の早いうちに当てても、持続の終わりに当てたのと同じ硬直差になるよう、相手の硬直を延ばす（残りの持続のぶん）
-  const late = (pj || m.plunge) ? 0 : Math.max(0, m.s + m.a - 1 - a.mvf);
+  const late = (pj || m.plunge || m.noLate) ? 0 : Math.max(0, m.s + m.a - 1 - a.mvf);
   const pw = a.power || 0;
   let dmgBase = Array.isArray(m.dmg) ? m.dmg[0] + Math.floor((m.dmg[1] - m.dmg[0]) * pw / 100) : m.dmg;
   if (pj && pj.dm) dmgBase = Math.floor(dmgBase * pj.dm / 100); // 花嵐: 遠くまで飛ぶほど重い
@@ -752,7 +781,7 @@ Sim.prototype.hash = function(){
   return h;
 };
 
-const API = { GROW, curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
+const API = { HANE, GROW, curBox, treeBox, TREE, PETAL, Sim, MV, FIN, KIT, DG, SHOT, C, PH, FP, PLATS, WALL_L, WALL_R, HP_MAX, GD_MAX, SMASH_MIN, SMASH_MAX, NOIN, invuln, hurt, box };
 if (typeof module !== 'undefined' && module.exports) module.exports = API;
 else root.IssenAction = API;
 })(typeof window !== 'undefined' ? window : globalThis);

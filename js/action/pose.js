@@ -29,6 +29,7 @@ function attackPose(id0, m, f){
   if (id === 'side' || id === 'sideA' || id === 'dashatk' || m.iai) { P.fA = [-34, 0]; P.fB = [30, 0]; P.hip = 44; P.lean = 28; if (m.k === 'a') { P.fA = [-24, 16]; P.fB = [20, 10]; } }
   if (id === 'gatk') { P.hip = 40; }
   if (m.grab) { P.arm = 0; P.sw = -40; P.lean = 22; }
+  if (m.hane) { P.fA = [-26, 8]; P.fB = [14, 2]; P.hip = 48; P.lean = 34; P.sw = -8; P.arm = -14; if (f < m.s) { P.lean = 6; P.sw = 150; P.arm = 40; } }
   return P;
 }
 /* 肩・手・刀先 */
@@ -42,7 +43,7 @@ function joints(P){
 }
 /* 当たっているフレームごとの判定（刀の通り道を囲む四角）。[前へのずれ, 高さ, 幅, 高さ] */
 function sweepBoxes(id, m){
-  if (m.noBox || !m.arc || m.grab) return null;
+  if (m.noBox || !m.arc || m.grab || m.hane) return null; // 羽跳は体ごと当たる（box）
   const out = [], ext = m.ext || 0, pad = m.pad || 6;
   for (let f = m.s; f < m.s + m.a; f++) {
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;

@@ -271,7 +271,7 @@ const owns = id => SNAP.owned.some(k => k.id === id);
 const KITS = [(SNAP.equip && owns(SNAP.equip[0])) ? SNAP.equip[0] : 'mumei', (SNAP.equip && owns(SNAP.equip[1])) ? SNAP.equip[1] : 'mumei'];
 try { const k = JSON.parse(localStorage.getItem('issen-action-kit2') || 'null'); if (Array.isArray(k)) k.forEach((v, i) => { if (owns(v)) KITS[i] = v; }); } catch (e) {}
 function saveKits(){ try { localStorage.setItem('issen-action-kit2', JSON.stringify(KITS)); } catch (e) {} }
-const kitOf = id => id === 'ouka' && owns('ouka') ? 'ouka' : 'common'; // 桜華の技は、ガチャなどで手に入れた人だけ
+const kitOf = id => (id === 'ouka' || id === 'yata') && owns(id) ? id : 'common'; // 絶の刀の技は、ガチャなどで手に入れた人だけ
 const rollFor = mode => [!!OPT.dashRoll, mode === 'vs' ? !!OPT.dashRoll : false];
 // 見た目の刀（技は kitsFor が決める）。CPU は相手ごとに並〜幻から一振り
 const cpuKat = n => { const ids = Object.keys(window.IssenKatLook || {}).filter(id => (IssenKatLook[id].t || '並') !== '絶'); return ids.length ? ids[(n * 7 + 3) % ids.length] : 'mumei'; };
@@ -393,6 +393,7 @@ function onEvent(e){
     SND.play('bloom'); /* 段階が上がるときのカットインはなし（2026-11-26 ユーザー指定）、止まらない */ for (const q of STORM) { q.x = Math.random(); q.y = Math.random(); }
     FX.grow[e.p] = 0; FX.shake = 6 + e.stage * 3; FX.pflash = 6 + e.stage * 2; }
   else if (e.t === 'start' && OUKA_MV[e.mv]) oukaStart(e);
+  else if (e.t === 'hane') { const p = sim.p[e.p], x = p.x / FP, y = p.y / FP + 50; for (let k = 0; k < 14; k++) { const a = rnd() * Math.PI * 2, v = 1 + rnd() * 3; FX.parts.push({ x, y: y + (rnd() - 0.5) * 50, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 30 + rnd() * 20, t: 0, col: k % 4 ? '#141414' : '#e9e9ee', r: 3 + rnd() * 2.5, petal: true, rot: rnd() * 6 }); } }
   else if (e.t === 'fallBurst') { const x = e.x / FP, y = e.y / FP; for (const d of [1, -1]) for (let k = 0; k < 40; k++) FX.parts.push({ x, y: y + 10 + rnd() * 40, vx: d * (2 + rnd() * 9), vy: 1 + rnd() * 4, life: 50 + rnd() * 30, t: 0, col: k % 3 ? SAKURA[k % 3] : CRIM[k % 3], r: 3 + rnd() * 3, petal: true, rot: rnd() * 6 });
     FX.ouka.push({ k: 'ring', x, y: y + 4, t: 0, life: 34, r: 420, flat: true }); FX.shake = 16; FX.pflash = 9; SND.play('drum'); SND.play('kotoChord'); }
   else if (e.t === 'treeGone') { petals(e.x / FP, e.y / FP + 70, 30, 3); FX.gone.push({ x: e.x / FP, y: e.y / FP, t: 0, p: e.p }); }
@@ -458,6 +459,8 @@ function burst(x, y, n, col, sp, spark){
   for (let k = 0; k < n; k++) { const a = rnd() * Math.PI * 2, v = sp * (0.4 + rnd()); FX.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 1, life: 18 + rnd() * 18, t: 0, col, r: spark ? 1.6 : 1.5 + rnd() * 3.5, spark }); }
 }
 function tickParts(){
+  for (const p of sim.p) if (p.st === 'atk' && p.mv === 'hane' && (Math.abs(p.vx) > 900 || Math.abs(p.vy) > 900)) for (let k = 0; k < 2; k++) // 羽跳: 跳んだ跡に黒い羽
+    FX.parts.push({ x: p.x / FP + (rnd() - 0.5) * 30, y: p.y / FP + 30 + rnd() * 60, vx: -p.vx / FP * 0.08 + (rnd() - 0.5), vy: -p.vy / FP * 0.08 - 0.3, life: 26 + rnd() * 16, t: 0, col: k ? '#121212' : '#2a2a30', r: 2.5 + rnd() * 2.5, petal: true, rot: rnd() * 6 });
   for (const q of FX.parts) { q.t++; q.x += q.vx; q.y += q.vy; if (q.petal) { q.vy = Math.max(-1.2, q.vy - 0.08); q.vx = q.vx * 0.96 + Math.sin((q.t + q.rot * 20) * 0.08) * 0.08; q.rot += 0.08; } else { q.vy -= 0.25; q.vx *= 0.94; } }
   for (const g of FX.gone) g.t++; FX.gone = FX.gone.filter(g => g.t < 40);
   for (let i = 0; i < 2; i++) if (FX.grow[i] != null && FX.grow[i] < 30) FX.grow[i]++;
@@ -944,7 +947,7 @@ function drawHud(){
     bar(x, top + 20, bw, 12, p.hp / A.HP_MAX, red ? '#f2e6d8' : INK, right);
     bar(x, top + 36, bw * 0.8 + 0, 5, p.gd / A.GD_MAX, p.gd <= 2000 ? COL[0].main : '#3d5a6c', right);
     cx.font = `500 11px ${UIF}`; cx.fillStyle = red ? '#f2e6d8' : '#3b3d33';
-    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : ''), right ? W - m : m, top + 56);
+    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : p.kit === 'yata' ? '　八咫' + (p.haneUsed && !p.ground ? '' : '　羽跳◆') : ''), right ? W - m : m, top + 56);
   }
   const left = sim.sd ? Math.max(0, Math.ceil((A.C.sdF - (sim.frame - sim.sdStart)) / 60)) : Math.max(0, Math.ceil((A.C.roundF - sim.frame) / 60));
   cx.textAlign = 'center'; cx.font = `30px ${DISPLAY}`; cx.fillStyle = red ? '#ffe2d4' : INK;
@@ -1265,7 +1268,7 @@ function setupMenu(){
   $('ed_small').onclick = () => editScale(1 / 1.12); $('ed_big').onclick = () => editScale(1.12);
   $('ed_reset').onclick = () => { BLAY = null; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); };
   $('ed_ok').onclick = () => endEdit(true); $('ed_cancel').onclick = () => endEdit(false);
-  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : '')]);
+  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : k.id === 'yata' ? '　羽跳（作りかけ）' : '')]);
   for (const [id, i] of [['kt0', 0], ['kt1', 1], ['a_kit', 0]]) { const el = $(id);
     const opts = KOPT.slice();
     opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });

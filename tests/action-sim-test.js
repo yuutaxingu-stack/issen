@@ -222,4 +222,15 @@ for (const lag of [0, 1, 2, 4]) { const s = sim(60); s.p[1].st = 'down'; s.p[1].
   const hit = ev.some(e => e.t === 'hit'), blk = ev.some(e => e.t === 'block');
   ok(!hit, '起き上がりに重ねた斬り（' + lag + 'F 前に出す）はガードか空振り ' + (blk ? '(ガード)' : '(空振り)')); }
 
+// 画面端: 端に追い詰めた相手に花嵐・飛ぶ斬撃が当たる
+for (const [kit, nm] of [['ouka', '花嵐'], ['common', '飛ぶ斬撃']]) for (const gap of [20, 50, 90]) {
+  const s = new A.Sim({ training: true, kits: [kit, 'common'] }); s.p[1].x = A.WALL_R; s.p[0].x = A.WALL_R - gap * A.FP; s.p[0].face = 1;
+  s.step([I({ K: 'h', R: 1 }), I()]); let hit = false; for (let k = 0; k < 200 && !hit; k++) { s.step([I(), I()]); for (const e of drain(s)) if (e.t === 'hit' || e.t === 'block') hit = true; }
+  ok(hit, '端の相手に' + nm + 'が当たる（間 ' + gap + 'px）'); }
+// 撃った側の硬直が12F以上残っているうちに当たったら、硬直が2F減る
+for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = gap => { const s = new A.Sim({ training: true, kits: [kit, 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + gap) * A.FP;
+    s.step([I({ K: 'h', R: 1 }), I()]); let n = 1, hitRem = null; while (s.p[0].st === 'atk' && n < 200) { const hs0 = s.hitstop; s.step([I(), I()]); if (!hs0) n++; for (const e of drain(s)) if (e.t === 'hit' && hitRem == null) hitRem = A.MV[mv].total - s.p[0].mvf; } return { n, hitRem }; };
+  const near = run1(80), far = run1(1200);
+  ok(near.hitRem != null && near.n === far.n - 2, A.MV[mv].n + ': 早く当たると撃った側の硬直が2F短い (' + near.n + 'F / 当たらず ' + far.n + 'F)'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

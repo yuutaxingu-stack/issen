@@ -121,7 +121,7 @@ function newPlayer(i){
   return { i, x: (i ? 1000 : 600) * FP, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, ground: true, plat: -1,
     st: 'idle', f: 0, mv: null, mvf: 0, hitDone: false, chainReq: false, chargeF: 0, power: 0,
     jumps: 1, adUsed: false, ff: false, dropF: 0,
-    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false,
+    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
     stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
@@ -478,12 +478,14 @@ function hbox(p){ const b = hurt(p); return [p.x + b[0] * FP, p.y + b[1] * FP, p
 const overlap = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
 
 Sim.prototype.spawnShot = function(p){
-  this.pj.push({ o: p.i, x: p.x + p.face * SHOT.ox * FP, y: p.y + SHOT.oy * FP, vx: p.face * SHOT.speed, life: SHOT.life });
+  p.pjCut = false;
+  this.pj.push({ o: p.i, x: Math.min(WALL_R, Math.max(WALL_L, p.x + p.face * SHOT.ox * FP)), y: p.y + SHOT.oy * FP, vx: p.face * SHOT.speed, life: SHOT.life });
   this.ev.push({ t: 'shot', p: p.i });
 };
 /* 花嵐: 普通は一枚。開花で速く、満開で三枚・大きく（まとめて一回当たる）、落花で五枚に散って一枚ずつ当たる */
 Sim.prototype.spawnPetals = function(p){
-  const b = p.boost, x = p.x + p.face * SHOT.ox * FP, y = p.y + SHOT.oy * FP;
+  p.pjCut = false;
+  const b = p.boost, x = Math.min(WALL_R, Math.max(WALL_L, p.x + p.face * SHOT.ox * FP)), y = p.y + SHOT.oy * FP;
   this.pjN = (this.pjN || 0) + 1;
   // 置き技（2026-11-26）: 弾の速さは前の slow 倍。大きさと威力の増え方は前と同じ速さ（前の速さで飛んだとした距離で決める）
     const add = (dy, vy, sp, w, mv, gid) => this.pj.push({ o: p.i, x, y: y + dy * FP, vx: Math.trunc(p.face * sp * PETAL.slow), vy: Math.trunc(vy * PETAL.slow), eq: sp, life: PETAL.life, w, h: w, w0: w, x0: x, dm: 100, mv, gid, petal: 1, hana: 1, b2: b === 2 ? 1 : 0 });
@@ -536,7 +538,7 @@ Sim.prototype.moveShots = function(){
   const P = this.p;
   for (const q of this.pj) { q.x += q.vx; q.y += q.vy || 0; q.life--;
     if (q.hana) { const k = (PETAL.life - q.life) * q.eq / FP | 0; q.w = q.h = Math.min(q.w0 * PETAL.maxW, q.w0 + Math.floor(q.w0 * k / PETAL.grow)); q.dm = Math.min(PETAL.maxDm, 100 + Math.floor(k * 100 / PETAL.dmgPer)); }
-    if (q.petal && q.y < 12 * FP) { q.y = 12 * FP; q.vy = 0; } if (q.x < WALL_L || q.x > WALL_R || q.y < 0 || q.y > 900 * FP) q.life = 0; } // 花びらは地面に着くと地を這う
+    if (q.petal && q.y < 12 * FP) { q.y = 12 * FP; q.vy = 0; } if (q.y < 0 || q.y > 900 * FP) q.life = 0; else if (q.x < WALL_L || q.x > WALL_R) { q.x = q.x < WALL_L ? WALL_L : WALL_R; q.out = 1; } } // 花びらは地面に着くと地を這う。竹林の端に着いたら、そこで当たりを見てから消える（端の相手にも当たる）
   // 斬撃どうしは相殺
   for (let i = 0; i < this.pj.length; i++) for (let j = i + 1; j < this.pj.length; j++) {
     const a = this.pj[i], b = this.pj[j];
@@ -552,9 +554,11 @@ Sim.prototype.moveShots = function(){
     if (!overlap(bx, hbox(d))) continue;
     kill();
     if (inCounter(d)) { this.triggerCounter(d, a); continue; }
+    // 花嵐・飛ぶ斬撃: 撃った側の硬直が12F以上残っているうちに当たったら（ガードでも）、残りの硬直を2F減らす（一つの技で一度）
+    if (a.st === 'atk' && (a.mv === 'hana' || a.mv === 'shot') && !a.pjCut && MV[a.mv].total - a.mvf >= 12) { a.mvf += 2; a.pjCut = true; }
     this.applyHit(a, d, MV[q.mv || 'shotP'], { a: a.i, dst: d.st, dmv: d.mv, dmvf: d.mvf, dground: d.ground }, q);
   }
-  this.pj = this.pj.filter(q => q.life > 0);
+  this.pj = this.pj.filter(q => q.life > 0 && !q.out);
 };
 Sim.prototype.hits = function(){
   const P = this.p;

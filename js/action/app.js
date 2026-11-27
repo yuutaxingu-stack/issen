@@ -292,6 +292,7 @@ function startMode(mode){
   document.body.dataset.mode = mode;
   showMenu(false); showOver(false);
   layoutViews();
+  applyTune();
 }
 
 /* ---------- 一歩 ---------- */
@@ -1227,6 +1228,7 @@ const FRAME_MS = 1000 / 60;
          onLocal(f, code) 自分の入力を送る, onOver(log, wins) 決着を知らせる, onExit() 戻る } */
 function onlineStart(o){
   GAME.mode = 'online'; GAME.log = []; GAME.coins = 0; GAME.n = 1;
+  applyTune(); // ネット対戦はいつもの値
   sim = new A.Sim({ toWin: 2, kits: o.kits, dashRoll: o.dashRoll || [false, false] });
   const zin = sim.p.some(p => p.kit === 'ouka') ? 110 : 0;
   ON = Object.assign({ L: { ph: 'intro', t: 0, zin, log: [] }, played: new Map(), hashes: {}, round: sim.roundNo, msg: '', done: false, wait: 0 }, o);
@@ -1304,7 +1306,79 @@ function recordOnlineWin(l){ // 勝った一本ごとに、自分の刀の戦績
 }
 function onlineEnd(){ ON = null; }
 
-resize(); setupBar(); setupMenu();
+/* ---------- 技の調整（神様アカウントの稽古だけ） ----------
+   技の数字をフレーム単位で変えて、その場で試せる。変えた値はこの端末に覚え、稽古の間だけ効く
+   （CPU戦・二人対戦・ネット対戦はいつもの値）。「書き出す」で変えた所をまとめて写せる */
+const GOD = SNAP.coins === -1;
+const TUNE_KEY = 'issen-action-tune-v1';
+let TUNE = {}; try { TUNE = JSON.parse(localStorage.getItem(TUNE_KEY) || '{}') || {}; } catch (e) { TUNE = {}; }
+const ORIG = {}; for (const id in MV) { const m = MV[id]; ORIG[id] = { s: m.s, a: m.a, r: m.r, hit: m.hit, blk: m.blk, hs: m.hs, bs: m.bs, total: m.total, dmg: m.dmg, gd: m.gd, kb: m.kb ? m.kb.slice() : null, box: m.box ? m.box.slice() : null, boxes: m.boxes ? m.boxes.map(b => b.slice()) : null }; }
+const TF = [ // [鍵, 名前, 単位の説明, 刻み]
+  ['s', '発生', 'F', 1], ['a', '持続', 'F', 1], ['r', '硬直', 'F', 1],
+  ['hit', 'ヒット時の硬直差', 'F', 1], ['blk', 'ガード時の硬直差', 'F', 1],
+  ['dmg', 'ダメージ（体力）', '', 0.5], ['gd', 'ガード削り', '', 1],
+  ['kbx', '吹っ飛び 横', '', 50], ['kby', '吹っ飛び 縦', '', 50],
+  ['bw', '判定の幅', '%', 10], ['bh', '判定の高さ', '%', 10], ['bx', '判定 前へずらす', 'px', 5], ['by', '判定 上へずらす', 'px', 5],
+];
+function tuneBase(id){ // 元の値（調整画面に出す形）
+  const o = ORIG[id], span = o.a - 1 + o.r;
+  return { s: o.s, a: o.a, r: o.r, hit: o.hit != null ? o.hit : (o.hs != null ? o.hs - span : 0), blk: o.blk != null ? o.blk : o.bs - span,
+    dmg: typeof o.dmg === 'number' ? o.dmg / 100 : null, gd: typeof o.gd === 'number' ? o.gd / 100 : null,
+    kbx: o.kb ? o.kb[0] : null, kby: o.kb ? o.kb[1] : null, bw: 100, bh: 100, bx: 0, by: 0 };
+}
+function tuneVal(id, k){ const t = TUNE[id]; return t && t[k] != null ? t[k] : tuneBase(id)[k]; }
+function restoreMV(){ for (const id in ORIG) { const m = MV[id], o = ORIG[id]; Object.assign(m, { s: o.s, a: o.a, r: o.r, hit: o.hit, blk: o.blk, hs: o.hs, bs: o.bs, total: o.total, dmg: o.dmg, gd: o.gd });
+  if (o.kb) m.kb = o.kb.slice(); if (o.box) m.box = o.box.slice(); if (o.boxes) m.boxes = o.boxes.map(b => b.slice()); } }
+function applyTune(){
+  restoreMV();
+  if (!GOD || GAME.mode !== 'train') return;
+  for (const id in TUNE) { const m = MV[id], o = ORIG[id]; if (!m || !o) continue; const v = k => tuneVal(id, k);
+    m.s = Math.max(1, v('s')); m.a = Math.max(1, v('a')); m.r = Math.max(0, v('r'));
+    const span = m.a - 1 + m.r; m.total = m.s + span;
+    m.hit = v('hit'); m.hs = Math.max(1, m.hit + span);
+    m.blk = v('blk'); m.bs = Math.max(1, m.blk + span);
+    if (typeof o.dmg === 'number') m.dmg = Math.round(v('dmg') * 100);
+    if (typeof o.gd === 'number') m.gd = Math.round(v('gd') * 100);
+    if (o.kb) m.kb = [v('kbx'), v('kby')];
+    const bw = v('bw'), bh = v('bh'), bx = v('bx'), by = v('by');
+    const tf = b => { const cx0 = b[0] + b[2] / 2, cy0 = b[1] + b[3] / 2, w = Math.round(b[2] * bw / 100), h = Math.round(b[3] * bh / 100); return [Math.round(cx0 - w / 2 + bx), Math.round(cy0 - h / 2 + by), w, h]; };
+    if (o.boxes) m.boxes = o.boxes.map(tf); if (o.box) m.box = tf(o.box);
+  }
+}
+function saveTune(){ try { localStorage.setItem(TUNE_KEY, JSON.stringify(TUNE)); } catch (e) {} applyTune(); }
+let TSEL = 'jab1';
+function tuneOpen(on){
+  const el = $('tune'); el.hidden = !on; PAUSED = on; if (!on) return;
+  if (FM.mv && MV[FM.mv]) TSEL = FM.mv;
+  const sel = $('tn_mv'); if (!sel.options.length) for (const id in MV) { if (MV[id].k === 'p' && !MV[id].dmg) continue; const op = document.createElement('option'); op.value = id; op.textContent = MV[id].n + '（' + id + '）'; sel.appendChild(op); }
+  sel.value = TSEL; tuneRender();
+}
+function tuneRender(){
+  const id = TSEL, base = tuneBase(id), t = TUNE[id] || {};
+  $('tn_rows').innerHTML = TF.filter(([k]) => base[k] != null).map(([k, n, u, st]) => {
+    const v = tuneVal(id, k), ch = t[k] != null && t[k] !== base[k];
+    return `<div class="tr${ch ? ' ch' : ''}"><span class="tn">${n}</span><button type="button" data-k="${k}" data-d="-${st}">−</button><input data-k="${k}" type="number" step="${st}" value="${v}"><button type="button" data-k="${k}" data-d="${st}">＋</button><span class="tu">${u}</span><span class="tb">元 ${base[k]}</span></div>`;
+  }).join('');
+  const m = MV[id]; $('tn_sum').textContent = `全体 ${m.total}F（${m.total + 1}F目に動ける）　ヒット硬直 ${m.hs}F　ガード硬直 ${m.bs}F`;
+}
+function tuneSet(k, v){ const id = TSEL, base = tuneBase(id); if (!isFinite(v)) return; if (k === 's' || k === 'a') v = Math.max(1, Math.round(v)); if (k === 'r') v = Math.max(0, Math.round(v)); if (k === 'bw' || k === 'bh') v = Math.max(10, v);
+  TUNE[id] = TUNE[id] || {}; if (v === base[k]) delete TUNE[id][k]; else TUNE[id][k] = v; if (!Object.keys(TUNE[id]).length) delete TUNE[id]; saveTune(); tuneRender(); }
+function setupTune(){
+  if (!GOD) return;
+  $('a_tune').hidden = false; $('a_tune').onclick = () => { $('bar').classList.remove('open'); $('a_more').textContent = '設定'; tuneOpen(true); };
+  $('tn_close').onclick = () => tuneOpen(false);
+  $('tn_mv').onchange = e => { TSEL = e.target.value; tuneRender(); e.target.blur(); };
+  $('tn_rows').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; tuneSet(b.dataset.k, Math.round((tuneVal(TSEL, b.dataset.k) + +b.dataset.d) * 100) / 100); });
+  $('tn_rows').addEventListener('change', e => { const i = e.target.closest('input[data-k]'); if (i) tuneSet(i.dataset.k, +i.value); });
+  $('tn_reset').onclick = () => { delete TUNE[TSEL]; saveTune(); tuneRender(); };
+  $('tn_all').onclick = () => { const b = $('tn_all'); if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'もう一度押すと全部戻す'; setTimeout(() => { b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; }, 2500); return; } TUNE = {}; saveTune(); tuneRender(); b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; };
+  $('tn_out').onclick = () => { const lines = Object.keys(TUNE).map(id => MV[id].n + '（' + id + '）: ' + Object.entries(TUNE[id]).map(([k, v]) => (TF.find(f => f[0] === k) || [k, k])[1] + ' ' + tuneBase(id)[k] + '→' + v).join('、'));
+    const txt = lines.length ? '新・一閃 技の調整\n' + lines.join('\n') + '\n' + JSON.stringify(TUNE) : '（変えた技はありません）';
+    $('tn_text').value = txt; $('tn_text').hidden = false; $('tn_text').select();
+    try { navigator.clipboard.writeText(txt).then(() => { $('tn_out').textContent = '写しました'; setTimeout(() => { $('tn_out').textContent = '書き出す'; }, 2000); }); } catch (e) {} };
+}
+
+resize(); setupBar(); setupMenu(); setupTune();
 { const m = (location.search.match(/[?&]m=(\w+)/) || [])[1]; if (m === 'train' || m === 'cpu' || m === 'vs') startMode(m); else if (!/[?&]match=/.test(location.search)) showMenu(true); }
 
 const DBG = { pause: false };

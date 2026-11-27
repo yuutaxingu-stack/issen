@@ -69,6 +69,19 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
 .onote{color:#e8dcc0;margin:-4px 0 10px}
 #pausep h2{font:400 28px 'Yuji Syuku',serif;margin:0 0 12px}
 
+
+#tune{position:fixed;inset:0;z-index:12;background:rgba(10,10,8,.55);display:flex;justify-content:flex-end;font:500 13px 'Zen Kaku Gothic New',sans-serif;color:#efe8d6}
+#tune[hidden]{display:none}
+#tune .tsheet{width:min(440px,100vw);height:100%;overflow:auto;background:#1c1d18;padding:calc(10px + env(safe-area-inset-top,0px)) 14px 16px;box-sizing:border-box}
+#tune .th{display:flex;align-items:center;gap:8px;margin-bottom:8px}#tune .th b{font:400 20px 'Yuji Syuku',serif}#tune .th span{flex:1;font-size:11px;color:#a39d8a}
+#tune button{font:inherit;background:none;color:#efe8d6;border:1px solid rgba(239,232,214,.4);border-radius:3px;padding:4px 10px;cursor:pointer}
+#tune button.pri{background:#c8372d;border-color:#c8372d}
+#tune select{width:100%;font:inherit;background:#2a2d24;color:#efe8d6;border:1px solid rgba(239,232,214,.35);border-radius:3px;padding:4px;margin-bottom:6px}
+#tune .tr{display:grid;grid-template-columns:1fr 34px 70px 34px 22px 58px;gap:4px;align-items:center;padding:3px 0;border-bottom:1px solid rgba(239,232,214,.08)}
+#tune .tr.ch .tn{color:#f3a294}#tune .tr input{width:100%;box-sizing:border-box;font:inherit;text-align:center;background:#2a2d24;color:#efe8d6;border:1px solid rgba(239,232,214,.3);border-radius:3px;padding:3px 2px}
+#tune .tr button{padding:3px 0}#tune .tu{font-size:11px;color:#a39d8a}#tune .tb{font-size:11px;color:#8d8775;text-align:right}
+#tune #tn_sum{font-size:12px;color:#c9c2ae;margin:8px 0}
+#tune .tacts{display:flex;gap:6px;flex-wrap:wrap}#tune textarea{width:100%;height:120px;margin-top:8px;font:12px ui-monospace,monospace;background:#2a2d24;color:#efe8d6;border:1px solid rgba(239,232,214,.3)}
 </style>
 </head>
 <body>
@@ -86,6 +99,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <button type="button" id="a_reset">位置を戻す</button>
   <button type="button" id="a_btns">ボタン配置</button>
   <button type="button" id="a_help">操作</button>
+  <button type="button" id="a_tune" hidden>技の調整</button>
 </div>
 <button type="button" id="a_pause">一時停止</button>
 <div id="menu" class="ov" hidden><div>
@@ -131,16 +145,24 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <h2 id="nv_h"></h2><p id="nv_p"></p>
   <div class="acts"><button type="button" id="nv_back" hidden>一閃へ戻る</button></div>
 </div></div>
+<div id="tune" hidden><div class="tsheet">
+  <div class="th"><b>技の調整</b><span>神様だけ・稽古の間だけ効く</span><button type="button" id="tn_close" class="pri">閉じて試す</button></div>
+  <select id="tn_mv"></select>
+  <div id="tn_rows"></div>
+  <p id="tn_sum"></p>
+  <div class="tacts"><button type="button" id="tn_reset">この技を元に戻す</button><button type="button" id="tn_all">全部の技を元に戻す</button><button type="button" id="tn_out">書き出す</button></div>
+  <textarea id="tn_text" hidden readonly></textarea>
+</div></div>
 <div id="rot">横向きにしてください</div>
-<script src="js/action/pose.js?v=1795781996"></script>
-<script src="js/action/boxes.js?v=1795781996"></script>
-<script src="js/action/sim.js?v=1795781996"></script>
-<script src="js/action/netplay.js?v=1795781996"></script>
-<script src="js/action/app.js?v=1795781996"></script>
+<script src="js/action/pose.js?v=1795783891"></script>
+<script src="js/action/boxes.js?v=1795783891"></script>
+<script src="js/action/sim.js?v=1795783891"></script>
+<script src="js/action/netplay.js?v=1795783891"></script>
+<script src="js/action/app.js?v=1795783891"></script>
 <script src="js/online-config.js"></script>
-<script src="js/no-link.js?v=1795781996"></script>
-<script src="js/net.js?v=1795781996"></script>
-<script src="js/action/online.js?v=1795781996"></script>
+<script src="js/no-link.js?v=1795783891"></script>
+<script src="js/net.js?v=1795783891"></script>
+<script src="js/action/online.js?v=1795783891"></script>
 <script>/* 招かれた人だけ: ログインしていなければタイトルへ（ネット対戦は online.js が確かめる） */
 (function(){var N=window.IssenNet;if(!N||!N.configured()||/[?&]match=/.test(location.search))return;N.init().then(function(){if(!N.user)location.replace('index.html');});})();</script>
 <script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>

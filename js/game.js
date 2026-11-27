@@ -344,7 +344,7 @@ function importAction(){
 }
 setInterval(importAction,3000); document.addEventListener('visibilitychange',()=>{ if(!document.hidden) importAction(); });
 function useGuest(){ ACCT=null; GOD=false; loadGuestArm(); loadGuestWallet(); PULLCOST=10; uiCache=''; setTimeout(importAction,0); if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
-window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT,KATANA,KMAP,TIER,arm:()=>ARM,isGod:()=>GOD};
+window.__issen={kn,G,P,CFG,RUN,WALLET,NET,netInput,netHorizon,startOnline,goTitle,netClock:off=>{ if(NETCLK) NETCLK.off=off; },now:()=>gnow(),guestData,applySave,useAccount,useGuest,isAccount:()=>!!ACCT,KATANA,KMAP,TIER,arm:()=>ARM,isGod:()=>GOD,zRun,get ZART(){ return ZART; },gachaFor,gachaReady:id=>!!liveBoxes().find(x=>x.pick===id)};
 
 function resetPlayer(p){ p.side=p.i; p.state='idle'; p.start=0; p.end=0; p.counters=0; p.lastCancelAt=-1e9; p.mkStart=-1e9; p.counteredAt=null; p.resumeAt=0; }
 function startMatch(mode,base){
@@ -1281,6 +1281,8 @@ function banSync(){
   if(BAN) banSize();
   if(!BAN&&KREADY){ const k=KMAP[curBox().pick]; if(k){ banSize(); BAN=zRun(document.getElementById('g_banc'),k,{ban:true}); } }
 }
+// お知らせから: その刀が目玉の箱が引けるなら、その箱でガチャを開く（まだなら false）
+function gachaFor(id){ const b=liveBoxes().find(x=>x.pick===id); if(!b) return false; openGacha('pull'); GA.box=b; refreshCoins(); return true; }
 function openGacha(tab){ banStop(); gachaEl.hidden=false; uiCache=''; GA.box=null; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ banStop(); gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }
 const GOD_N=1000; // 運営アカウントが一度に引ける数
@@ -1525,22 +1527,35 @@ function renderBook(){
 }
 let DETAIL=null;
 // 絶の刀帳: 鞘から刃が抜け、赤黒い闇に桜が舞い続ける専用の頁
-const ZSAYA=new Image(); ZSAYA.src='assets/katana_ouka_saya.png';
-const ZHD=new Image(); let ZHDreq=false; // 細部まで見る用の大きな絵（刀帳を開いたときに読む）
+/* 絶の刀ごとの絵と色。saya=鞘に納めた姿、hd/sayaHd=大きく見る用、src=抜き身（KATANA に入る前でも描けるように）
+   色は rgb の三つ組: hot=光の芯、deep=縁の線、pale=白い光、void=闇。parts は舞うもの（petal=桜、feather=烏の羽） */
+const ZART={
+  ouka:{mei:'桜華',yomi:'おうか',saya:'assets/katana_ouka_saya.png',hd:'assets/katana_ouka_hd.png',sayaHd:'assets/katana_ouka_saya_hd.png',src:'assets/katana_ouka.png',
+    bg:['#5a0d18','#250609','#070203'],hot:[255,40,70],deep:[200,24,48],pale:[255,220,228],void:[5,1,2],band:'#0a0203',seal:['#a8101f','#f4d6d6'],mark:'#ff5a6a',
+    tint:['rgba(40,2,8,.6)','rgba(255,70,95,.45)'],parts:'petal',sun:'moon'},
+  yata:{mei:'八咫',yomi:'やた',saya:'assets/katana_yata_saya.png',hd:'assets/katana_yata_hd.png',sayaHd:'assets/katana_yata_saya_hd.png',src:'assets/katana_yata.png',
+    bg:['#3a3a40','#121215','#020203'],hot:[255,255,255],deep:[210,210,220],pale:[255,255,255],void:[2,2,3],band:'#060608',seal:['#0a0a0c','#f4f4f6'],mark:'#ffffff',
+    tint:['rgba(255,255,255,.18)','rgba(255,255,255,.55)'],parts:'feather',sun:'eclipse'}};
+function zArt(id){ const a=ZART[id]||ZART.ouka; if(!a.S){ a.S=new Image(); a.S.src=a.saya; a.B=new Image(); a.B.src=a.src; } return a; }
+function zArtHd(a){ if(!a.H){ a.H=new Image(); a.H.src=a.hd; } return a.H; }
+// 抜き身の絵: KATANA に入っていれば作り直した絵、まだなら元の絵
+function zBlade(k,a){ return k.canvas||(a.B.complete&&a.B.naturalWidth?a.B:null); }
+const rgba=(c,al)=>'rgba('+c[0]+','+c[1]+','+c[2]+','+al+')';
 let ZST=null;
 /* 刀帳・桜華の抜刀: 闇に細い帯のカットが次々と斬り込む（鍔 → 鯉口の光 → 走る刃）。
    最後に一筋の斬線が帯を裂き、赤黒い頁に抜き身が据わる。画面全体は動かさない（帯の中だけ動く） */
 const ZSLASH=1.75, ZPEND=ZSLASH+0.55;
 const ZTINT=new Map();
-function zTint(src){ // 赤黒く沈めた絵（一度だけ作る）
-  if(ZTINT.has(src)) return ZTINT.get(src);
+function zTint(src,T){ // 赤黒く沈めた絵（一度だけ作る）。八咫は白く光らせる
+  T=T||ZART.ouka; const key=src; if(ZTINT.has(key)) return ZTINT.get(key);
   const c=document.createElement('canvas'); c.width=src.width||KIMG_W; c.height=src.height||KIMG_H; const t=c.getContext('2d');
   t.drawImage(src,0,0,c.width,c.height); t.globalCompositeOperation='source-atop';
-  t.fillStyle='rgba(40,2,8,.6)'; t.fillRect(0,0,c.width,c.height);
-  const g=t.createLinearGradient(0,0,0,c.height); g.addColorStop(0,'rgba(255,70,95,.45)'); g.addColorStop(.35,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,.5)'); t.fillStyle=g; t.fillRect(0,0,c.width,c.height);
-  ZTINT.set(src,c); return c;
+  t.fillStyle=T.tint[0]; t.fillRect(0,0,c.width,c.height);
+  const g=t.createLinearGradient(0,0,0,c.height); g.addColorStop(0,T.tint[1]); g.addColorStop(.35,'rgba(0,0,0,0)'); g.addColorStop(1,'rgba(0,0,0,.5)'); t.fillStyle=g; t.fillRect(0,0,c.width,c.height);
+  ZTINT.set(key,c); return c;
 }
-function drawManga(x,W,H,rt,k){
+function drawManga(x,W,H,rt,k,T){
+  T=T||ZART.ouka; const SV=T.S&&T.S.complete&&T.S.naturalWidth?T.S:null, KB=zBlade(k,T); if(!KB) return;
   if(rt>=ZPEND) return;
   const ee=v=>1-Math.pow(1-Math.max(0,Math.min(1,v)),4);
   const BANDS=[
@@ -1550,47 +1565,47 @@ function drawManga(x,W,H,rt,k){
   ];
   const split=ee((rt-ZSLASH)/0.5); // 斬線のあと、帯が上下に裂けて消える
   x.save();
-  if(rt<ZSLASH){ x.fillStyle='#050102'; x.fillRect(-W,-H,W*3,H*3); }
+  if(rt<ZSLASH){ x.fillStyle=rgba(T.void,1); x.fillRect(-W,-H,W*3,H*3); }
   // 始まりの一筋（横一文字の細い紅）
-  if(rt<0.5){ const a=ee(rt/0.12)*(1-ee((rt-0.25)/0.25)); x.fillStyle='rgba(220,30,55,'+a+')'; x.fillRect(W*0.5-W*0.5*ee(rt/0.15),H*0.5-1,W*ee(rt/0.15),2); }
+  if(rt<0.5){ const a=ee(rt/0.12)*(1-ee((rt-0.25)/0.25)); x.fillStyle=rgba(T.deep,a); x.fillRect(W*0.5-W*0.5*ee(rt/0.15),H*0.5-1,W*ee(rt/0.15),2); }
   BANDS.forEach((b,bi)=>{ const lt=rt-b.at; if(lt<0) return;
     const off=(bi===0?-1:bi===2?1:(bi%2?1:-1))*split*H*0.35, fade=1-split;
     if(fade<=0) return;
     x.save(); x.globalAlpha=fade; x.translate(0,off);
     const wipe=ee(lt/0.14); // 左から一瞬で斬り開く
     x.save(); path(b.poly); x.clip(); x.beginPath(); x.rect(0,0,W*wipe,H); x.clip();
-    x.fillStyle='#0a0203'; x.fillRect(0,0,W,H); b.draw(lt);
-    const vg=x.createLinearGradient(0,0,W,0); vg.addColorStop(0,'rgba(5,1,2,.85)'); vg.addColorStop(.25,'rgba(5,1,2,0)'); vg.addColorStop(.75,'rgba(5,1,2,0)'); vg.addColorStop(1,'rgba(5,1,2,.85)'); x.fillStyle=vg; x.fillRect(0,0,W,H);
+    x.fillStyle=T.band; x.fillRect(0,0,W,H); b.draw(lt);
+    const vg=x.createLinearGradient(0,0,W,0); vg.addColorStop(0,rgba(T.void,.85)); vg.addColorStop(.25,rgba(T.void,0)); vg.addColorStop(.75,rgba(T.void,0)); vg.addColorStop(1,rgba(T.void,.85)); x.fillStyle=vg; x.fillRect(0,0,W,H);
     x.restore();
     // 帯の縁の紅い細線、斬り開く先に光
-    x.strokeStyle='rgba(200,24,48,.9)'; x.lineWidth=1.5; x.beginPath(); x.moveTo(b.poly[0][0],b.poly[0][1]); x.lineTo(b.poly[1][0],b.poly[1][1]); x.moveTo(b.poly[3][0],b.poly[3][1]); x.lineTo(b.poly[2][0],b.poly[2][1]); x.stroke();
-    if(wipe<1){ const ex=W*wipe; x.fillStyle='rgba(255,220,228,.9)'; x.shadowColor='#ff2a4a'; x.shadowBlur=18; x.fillRect(ex-2,0,3,H); }
+    x.strokeStyle=rgba(T.deep,.9); x.lineWidth=1.5; x.beginPath(); x.moveTo(b.poly[0][0],b.poly[0][1]); x.lineTo(b.poly[1][0],b.poly[1][1]); x.moveTo(b.poly[3][0],b.poly[3][1]); x.lineTo(b.poly[2][0],b.poly[2][1]); x.stroke();
+    if(wipe<1){ const ex=W*wipe; x.fillStyle=rgba(T.pale,.9); x.shadowColor=rgba(T.hot,1); x.shadowBlur=18; x.fillRect(ex-2,0,3,H); }
     x.restore(); });
   // 斬線: 左下から右上へ一閃
   if(rt>=ZSLASH-0.12&&rt<ZPEND){ const p=ee((rt-ZSLASH+0.12)/0.14), a=1-ee((rt-ZSLASH-0.05)/0.45);
     const x0=-40,y0=H*0.86,x1=W+40,y1=H*0.1, xe=x0+(x1-x0)*p, ye=y0+(y1-y0)*p;
-    x.save(); x.globalAlpha=Math.max(0,a); x.lineCap='round'; x.shadowColor='#ff1f45'; x.shadowBlur=30;
-    x.strokeStyle='rgba(200,20,45,.9)'; x.lineWidth=10; x.beginPath(); x.moveTo(x0,y0); x.lineTo(xe,ye); x.stroke();
+    x.save(); x.globalAlpha=Math.max(0,a); x.lineCap='round'; x.shadowColor=rgba(T.hot,1); x.shadowBlur=30;
+    x.strokeStyle=rgba(T.deep,.9); x.lineWidth=10; x.beginPath(); x.moveTo(x0,y0); x.lineTo(xe,ye); x.stroke();
     x.strokeStyle='#fff3f5'; x.lineWidth=2.5; x.beginPath(); x.moveTo(x0,y0); x.lineTo(xe,ye); x.stroke(); x.restore(); }
   x.restore();
   function path(poly){ x.beginPath(); poly.forEach(([px,py],i)=>i?x.lineTo(px,py):x.moveTo(px,py)); x.closePath(); }
   function img(src,sx,sw,dx,dy,dw,rot){ const dh=dw*KIMG_H/sw; x.save(); x.translate(dx,dy); x.rotate(rot||0); x.drawImage(src,sx*src.width/KIMG_W,0,sw*src.width/KIMG_W,src.height,-dw/2,-dh/2,dw,dh); x.restore(); }
-  function glow(cx,cy,r,a){ const g=x.createRadialGradient(cx,cy,0,cx,cy,r); g.addColorStop(0,'rgba(255,245,248,'+a+')'); g.addColorStop(.18,'rgba(255,70,100,'+a*0.7+')'); g.addColorStop(1,'rgba(160,0,30,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=g; x.fillRect(cx-r,cy-r,r*2,r*2); x.globalCompositeOperation='source-over'; }
-  function streaks(y0,y1,n,seed,lt,sp){ let s=seed; const r=()=>(s=(s*16807)%2147483647)/2147483647; x.fillStyle='rgba(180,20,40,.35)';
+  function glow(cx,cy,r,a){ const g=x.createRadialGradient(cx,cy,0,cx,cy,r); g.addColorStop(0,rgba(T.pale,a)); g.addColorStop(.18,rgba(T.hot,a*0.7)); g.addColorStop(1,rgba(T.deep,0)); x.globalCompositeOperation='lighter'; x.fillStyle=g; x.fillRect(cx-r,cy-r,r*2,r*2); x.globalCompositeOperation='source-over'; }
+  function streaks(y0,y1,n,seed,lt,sp){ let s=seed; const r=()=>(s=(s*16807)%2147483647)/2147483647; x.fillStyle=rgba(T.deep,.35);
     for(let i=0;i<n;i++){ const y=y0+r()*(y1-y0), len=80+r()*260, xx=((r()*W*1.5-lt*sp)%(W*1.5)+W*1.5)%(W*1.5)-W*0.25; x.fillRect(xx,y,len,1); } }
   // 一: 鍔の大写し。紅い縁の光がゆっくり流れる
-  function b1(lt){ const sv=ZSAYA.complete?zTint(ZSAYA):null; if(sv) img(sv,0,900,W*0.5+20-lt*40,77,W*0.95,-0.02);
-    const gx=W*0.2+((lt*0.5)%1)*W*0.7; const lg=x.createLinearGradient(gx-90,0,gx+90,0); lg.addColorStop(0,'rgba(255,40,70,0)'); lg.addColorStop(.5,'rgba(255,60,90,.35)'); lg.addColorStop(1,'rgba(255,40,70,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(gx-90,0,180,160); x.globalCompositeOperation='source-over'; }
+  function b1(lt){ const sv=SV?zTint(SV,T):null; if(sv) img(sv,0,900,W*0.5+20-lt*40,77,W*0.95,-0.02);
+    const gx=W*0.2+((lt*0.5)%1)*W*0.7; const lg=x.createLinearGradient(gx-90,0,gx+90,0); lg.addColorStop(0,rgba(T.hot,0)); lg.addColorStop(.5,rgba(T.hot,.35)); lg.addColorStop(1,rgba(T.hot,0)); x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(gx-90,0,180,160); x.globalCompositeOperation='source-over'; }
   // 二: 鯉口が切られ、刃の付け根から白い光
-  function b2(lt){ const mx=W*0.46, pull=ee(lt/0.3)*36; const sv=ZSAYA.complete?zTint(ZSAYA):null, kv=zTint(k.canvas);
+  function b2(lt){ const mx=W*0.46, pull=ee(lt/0.3)*36; const sv=SV?zTint(SV,T):null, kv=zTint(KB,T);
     const dw=W*1.05, sx=60, sw=480, cx0=mx-((226-sx)/sw-0.5)*dw;
     if(sv){ x.save(); x.beginPath(); x.rect(mx,0,W,H); x.clip(); img(sv,sx,sw,cx0,215,dw,0.0); x.restore(); }
     x.save(); x.beginPath(); x.rect(0,0,mx+pull,H); x.clip(); img(kv,sx,sw,cx0-pull,215,dw,0.0); x.restore();
     const fl=Math.min(1,lt/0.08)*(0.75+0.25*Math.sin(lt*30)); glow(mx+pull*0.5,215,170,fl);
-    x.save(); x.globalCompositeOperation='lighter'; x.fillStyle='rgba(255,235,240,'+fl*0.8+')'; x.fillRect(mx+pull*0.5-220*fl,214,440*fl,2); x.fillRect(mx+pull*0.5-1,215-60*fl,2,120*fl); x.restore(); }
+    x.save(); x.globalCompositeOperation='lighter'; x.fillStyle=rgba(T.pale,fl*0.8); x.fillRect(mx+pull*0.5-220*fl,214,440*fl,2); x.fillRect(mx+pull*0.5-1,215-60*fl,2,120*fl); x.restore(); }
   // 三: 刃が闇を走る。刃文に紅が映る
-  function b3(lt){ streaks(290,H,40,23,lt,1800); const kv=zTint(k.canvas); img(kv,240,660,W*0.58-lt*220,352,W*1.15,0.0);
-    const rx=W*1.2-lt*1700; const lg=x.createLinearGradient(rx-120,0,rx+120,0); lg.addColorStop(0,'rgba(255,60,90,0)'); lg.addColorStop(.5,'rgba(255,200,210,.55)'); lg.addColorStop(1,'rgba(255,60,90,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(rx-120,290,240,H); x.globalCompositeOperation='source-over'; }
+  function b3(lt){ streaks(290,H,40,23,lt,1800); const kv=zTint(KB,T); img(kv,240,660,W*0.58-lt*220,352,W*1.15,0.0);
+    const rx=W*1.2-lt*1700; const lg=x.createLinearGradient(rx-120,0,rx+120,0); lg.addColorStop(0,rgba(T.hot,0)); lg.addColorStop(.5,rgba(T.pale,.55)); lg.addColorStop(1,rgba(T.hot,0)); x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(rx-120,290,240,H); x.globalCompositeOperation='source-over'; }
 }
 function zetsuStage(k){
   const c=document.getElementById('gd_z'), zw=document.getElementById('gd_zw');
@@ -1603,9 +1618,10 @@ function zetsuStage(k){
    場面は 1040x420 で描き、canvas の幅に合わせる（縦が余れば闇と花びらが広がり、足りなければ上下を切る）
    看板では刀を右へ寄せて小さくし、左を題字のために空ける。大きな「絶」と落款は描かない */
 function zRun(c,k,o){
-  if(!ZHDreq){ ZHDreq=true; ZHD.src='assets/katana_ouka_hd.png'; }
+  const T=zArt(o.art||k.id), ZHD=zArtHd(T), ZSAYA=T.S, FE=T.parts==='feather';
   const W=1040, H=420, x=c.getContext('2d');
-  const P=[]; for(let i=0;i<190;i++) P.push({x:Math.random()*W,y:Math.random()*H,v:20+Math.random()*50,s:3+Math.random()*8,r:Math.random()*6,w:Math.random()*6,d:Math.random()<.3,c:'rgba('+(170+Math.random()*60|0)+','+(14+Math.random()*40|0)+','+(36+Math.random()*30|0)+',.88)'});
+  const P=[]; for(let i=0;i<(FE?120:190);i++) P.push({x:Math.random()*W,y:Math.random()*H,v:(FE?14:20)+Math.random()*(FE?36:50),s:FE?7+Math.random()*9:3+Math.random()*8,r:Math.random()*6,w:Math.random()*6,d:Math.random()<(FE?.72:.3),
+    c:FE?'rgba(250,250,252,.92)':'rgba('+(170+Math.random()*60|0)+','+(14+Math.random()*40|0)+','+(36+Math.random()*30|0)+',.88)'});
   const t0=performance.now(); let last=t0;
   const ZS={raf:0,burst:0,dead:false,stop(){ ZS.dead=true; cancelAnimationFrame(ZS.raf); }};
   const frame=now=>{
@@ -1613,12 +1629,12 @@ function zRun(c,k,o){
     const t=rt<ZSLASH?0:2.9+(rt-ZSLASH); // 斬線で帯が裂けると、その下に抜き身が据わっている
     const sc0=c.width/W, oy=(c.height-H*sc0)/2, vy0=-oy/sc0, vy1=H+oy/sc0; // 見えている縦の範囲（場面の座標）
     x.setTransform(sc0,0,0,sc0,0,oy);
-    const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,'#5a0d18'); g.addColorStop(.55,'#250609'); g.addColorStop(1,'#070203');
+    const g=x.createRadialGradient(W*.5,H*.55,20,W*.5,H*.55,W*.65); g.addColorStop(0,T.bg[0]); g.addColorStop(.55,T.bg[1]); g.addColorStop(1,T.bg[2]);
     x.fillStyle=g; x.fillRect(0,vy0,W,vy1-vy0);
     // 朱の月
-    x.save(); x.globalAlpha=.55; x.fillStyle='#b3122a'; x.shadowColor='#ff2a44'; x.shadowBlur=40; x.beginPath(); x.arc(W*.78,H*.3,64,0,7); x.fill(); x.restore();
+    if(T.sun==='eclipse') drawEclipse(x,W*.7,H*.42,92,rt); else { x.save(); x.globalAlpha=.55; x.fillStyle='#b3122a'; x.shadowColor='#ff2a44'; x.shadowBlur=40; x.beginPath(); x.arc(W*.78,H*.3,64,0,7); x.fill(); x.restore(); }
     // 大きな「絶」
-    if(!o.ban){ x.save(); x.globalAlpha=.12; x.fillStyle='#ff5a6a'; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore(); }
+    if(!o.ban){ x.save(); x.globalAlpha=.12; x.fillStyle=T.mark; x.font='bold 300px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W*.28,H*.52); x.restore(); }
     // 抜刀: 鞘に納まった桜華が現れ → 鯉口を切り → 刃が鞘から滑り出て → 鞘が消え、抜き身が中央に据わる
     const kw=W*(o.ban?0.68:0.9), sc=kw/900, kh=106*sc, mouthI=226, bladeI=650*sc, kx0=W-kw-24, ky=H*0.56, cxF=o.ban?W*0.29:(W-kw)/2;
     const A=0.8, B=1.3, Cd=2.3, D=2.9; // 現れる / 鯉口 / 抜き終わり / 据わる
@@ -1626,23 +1642,24 @@ function zRun(c,k,o){
     let pull=0; if(t>A) pull=8*sc*eo((t-A)/(B-A)); if(t>B) pull=8*sc+(bladeI-8*sc)*eio((t-B)/(Cd-B));
     const settle=eo((t-Cd-0.15)/(D-Cd)), bob=t>D?Math.sin((t-D)*1.3)*4:0;
     const bx=kx0-pull+(cxF-(kx0-bladeI))*settle; // 刀（柄の左端）の位置
-    if(KREADY&&ZSAYA.complete&&ZSAYA.naturalWidth){
+    const KB=zBlade(k,T);
+    if(KB&&ZSAYA.complete&&ZSAYA.naturalWidth){
       x.save(); x.translate(W/2,ky+bob); x.rotate(-0.1*(t<Cd?1:1-settle)-0.07*settle); x.translate(-W/2,-kh/2);
       if(t<B){ // 鞘に納まった姿
-        x.globalAlpha=eo(t/A); x.shadowColor='rgba(255,40,70,.7)'; x.shadowBlur=18+10*Math.sin(t*8); x.drawImage(ZSAYA,kx0,0,kw,kh);
-        if(t>A){ x.globalAlpha=1; x.save(); x.beginPath(); x.rect(0,-50,kx0+mouthI*sc,kh+100); x.clip(); x.shadowBlur=0; x.drawImage(k.canvas,bx,0,kw,kh); x.restore(); }
+        x.globalAlpha=eo(t/A); x.shadowColor=rgba(T.hot,.7); x.shadowBlur=18+10*Math.sin(t*8); x.drawImage(ZSAYA,kx0,0,kw,kh);
+        if(t>A){ x.globalAlpha=1; x.save(); x.beginPath(); x.rect(0,-50,kx0+mouthI*sc,kh+100); x.clip(); x.shadowBlur=0; x.drawImage(KB,bx,0,kw,kh); x.restore(); }
       } else {
         // 鞘（鯉口から先だけ）。抜き終わると落ちて消える
         const sa=1-eo((t-Cd)/0.5); if(sa>0){ x.save(); x.globalAlpha=sa; x.translate(0,(1-sa)*40); x.beginPath(); x.rect(kx0+mouthI*sc,-50,W,kh+100); x.clip(); x.drawImage(ZSAYA,kx0,0,kw,kh); x.restore(); }
         // 刃: 鞘の中にある間は鯉口より先を隠す
         x.save(); if(t<Cd){ x.beginPath(); x.rect(-W,-200,kx0+mouthI*sc+W,kh+400); x.clip(); }
-        x.shadowColor='rgba(255,40,70,.85)'; x.shadowBlur=24;
-        if(t>=Cd&&ZHD.complete&&ZHD.naturalWidth){ const hh=kw*ZHD.naturalHeight/ZHD.naturalWidth; x.drawImage(ZHD,bx,(kh-hh)/2,kw,hh); } else x.drawImage(k.canvas,bx,0,kw,kh); x.restore();
+        x.shadowColor=rgba(T.hot,.85); x.shadowBlur=24;
+        if(t>=Cd&&ZHD.complete&&ZHD.naturalWidth){ const hh=kw*ZHD.naturalHeight/ZHD.naturalWidth; x.drawImage(ZHD,bx,(kh-hh)/2,kw,hh); } else x.drawImage(KB,bx,0,kw,kh); x.restore();
         // 鯉口の火花
-        if(t<Cd){ const mx=kx0+mouthI*sc, g2=x.createRadialGradient(mx,kh*.45,0,mx,kh*.45,60); g2.addColorStop(0,'rgba(255,240,245,.95)'); g2.addColorStop(1,'rgba(255,60,90,0)'); x.globalCompositeOperation='lighter'; x.fillStyle=g2; x.fillRect(mx-60,kh*.45-60,120,120); x.globalCompositeOperation='source-over'; }
+        if(t<Cd){ const mx=kx0+mouthI*sc, g2=x.createRadialGradient(mx,kh*.45,0,mx,kh*.45,60); g2.addColorStop(0,rgba(T.pale,.95)); g2.addColorStop(1,rgba(T.hot,0)); x.globalCompositeOperation='lighter'; x.fillStyle=g2; x.fillRect(mx-60,kh*.45-60,120,120); x.globalCompositeOperation='source-over'; }
         // 抜き終わりの閃光と、刃を流れる光
-        if(t>Cd&&t<Cd+0.5){ x.save(); x.globalCompositeOperation='lighter'; x.globalAlpha=1-(t-Cd)/0.5; x.fillStyle='rgba(255,210,220,.6)'; x.fillRect(-W,-H,W*3,H*3); x.restore(); }
-        if(t>D){ const sx=bx+kw*(0.3+((t-D)*.4%1)*0.72); const lg=x.createLinearGradient(sx-60,0,sx+60,0); lg.addColorStop(0,'rgba(255,255,255,0)'); lg.addColorStop(.5,'rgba(255,235,240,.75)'); lg.addColorStop(1,'rgba(255,255,255,0)');
+        if(t>Cd&&t<Cd+0.5){ x.save(); x.globalCompositeOperation='lighter'; x.globalAlpha=1-(t-Cd)/0.5; x.fillStyle=rgba(T.pale,.6); x.fillRect(-W,-H,W*3,H*3); x.restore(); }
+        if(t>D){ const sx=bx+kw*(0.3+((t-D)*.4%1)*0.72); const lg=x.createLinearGradient(sx-60,0,sx+60,0); lg.addColorStop(0,'rgba(255,255,255,0)'); lg.addColorStop(.5,rgba(T.pale,.75)); lg.addColorStop(1,'rgba(255,255,255,0)');
           x.globalCompositeOperation='lighter'; x.fillStyle=lg; x.fillRect(sx-60,kh*.25,120,kh*.3); x.globalCompositeOperation='source-over'; }
       }
       x.restore();
@@ -1650,14 +1667,41 @@ function zRun(c,k,o){
     }
     // 花びら
     for(const p of P){ if(p.kx){ p.x+=p.kx*dt; p.kx*=0.96; if(Math.abs(p.kx)<5) p.kx=0; } if(p.v<20) p.v+=160*dt; p.y+=p.v*dt; p.x+=Math.sin(t*1.5+p.w)*30*dt-12*dt; p.r+=dt*2; if(p.y>vy1+10){p.y=vy0-10;p.x=Math.random()*W*1.1;} if(p.x<-10)p.x=W+10;
-      x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':p.c; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); }
+      if(FE) drawFeather(x,p); else { x.save(); x.translate(p.x,p.y); x.rotate(p.r); x.scale(1,Math.cos(p.r*1.3)); x.fillStyle=p.d?'rgba(30,4,8,.9)':p.c; x.beginPath(); x.ellipse(0,0,p.s,p.s*.6,0,0,7); x.fill(); x.restore(); } }
     // 落款
-    if(!o.ban){ x.save(); x.fillStyle='#a8101f'; x.fillRect(W-82,H-92,58,58); x.fillStyle='#f4d6d6'; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore(); }
-    drawManga(x,W,H,rt,k);
+    if(!o.ban){ x.save(); x.fillStyle=T.seal[0]; x.fillRect(W-82,H-92,58,58); if(FE){ x.strokeStyle='rgba(255,255,255,.8)'; x.lineWidth=2; x.strokeRect(W-82,H-92,58,58); } x.fillStyle=T.seal[1]; x.font='bold 40px serif'; x.textAlign='center'; x.textBaseline='middle'; x.fillText('絶',W-53,H-62); x.restore(); }
+    drawManga(x,W,H,rt,k,T);
     ZS.raf=requestAnimationFrame(frame);
   };
   ZS.raf=requestAnimationFrame(frame);
   return ZS;
+}
+/* 日食: 黒い日のまわりに白い光の輪と、ゆっくり回る光の筋 */
+function drawEclipse(x,cx,cy,r,t){
+  x.save(); x.globalCompositeOperation='lighter';
+  const g=x.createRadialGradient(cx,cy,r*0.9,cx,cy,r*3.2); g.addColorStop(0,'rgba(255,255,255,.95)'); g.addColorStop(.08,'rgba(235,238,255,.55)'); g.addColorStop(.35,'rgba(170,175,200,.16)'); g.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=g; x.fillRect(cx-r*3.3,cy-r*3.3,r*6.6,r*6.6);
+  x.translate(cx,cy); x.rotate(t*0.05);
+  for(let i=0;i<22;i++){ const a=i/22*Math.PI*2+Math.sin(i*7.3)*0.12, len=r*(1.5+0.9*Math.abs(Math.sin(i*2.1+t*0.6))), w=0.018+0.012*Math.sin(i*3.7);
+    x.save(); x.rotate(a); const lg=x.createLinearGradient(r,0,len,0); lg.addColorStop(0,'rgba(255,255,255,.55)'); lg.addColorStop(1,'rgba(255,255,255,0)'); x.fillStyle=lg;
+    x.beginPath(); x.moveTo(r*0.98,-r*w*3); x.lineTo(len,0); x.lineTo(r*0.98,r*w*3); x.closePath(); x.fill(); x.restore(); }
+  x.restore();
+  x.save(); x.fillStyle='#000'; x.shadowColor='rgba(255,255,255,.9)'; x.shadowBlur=26; x.beginPath(); x.arc(cx,cy,r,0,7); x.fill();
+  x.shadowBlur=0; x.strokeStyle='rgba(255,255,255,.9)'; x.lineWidth=1.6; x.beginPath(); x.arc(cx,cy,r+0.5,0,7); x.stroke(); x.restore();
+}
+/* 烏の羽: 羽軸と、片側が長い羽弁。黒い羽は白い縁で闇から浮かせる */
+function drawFeather(x,p){
+  const L=p.s*3.4, Wd=p.s*0.62; x.save(); x.translate(p.x,p.y); x.rotate(p.r*0.5+Math.sin(p.w+p.r)*0.7); x.scale(1,0.5+0.5*Math.abs(Math.cos(p.r*1.1)));
+  // 羽弁: 根元は細く、先は丸く。下側に二つの切れ込み
+  x.beginPath(); x.moveTo(-L/2,0); x.bezierCurveTo(-L*0.2,-Wd*1.2,L*0.32,-Wd*1.15,L/2,-Wd*0.1);
+  x.bezierCurveTo(L*0.38,Wd*0.5,L*0.2,Wd*0.55,L*0.12,Wd*0.42); x.lineTo(L*0.05,Wd*0.25); x.lineTo(L*0.0,Wd*0.6);
+  x.bezierCurveTo(-L*0.12,Wd*0.62,-L*0.2,Wd*0.45,-L*0.24,Wd*0.32); x.lineTo(-L*0.3,Wd*0.2); x.quadraticCurveTo(-L*0.4,Wd*0.25,-L/2,0); x.closePath();
+  if(p.d){ x.fillStyle='rgba(6,6,8,.96)'; x.fill(); x.strokeStyle='rgba(235,238,248,.6)'; x.lineWidth=1; x.stroke(); }
+  else { x.fillStyle=p.c; x.shadowColor='rgba(255,255,255,.9)'; x.shadowBlur=10; x.fill(); x.shadowBlur=0; }
+  // 羽軸と羽枝
+  x.strokeStyle=p.d?'rgba(210,214,228,.7)':'rgba(110,110,120,.55)'; x.lineWidth=0.9; x.beginPath(); x.moveTo(-L/2-L*0.12,Wd*0.05); x.quadraticCurveTo(0,-Wd*0.1,L/2,-Wd*0.1); x.stroke();
+  x.lineWidth=0.5; x.beginPath(); for(let i=1;i<6;i++){ const u=-L/2+L*i/6.5; x.moveTo(u,-Wd*0.08); x.lineTo(u+L*0.1,-Wd*0.7); } x.stroke();
+  x.restore();
 }
 /* 桜華を大きく見る: 指二本で拡大、なぞって動かす、二度触ると寄る/戻る */
 function zetsuZoom(k,again){
@@ -1671,7 +1715,7 @@ function zetsuZoom(k,again){
     S.x=Math.max(-mx,Math.min(mx,S.x)); S.y=Math.max(-my,Math.min(my,S.y)); im.style.transform='translate('+S.x+'px,'+S.y+'px) scale('+S.z+')'; };
   const zoomAt=(nz,cx,cy)=>{ const r=st.getBoundingClientRect(); nz=Math.max(1,Math.min(8,nz)); const ox=cx-r.left-r.width/2, oy=cy-r.top-r.height/2;
     S.x=ox-(ox-S.x)*nz/S.z; S.y=oy-(oy-S.y)*nz/S.z; S.z=nz; apply(); };
-  const show=w=>{ im.src=w==='saya'?'assets/katana_ouka_saya_hd.png':'assets/katana_ouka_hd.png'; S.z=1; S.x=S.y=0; apply(); v.querySelectorAll('[data-z]').forEach(b=>b.classList.toggle('on',b.dataset.z===w)); };
+  const ZA=zArt(k.id), show=w=>{ im.src=w==='saya'?ZA.sayaHd:ZA.hd; S.z=1; S.x=S.y=0; apply(); v.querySelectorAll('[data-z]').forEach(b=>b.classList.toggle('on',b.dataset.z===w)); };
   v.onclick=e=>{ const b=e.target.closest('[data-z]'); if(!b) return; const z=b.dataset.z;
     if(z==='close'){ v.hidden=true; } else if(z==='again'){ v.hidden=true; (again||zetsuStage)(k); } else show(z); };
   st.onpointerdown=e=>{ st.setPointerCapture(e.pointerId); pts.set(e.pointerId,{x:e.clientX,y:e.clientY});

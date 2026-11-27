@@ -212,4 +212,14 @@ for (const kit of ['common', 'ouka']) { const s = new A.Sim({ training: true, ki
   for (let k = 0; k < 300; k++) { t.step([I(), I({ G: k % 2 })]); if (t.p[1].st === 'fall') f = true; if (t.p[1].st === 'down') d = true; }
   ok(f && d, '無防備落下中に「必ずダウン」なら着地で必ずダウン'); }
 
+// 起き上がりの1F目に攻撃を重ねられても、守を押していればガードできる
+for (const lag of [0, 1, 2, 4]) { const s = sim(60); s.p[1].st = 'down'; s.p[1].f = 0; s.p[1].ground = true; let gu = -1;
+  s.step([I(), I({ G: 1 })]); for (let k = 0; k < 40 && gu < 0; k++) { s.step([I(), I({ G: 1 })]); if (s.p[1].st !== 'getup') gu = k; }
+  for (let k = 0; k < 5 + lag; k++) s.step([I(), I({ G: 1 })]); // 起きる少し前から構えておく
+  const t = sim(60); t.p[1].st = 'down'; t.p[1].f = 0; t.p[1].ground = true; let ev = [], n = 0;
+  t.step([I(), I({ G: 1 })]); while (t.p[1].st === 'getup' || t.p[1].st === 'down') { const f0 = t.p[1].f; t.step([n === 0 && false ? I() : I(), I({ G: 1 })]); n++; if (n > 60) break; if (t.p[1].st === 'getup' && f0 === 30 - 5 - lag) { t.step([I({ A: 1, C: 'n' }), I({ G: 1 })]); } }
+  for (let k = 0; k < 20; k++) { t.step([I(), I({ G: 1 })]); ev.push(...drain(t)); }
+  const hit = ev.some(e => e.t === 'hit'), blk = ev.some(e => e.t === 'block');
+  ok(!hit, '起き上がりに重ねた斬り（' + lag + 'F 前に出す）はガードか空振り ' + (blk ? '(ガード)' : '(空振り)')); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

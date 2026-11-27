@@ -198,7 +198,7 @@ function invuln(p){
   if (p.st === 'roll') { const d = DG[p.rk]; return p.f >= d.i0 && p.f <= d.i1; }
   if (p.st === 'adodge') { const d = DG[p.ak]; return p.f >= d.i0 && p.f <= d.i1; }
   if (p.st === 'tech') return p.f <= 14;
-  if (p.st === 'getup') return p.f <= (p.gk === 'roll' ? 16 : 20);
+  if (p.st === 'getup') return true; // 起き上がりは終わるまで無敵（終わった1F目に重ねられても守れるように）
   if (p.st === 'atk' && MV[p.mv].inv) { const v = MV[p.mv].inv; return p.mvf >= v[0] && p.mvf <= v[1]; }
   return false;
 }
@@ -371,7 +371,7 @@ Sim.prototype.update = function(p, o){
     case 'getup':
       p.f++;
       if (p.gk === 'roll') p.vx = (p.f >= 4 && p.f <= 22) ? p.rollDir * 520 : 0;
-      if (p.f >= (p.gk === 'roll' ? 32 : 30)) p.st = 'idle';
+      if (p.f >= (p.gk === 'roll' ? 32 : 30)) { if (p.inp.G && o.st !== 'stun') { p.st = 'guard'; p.f = 0; p.slideF = C.slideF; } else p.st = 'idle'; } // 守を押していれば、起きた瞬間からガード
       break;
     case 'down':
       p.vx = toward(p.vx, 0, PH.gFric * 2); p.downT++; if (p.f > 0) p.f--; break;

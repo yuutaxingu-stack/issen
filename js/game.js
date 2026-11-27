@@ -1538,7 +1538,7 @@ const ZART={
   ouka:{mei:'桜華',yomi:'おうか',saya:'assets/katana_ouka_saya.png',hd:'assets/katana_ouka_hd.png',sayaHd:'assets/katana_ouka_saya_hd.png',src:'assets/katana_ouka.png',
     bg:['#5a0d18','#250609','#070203'],hot:[255,40,70],deep:[200,24,48],pale:[255,220,228],void:[5,1,2],band:'#0a0203',seal:['#a8101f','#f4d6d6'],mark:'#ff5a6a',
     tint:['rgba(40,2,8,.6)','rgba(255,70,95,.45)'],parts:'petal',sun:'moon'},
-  yata:{mei:'八咫',yomi:'やた',saya:'assets/katana_yata_saya.png',hd:'assets/katana_yata_hd.png',sayaHd:'assets/katana_yata_saya_hd.png',src:'assets/katana_yata.png',
+  yata:{mei:'八咫',yomi:'やた',up:true,saya:'assets/katana_yata_saya.png',hd:'assets/katana_yata_hd.png',sayaHd:'assets/katana_yata_saya_hd.png',src:'assets/katana_yata.png',
     bg:['#3a3a40','#121215','#020203'],hot:[255,255,255],deep:[210,210,220],pale:[255,255,255],void:[2,2,3],band:'#060608',seal:['#0a0a0c','#f4f4f6'],mark:'#ffffff',
     tint:['rgba(255,255,255,.18)','rgba(255,255,255,.55)'],parts:'feather',sun:'eclipse'}};
 function zArt(id){ const a=ZART[id]||ZART.ouka; if(!a.S){ a.S=new Image(); a.S.src=a.saya; a.B=new Image(); a.B.src=a.src; } return a; }
@@ -1624,6 +1624,7 @@ function zetsuStage(k){
    看板では刀を右へ寄せて小さくし、左を題字のために空ける。大きな「絶」と落款は描かない */
 function zRun(c,k,o){ o=Object.assign({flip:true},o||{});
   const T=zArt(o.art||k.id), ZHD=zArtHd(T), ZSAYA=T.S, FE=T.parts==='feather';
+  if(T.up) o.flip=false; // 八咫の絵は元から刃が上
   const W=1040, H=420, x=c.getContext('2d');
   const P=[]; for(let i=0;i<(FE?120:190);i++) P.push({x:Math.random()*W,y:Math.random()*H,v:(FE?14:20)+Math.random()*(FE?36:50),s:FE?7+Math.random()*9:3+Math.random()*8,r:Math.random()*6,w:Math.random()*6,d:Math.random()<(FE?.72:.3),
     c:FE?'rgba(250,250,252,.92)':'rgba('+(170+Math.random()*60|0)+','+(14+Math.random()*40|0)+','+(36+Math.random()*30|0)+',.88)'});
@@ -1743,9 +1744,9 @@ function zetsuZoom(k,again){
     v.innerHTML='<div class="zzst"><img alt="" draggable="false"></div><div class="zzbar"><button type="button" data-z="blade" class="on">抜き身</button><button type="button" data-z="saya">鞘</button><button type="button" data-z="again">抜刀をもう一度</button><button type="button" data-z="close">閉じる</button></div><p class="zzhint">指二本で拡大・なぞって動かす・二度触ると寄る</p>';
     document.body.appendChild(v); }
   const st=v.querySelector('.zzst'), im=v.querySelector('img');
-  const S={z:1,x:0,y:0}, pts=new Map(); let pinch=null, lastTap=0;
+  const S={z:1,x:0,y:0}, pts=new Map(); let pinch=null, lastTap=0; const UP=!!(ZART[k.id]&&ZART[k.id].up);
   const apply=()=>{ const r=st.getBoundingClientRect(), bw=im.offsetWidth*S.z, bh=im.offsetHeight*S.z, mx=Math.max(0,(bw-r.width)/2), my=Math.max(0,(bh-r.height)/2);
-    S.x=Math.max(-mx,Math.min(mx,S.x)); S.y=Math.max(-my,Math.min(my,S.y)); im.style.transform='translate('+S.x+'px,'+S.y+'px) scale('+S.z+','+(-S.z)+')'; };
+    S.x=Math.max(-mx,Math.min(mx,S.x)); S.y=Math.max(-my,Math.min(my,S.y)); im.style.transform='translate('+S.x+'px,'+S.y+'px) scale('+S.z+','+(UP?S.z:-S.z)+')'; };
   const zoomAt=(nz,cx,cy)=>{ const r=st.getBoundingClientRect(); nz=Math.max(1,Math.min(8,nz)); const ox=cx-r.left-r.width/2, oy=cy-r.top-r.height/2;
     S.x=ox-(ox-S.x)*nz/S.z; S.y=oy-(oy-S.y)*nz/S.z; S.z=nz; apply(); };
   const ZA=zArt(k.id), show=w=>{ im.src=w==='saya'?ZA.sayaHd:ZA.hd; S.z=1; S.x=S.y=0; apply(); v.querySelectorAll('[data-z]').forEach(b=>b.classList.toggle('on',b.dataset.z===w)); };

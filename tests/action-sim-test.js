@@ -277,4 +277,9 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   for (let k = 0; k < 40; k++) { f.step([I({ H: 1 }), I(k === 5 ? { A: 1, C: 'n' } : {})]); if (f.p[0].st === 'hit' || f.p[0].st === 'tumble') hitIn = true; }
   ok(hitIn && f.p[0].mv !== 'fukuen' && f.p[0].fuku > 0 && f.p[0].fuku < A.FUKU.max && f.p[0].ecl === 2, '復円の溜めは相手の攻撃で止まる（溜まった分は残る ' + f.p[0].fuku + 'F）'); }
 
+// 八咫の技は稽古で何度でも出せる（地上で横へ羽跳した後も）
+{ const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 400 * A.FP; s.p[1].x = 1400 * A.FP; const got = [];
+  for (let t = 0; t < 3; t++) { s.step([I({ K: 'u' }), I()]); got.push(s.p[0].mv); for (let k = 0; k < 150; k++) s.step([I({ R: 1 }), I()]); s.p[0].x = 400 * A.FP; }
+  ok(got.every(m => m === 'hane'), '地上で横へ羽跳しても、次もまた出せる ' + got); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

@@ -240,7 +240,7 @@ Sim.prototype.startMove = function(p, id){
 /* 技スティック（設定）: 弾いた向きの刀の技。向きなし＝特殊技1、横＝その向きへ特殊技1、上＝特殊技2、下＝特殊技3 */
 Sim.prototype.kitByStick = function(p, air){
   const kit = KIT[p.kit] || KIT.common, k = p.wk.d; p.wk = null;
-  if (k === 'u') { const id = air ? kit.s2a : kit.s2; if (id === 'hane' && p.haneUsed) { p.buf.A = 0; return; } return this.startMove(p, id); }
+  if (k === 'u') { const id = air ? kit.s2a : kit.s2; if (id === 'hane' && p.haneUsed && !p.ground) { p.buf.A = 0; return; } return this.startMove(p, id); }
   if (k === 'd') { const id = air ? kit.s3a : kit.s3; if (id === 'plant' && p.tree) { p.buf.A = 0; return; } return this.startMove(p, id); }
   if (air) { if (p.s1Used) { p.buf.A = 0; return; } p.s1Used = true; }
   if (k === 'l' || k === 'r') p.face = k === 'r' ? 1 : -1;
@@ -367,6 +367,7 @@ Sim.prototype.think = function(p, o){
 Sim.prototype.update = function(p, o){
   const h = horiz(p);
   if (p.wallF > 0) p.wallF--;
+  if (p.ground && p.haneUsed && p.mv !== 'hane') p.haneUsed = false; // 地面にいれば羽跳はまた使える（地上で横へ跳んだときも）
   if (p.dropF > 0) p.dropF--;
   switch (p.st) {
     case 'guard':

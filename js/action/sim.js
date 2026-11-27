@@ -798,7 +798,8 @@ Sim.prototype.step = function(inputs){
   for (const p of P) this.physics(p);
   // 押し合い
   const a = P[0], b = P[1];
-  if (Math.abs(a.y - b.y) < 100 * FP && a.st !== 'roll' && b.st !== 'roll' && a.st !== 'down' && b.st !== 'down') {
+  const thru = q => q.st === 'atk' && (q.mv === 'hane' || q.mv === 'shokujin'); // 羽跳・食甚は相手をすり抜ける
+  if (Math.abs(a.y - b.y) < 100 * FP && a.st !== 'roll' && b.st !== 'roll' && a.st !== 'down' && b.st !== 'down' && !thru(a) && !thru(b)) {
     const dx = b.x - a.x, ov = 44 * FP - Math.abs(dx);
     if (ov > 0) { const s = dx >= 0 ? 1 : -1, hlf = Math.ceil(ov / 2); a.x -= s * hlf; b.x += s * hlf;
       a.x = Math.min(WALL_R, Math.max(WALL_L, a.x)); b.x = Math.min(WALL_R, Math.max(WALL_L, b.x)); }

@@ -294,4 +294,9 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   s.step([I({ K: 'u' }), I({})]); for (let k = 0; k < 30; k++) s.step([I({ U: 1 }), I()]);
   ok(!s.p[0].hane2, '上へ跳んで上を押し続けても、二度目は跳ばない'); }
 
+// 羽跳は当たっても相手をすり抜けて向こうへ抜ける
+{ const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 500 * A.FP; s.p[1].x = 620 * A.FP; let hit = false;
+  s.step([I({ K: 'u', R: 1 }), I()]); for (let k = 0; k < 30; k++) { s.step([I({ R: 1 }), I()]); if (drain(s).some(e => e.t === 'hit')) hit = true; }
+  ok(hit && s.p[0].x > s.p[1].x, '横への羽跳が当たって相手の向こうへ抜ける (' + (s.p[0].x / 100 | 0) + ' > ' + (s.p[1].x / 100 | 0) + ')'); }
+
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

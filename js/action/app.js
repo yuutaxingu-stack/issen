@@ -273,6 +273,9 @@ try { const k = JSON.parse(localStorage.getItem('issen-action-kit2') || 'null');
 function saveKits(){ try { localStorage.setItem('issen-action-kit2', JSON.stringify(KITS)); } catch (e) {} }
 const kitOf = id => id === 'ouka' && owns('ouka') ? 'ouka' : 'common'; // 桜華の技は、ガチャなどで手に入れた人だけ
 const rollFor = mode => [!!OPT.dashRoll, mode === 'vs' ? !!OPT.dashRoll : false];
+// 見た目の刀（技は kitsFor が決める）。CPU は相手ごとに並〜幻から一振り
+const cpuKat = n => { const ids = Object.keys(window.IssenKatLook || {}).filter(id => (IssenKatLook[id].t || '並') !== '絶'); return ids.length ? ids[(n * 7 + 3) % ids.length] : 'mumei'; };
+const katsFor = mode => mode === 'vs' ? [KITS[0], KITS[1]] : mode === 'cpu' ? [KITS[0], cpuKat(GAME.n || 1)] : [KITS[0], 'mumei'];
 const kitsFor = mode => mode === 'vs' ? [kitOf(KITS[0], mode), kitOf(KITS[1], mode)] : [kitOf(KITS[0], mode), 'common'];
 function recordWin(r){ // 勝った刀の戦績と銭
   const i = r.winner; if (i < 0 || GAME.mode === 'train' || (GAME.mode === 'cpu' && i !== 0)) return;
@@ -286,6 +289,7 @@ function startMode(mode){
   GAME.mode = mode; GAME.log = []; GAME.n = 1; GAME.t = 0; GAME.coins = 0;
   sim = new A.Sim(mode === 'train' ? { training: true, kits: kitsFor(mode), dashRoll: rollFor(mode) } : { toWin: mode === 'cpu' ? 1 : 2, kits: kitsFor(mode), dashRoll: rollFor(mode) });
   if (mode === 'cpu') cpuReset(1);
+  GAME.kats = katsFor(mode);
   GAME.phase = mode === 'train' ? 'fight' : 'intro';
   GAME.zin = mode !== 'train' && sim.p.some(p => p.kit === 'ouka') ? 110 : 0; // 絶の持ち主がいれば立ち合いの前に抜刀のカットイン
   clearFx(); FX.hist = []; FX.last = null;
@@ -347,7 +351,7 @@ function afterFinish(){
   GAME.log.push({ name: r.name, tier: r.tier, winner: r.winner });
   recordWin(r);
   if (GAME.mode === 'cpu') {
-    if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu'), dashRoll: rollFor('cpu') }); cpuReset(GAME.n); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
+    if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu'), dashRoll: rollFor('cpu') }); cpuReset(GAME.n); GAME.kats = katsFor('cpu'); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
     if (r.winner < 0) { resetRound(); GAME.phase = 'intro'; GAME.t = 0; return; } // 引き分けは同じ相手ともう一度
     const rec = GAME.n - 1;
     if (rec > GAME.best) { GAME.best = rec; try { localStorage.setItem('issen-action-cpu-v1', JSON.stringify({ best: rec })); } catch (e) {} }
@@ -514,6 +518,48 @@ function leg(c, hx, hy, fx, fy, bend){
   const kx = hx + Math.cos(a + b) * L, ky = hy + Math.sin(a + b) * L;
   c.moveTo(hx, hy); c.lineTo(kx, ky); c.lineTo(hx + Math.cos(a) * d, hy + Math.sin(a) * d);
 }
+/* ---------- 持っている刀の見た目 ----------
+   刀帳と同じ絵（初めの刀の絵を柄巻・鍔・刃の色で塗り替えたもの、絶は本物の絵）を、手から切っ先へ沿わせて描く。
+   見た目だけで、計算（sim）には入らない。表は js/action/katlook-data.js（tools/action-katlook.js が作る） */
+const KLOOK = window.IssenKatLook || {}, KMETAL = { gold: null, silver: [198, 204, 214], copper: [206, 122, 82], black: [44, 40, 38] };
+const KIMG_W = 900, KIMG_H = 106, KTSUBA = 226, KCV = {};
+const KBASE = new Image(); if (window.ISSEN_KATANA_IMAGE) KBASE.src = window.ISSEN_KATANA_IMAGE;
+const lookOf = id => KLOOK[id] || KLOOK.mumei || { m: 'gold', s: {} };
+const hsl = (h, s, l) => { h = ((h % 360) + 360) % 360 / 360; const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return 255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))); }; return [f(0), f(8), f(4)]; };
+function katCanvas(id){
+  if (KCV[id]) return KCV[id] === 1 ? null : KCV[id];
+  const L = lookOf(id);
+  let img = KBASE;
+  if (L.src) { if (!L.img) { L.img = new Image(); L.img.src = L.src; } img = L.img; }
+  if (!img.complete || !img.naturalWidth) return null; // 読み込み中は線で描く
+  const cv = document.createElement('canvas'); cv.width = KIMG_W; cv.height = KIMG_H; const x = cv.getContext('2d');
+  if (L.src) { if (!L.up) { x.translate(0, KIMG_H); x.scale(1, -1); } x.drawImage(img, 0, 0, KIMG_W, KIMG_H); } // 戦うときは刃が上（絵の上 = 刀の刃）にそろえる
+  else {
+    x.translate(0, KIMG_H); x.scale(1, -1); x.drawImage(img, 0, 0, KIMG_W, KIMG_H); x.setTransform(1, 0, 0, 1, 0, 0);
+    try {
+      const d = x.getImageData(0, 0, KIMG_W, KIMG_H), a = d.data;
+      for (let i = 0; i < a.length; i += 4) { if (a[i + 3] < 8) continue; const px = (i >> 2) % KIMG_W; let r = a[i], g = a[i + 1], b = a[i + 2]; const l = (r + g + b) / 3;
+        const blue = b > r + 12 && b > g + 12, warm = r > b + 40 && g > b + 15;
+        if (px < 250 && blue) { if (L.w) { const k = Math.min(1.45, b / 70); r = L.w[0] * k; g = L.w[1] * k; b = L.w[2] * k; } }
+        else if (warm && px < 285) { const m = KMETAL[L.m]; if (m) { const k = l / 150; r = m[0] * k; g = m[1] * k; b = m[2] * k; } }
+        else if (px >= 255 && L.b) { let t = L.b; if (t === 'iris') t = hsl(180 + (px / KIMG_W) * 320, 0.7, 0.72).concat(0.4);
+          const am = t[3], q = l / 255; r = r * (1 - am) + t[0] * q * am * 1.3; g = g * (1 - am) + t[1] * q * am * 1.3; b = b * (1 - am) + t[2] * q * am * 1.3; }
+        a[i] = r; a[i + 1] = g; a[i + 2] = b; }
+      x.putImageData(d, 0, 0);
+    } catch (e) {}
+  }
+  // 小さく描くので、先に縮めておく（細い刃がちらつかないように）
+  const sm = document.createElement('canvas'); sm.width = 300; sm.height = 36; const y = sm.getContext('2d'); y.imageSmoothingQuality = 'high'; y.drawImage(cv, 0, 0, 300, 36);
+  return (KCV[id] = sm);
+}
+// 斬った筋の色（刀帳の「一閃の色」と同じ）
+function slashLook(id){
+  const s = lookOf(id).s || {};
+  if (s._c) return s._c;
+  const rgb = h => { h = (h || '#ffffff').replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
+  const c = rgb(s.col), dark = (c[0] + c[1] + c[2]) / 3 < 90;
+  return (s._c = { c, dark, glow: s.glow || null, rainbow: !!s.rainbow, double: !!s.double, feathers: !!s.feathers });
+}
 function drawFighter(p, fr){
   const P = pose(p, fr), col = COL[p.i];
   const sx = wx(p.x / FP), sy = wy(p.y / FP), z = cam.z;
@@ -550,7 +596,13 @@ function drawFighter(p, fr){
   const tipx = hnx + Math.cos(sa) * 82, tipy = hny + Math.sin(sa) * 82;
   const ext = p.st === 'atk' ? (MV[p.mv].ext || 0) : 0; // 刀より先まで届く技は軌跡も伸ばす
   const etx = tipx + Math.cos(sa) * ext, ety = tipy + Math.sin(sa) * ext;
-  if (!P.sheath) {
+  const kc = !P.sheath && katCanvas((GAME.kats || [])[p.i] || 'mumei');
+  if (kc) { // 鍔を手に、切っ先を刀の先に合わせて絵を置く
+    const k = 82 / (KIMG_W - KTSUBA), lk = lookOf((GAME.kats || [])[p.i]);
+    c.save(); c.translate(hnx, hny); c.rotate(sa); c.scale(k * KIMG_W / 300, k * KIMG_H / 36);
+    if (lk.t === '幻' || lk.t === '絶') { c.shadowColor = (lk.s && lk.s.glow) || 'rgba(255,255,255,.8)'; c.shadowBlur = 6; }
+    c.drawImage(kc, -KTSUBA * 300 / KIMG_W, -18); c.restore();
+  } else if (!P.sheath) {
     c.strokeStyle = '#2b2520'; c.lineWidth = 5; c.beginPath(); c.moveTo(hnx - Math.cos(sa) * 12, hny - Math.sin(sa) * 12); c.lineTo(hnx, hny); c.stroke();
     c.strokeStyle = '#c9a54a'; c.lineWidth = 3; c.beginPath(); c.moveTo(hnx + Math.cos(sa + 1.57) * 5, hny + Math.sin(sa + 1.57) * 5); c.lineTo(hnx - Math.cos(sa + 1.57) * 5, hny - Math.sin(sa + 1.57) * 5); c.stroke();
     c.strokeStyle = p.kit === 'ouka' ? '#f6dde6' : '#e8e6df'; c.lineWidth = 2.6; c.beginPath(); c.moveTo(hnx, hny); c.lineTo(tipx, tipy); c.stroke();
@@ -654,6 +706,7 @@ function drawOukaFx(){
   }
 }
 function drawTrails(){
+  const fr0 = GAME.t || 0;
   for (let i = 0; i < 2; i++) {
     const tr = FX.trails[i]; if (tr.length < 2) continue;
     const ox = sim.p[i].x / FP, oy = sim.p[i].y / FP;
@@ -661,7 +714,10 @@ function drawTrails(){
     cx.globalCompositeOperation = 'lighter';
     for (let k = 1; k < tr.length; k++) {
       const a = tr[k - 1], b = tr[k], al = Math.min(1, b.life / 10);
-      cx.fillStyle = b.iai ? `rgba(255,255,255,${0.85 * al})` : sim.p[i].kit === 'ouka' ? `rgba(250,200,218,${0.6 * al})` : `rgba(240,236,226,${0.55 * al})`;
+      const sl = slashLook((GAME.kats || [])[i]);
+      let col = sl.c; if (sl.rainbow) col = hsl(fr0 * 4 + k * 26, 0.8, 0.75);
+      if (sl.dark && !b.iai) { cx.globalCompositeOperation = 'source-over'; cx.shadowColor = sl.glow || '#fff'; cx.shadowBlur = 8; } else { cx.globalCompositeOperation = 'lighter'; cx.shadowBlur = 0; }
+      cx.fillStyle = b.iai ? `rgba(255,255,255,${0.85 * al})` : `rgba(${col[0] | 0},${col[1] | 0},${col[2] | 0},${(sl.dark ? 0.8 : 0.6) * al})`;
       cx.beginPath();
       const mid = (q, f) => [ox + q.h[0] + (q.t[0] - q.h[0]) * f, oy + q.h[1] + (q.t[1] - q.h[1]) * f];
       const a1 = mid(a, 0.3), b1 = mid(b, 0.3);
@@ -1228,6 +1284,7 @@ const FRAME_MS = 1000 / 60;
          onLocal(f, code) 自分の入力を送る, onOver(log, wins) 決着を知らせる, onExit() 戻る } */
 function onlineStart(o){
   GAME.mode = 'online'; GAME.log = []; GAME.coins = 0; GAME.n = 1;
+  GAME.kats = (o.kats || []).map(id => (window.IssenKatLook || {})[id] ? id : 'mumei');
   applyTune(); // ネット対戦はいつもの値
   sim = new A.Sim({ toWin: 2, kits: o.kits, dashRoll: o.dashRoll || [false, false] });
   const zin = sim.p.some(p => p.kit === 'ouka') ? 110 : 0;

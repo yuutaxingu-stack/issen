@@ -126,10 +126,11 @@
     const h = st.hello || {}, kits = [], names = [];
     kits[ME] = st.mine.kit; kits[OP] = h.kit === 'ouka' ? 'ouka' : 'common';
     names[ME] = st.mine.name; names[OP] = String(h.name || N.nameOf(st.oppId)).slice(0, 10);
+    const kats = []; kats[ME] = st.mine.kat; kats[OP] = h.kit === 'ouka' ? 'ouka' : (h.kat === 'ouka' ? 'mumei' : String(h.kat || 'mumei')); // 刀の見た目
     const roll = []; roll[ME] = !!st.mine.roll; roll[OP] = !!h.roll; // ダッシュ中の守の設定は、それぞれの人のもの
     const off = ME === 1 ? st.off : 0;
     cover(null);
-    AP.onlineStart({ me: ME, kits, names, dashRoll: roll, kat: st.mine.kat, startAt, now: () => performance.now() + off, delay: 2,
+    AP.onlineStart({ me: ME, kits, kats, names, dashRoll: roll, kat: st.mine.kat, startAt, now: () => performance.now() + off, delay: 2,
       onLocal, onOver: report, onExit: why => leave(why) });
   }
 

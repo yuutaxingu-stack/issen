@@ -604,7 +604,8 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   // ここから当たり
   if (this.sd) { d.hp = Math.max(0, d.hp - dmgBase); this.finish(a, d, 'sd', m, s); return; }
   const inStun = s.dst === 'hit' || s.dst === 'tumble' || s.dst === 'stun' || s.dst === 'down';
-  if (s.dst === 'stun' && m.iai) { this.finish(a, d, 'iai', m, s); return; }
+  const inf = this.opts.training && d.i === 1; // 稽古の相手は体力無限（倒れない）
+  if (s.dst === 'stun' && m.iai && !inf) { this.finish(a, d, 'iai', m, s); return; }
   if (inStun && a.combo > 0) { a.combo++; }
   else {
     a.combo = 1; a.comboDmg = 0; a.sameCnt = 0; a.lastMv = null;
@@ -645,7 +646,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
     ev.push({ t: 'hit', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, dmg, combo: a.combo, adv, counter: a.combo === 1 && a.comboFirst.counter });
   }
   this.hitstop = dmg >= 700 ? 8 : 4;
-  if (d.hp <= 0) this.finish(a, d, 'ko', m, s);
+  if (d.hp <= 0) { if (inf) d.hp = HP_MAX; else this.finish(a, d, 'ko', m, s); }
 };
 
 /* 一本。決着名を決める */

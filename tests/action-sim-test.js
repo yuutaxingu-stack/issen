@@ -4,6 +4,7 @@ let fail = 0;
 const ok = (c, msg) => { if (!c) { fail++; console.log('NG', msg); } else console.log('ok', msg); };
 const I = o => Object.assign({}, A.NOIN, o || {});
 function sim(dist){ const s = new A.Sim({ training: true }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + dist) * A.FP; return s; }
+function simM(dist){ const s = new A.Sim({ toWin: 2 }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + dist) * A.FP; return s; } // 倒れる立ち合い（稽古の相手は体力無限）
 function run(s, n, f0, f1){ for (let k = 0; k < n; k++) s.step([f0 ? f0(k, s) : I(), f1 ? f1(k, s) : I()]); }
 function drain(s){ const e = s.ev; s.ev = []; return e; }
 
@@ -19,11 +20,11 @@ function drain(s){ const e = s.ev; s.ev = []; return e; }
 // 3) 全体フレーム: 弱斬りは17F
 { const s = sim(400); run(s, 1, () => I({ A: 1 })); let n = 1; while (s.p[0].st === 'atk') { s.step([I(), I()]); n++; } ok(n === 17 && A.MV.jab1.total === 17, '弱斬り 全体17F（18F目に動ける） n=' + n); }
 // 4) ガードを削りきると気絶、守が居合になって一本
-{ const s = sim(60); s.p[1].gd = 500; run(s, 2, null, () => I({ G: 1 })); run(s, 1, () => I({ A: 1 }), () => I({ G: 1 })); run(s, 30, null, () => I({ G: 1 }));
+{ const s = simM(60); s.p[1].gd = 500; run(s, 2, null, () => I({ G: 1 })); run(s, 1, () => I({ A: 1 }), () => I({ G: 1 })); run(s, 30, null, () => I({ G: 1 }));
   ok(s.p[1].st === 'stun', 'ガードが割れて気絶');
   run(s, 1, () => I({ G: 1 })); run(s, 40); ok(s.result && s.result.how === 'iai', '気絶中の居合で一本 ' + (s.result && s.result.name)); }
 // 5) 連撃で体力を削りきる
-{ const s = sim(60); s.p[1].hp = 200; let k = 0; run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.result && s.result.how === 'ko', '体力0で斬り伏せ ' + (s.result && s.result.name)); }
+{ const s = simM(60); s.p[1].hp = 200; let k = 0; run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.result && s.result.how === 'ko', '体力0で斬り伏せ ' + (s.result && s.result.name)); }
 // 6) 弱斬りの連撃が三段まで出る
 { const s = sim(60); const seen = new Set(); for (let k = 0; k < 80; k++) { s.step([I({ A: (k % 6) < 2 }), I()]); if (s.p[0].mv) seen.add(s.p[0].mv); } ok(seen.has('jab2') && seen.has('jab3'), '弱斬り三段 ' + [...seen].join(',')); }
 // 7) 跳ぶ・二段跳び・着地
@@ -177,5 +178,13 @@ ok(A.MV.bair.s < A.MV.fair.s && A.MV.bair.dmg > A.MV.fair.dmg && Math.abs(A.MV.u
   ok(s.p[0].mv === 'utilt', '硬直中に入れた上斬りが、弱斬りの終わりにすぐ出る (' + s.p[0].mv + ')');
   const b = sim(400); b.step([I({ A: 1, C: 'n' }), I()]); b.step([I(), I()]); b.step([I({ J: 1 }), I()]); let g = 0; while (b.p[0].mv === 'jab1' && g < 40) { b.step([I(), I()]); g++; }
   ok(b.p[0].st !== 'jsq' && b.p[0].ground, '発生前に押した跳は受け付けない (' + b.p[0].st + ')'); }
+
+// 稽古の相手は体力無限: 体力を少なくしても倒れない
+{ const s = sim(70); s.p[1].hp = 300; let ko = false;
+  for (let k = 0; k < 600 && !ko; k++) { s.step([I(k % 12 === 0 ? { A: 1, C: 'n' } : {}), I()]); ko = !!s.over; }
+  ok(!ko && s.p[1].hp > 0, '稽古の相手は斬られ続けても倒れない (体力 ' + s.p[1].hp + ')');
+  const t = new A.Sim({ toWin: 2 }); t.p[0].x = 600 * A.FP; t.p[1].x = 670 * A.FP; t.p[1].hp = 300; let ko2 = false;
+  for (let k = 0; k < 600 && !ko2; k++) { t.step([I(k % 12 === 0 ? { A: 1, C: 'n' } : {}), I()]); ko2 = !!t.over; }
+  ok(ko2, '稽古でなければ倒れる'); }
 
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);

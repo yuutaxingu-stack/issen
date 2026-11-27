@@ -124,7 +124,7 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
     <tr><td>居</td><td>相手が気絶すると守が居に変わる。当たれば一本</td></tr>
   </table>
   <p>ボタンの置き場所と大きさは「ボタン配置」で変えられます。キーボードで二人対戦: 朱は WASD・J斬 U技 K跳 L守、藍は 矢印・テンキー1斬 4技 2跳 3守。</p>
-  <p>稽古では右上に入力の履歴、左上に今の技のフレームと直前の有利F（＋は先に動ける）が出ます。数字はすべて叩き台です。</p>
+  <p>稽古は時間切れなし。上のフレームメーターは1マス＝1コマで、緑＝発生・赤＝持続・青＝硬直・黄＝やられ／ガード硬直・白＝無敵。右の大きな数字は直前の当たりの硬直差（＋は先に動ける）。相手を「コンボ確認」にすると、一度当たった後は動けるようになった瞬間から守るので、つながっていない連撃はガードされます。</p>
   <button type="button" id="h_close">閉じる</button>
 </div></div>
 <div id="netov" class="ov" hidden><div class="sheet">
@@ -132,15 +132,15 @@ body[data-mode=vs] #a_pause{top:50%;margin-top:0;transform:translate(-50%,-50%) 
   <div class="acts"><button type="button" id="nv_back" hidden>一閃へ戻る</button></div>
 </div></div>
 <div id="rot">横向きにしてください</div>
-<script src="js/action/pose.js?v=1795768092"></script>
-<script src="js/action/boxes.js?v=1795768092"></script>
-<script src="js/action/sim.js?v=1795768092"></script>
-<script src="js/action/netplay.js?v=1795768092"></script>
-<script src="js/action/app.js?v=1795768092"></script>
+<script src="js/action/pose.js?v=1795781996"></script>
+<script src="js/action/boxes.js?v=1795781996"></script>
+<script src="js/action/sim.js?v=1795781996"></script>
+<script src="js/action/netplay.js?v=1795781996"></script>
+<script src="js/action/app.js?v=1795781996"></script>
 <script src="js/online-config.js"></script>
-<script src="js/no-link.js?v=1795768092"></script>
-<script src="js/net.js?v=1795768092"></script>
-<script src="js/action/online.js?v=1795768092"></script>
+<script src="js/no-link.js?v=1795781996"></script>
+<script src="js/net.js?v=1795781996"></script>
+<script src="js/action/online.js?v=1795781996"></script>
 <script>/* 招かれた人だけ: ログインしていなければタイトルへ（ネット対戦は online.js が確かめる） */
 (function(){var N=window.IssenNet;if(!N||!N.configured()||/[?&]match=/.test(location.search))return;N.init().then(function(){if(!N.user)location.replace('index.html');});})();</script>
 <script>document.getElementById('a_more').addEventListener('click',function(){var b=document.getElementById('bar');b.classList.toggle('open');this.textContent=b.classList.contains('open')?'閉じる':'設定';});</script>

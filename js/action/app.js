@@ -43,7 +43,7 @@ function viewAt(sx, sy){
 const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false, wazaStick: false }; // wazaStick: 技ボタンをスティックにする // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('issen-action-opt') || '{}')); } catch (e) {}
 function saveOpt(){ try { localStorage.setItem('issen-action-opt', JSON.stringify(OPT)); } catch (e) {} }
-const DUMMY = [['stand', '立つだけ'], ['guard', '守り続ける'], ['jump', '跳び回る'], ['mash', '暴れる']];
+const DUMMY = [['stand', '立つだけ'], ['cguard', 'コンボ確認（当たったら守る）'], ['guard', '守り続ける'], ['jump', '跳び回る'], ['mash', '暴れる']];
 
 /* ---------- 入力 ---------- */
 const key = {};
@@ -150,12 +150,17 @@ function readHuman(pi){
 
 /* ---------- 木偶 ---------- */
 let rngS = 12345; const rnd = () => (rngS = (rngS * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-const ai = { t: 0, act: null, left: 0 };
+const ai = { t: 0, act: null, left: 0, cg: 0 };
+const HITST = { hit: 1, tumble: 1, down: 1, getup: 1, tech: 1, stun: 0 };
 function readDummy(sim){
   const p = sim.p[1], o = sim.p[0], i = Object.assign({}, A.NOIN);
   ai.t++;
   switch (OPT.dummy) {
     case 'guard': if (p.st !== 'stun') i.G = true; break;
+    case 'cguard': // 一度当たったら、動けるようになった瞬間から守る。つながっていない連撃はガードされる
+      if (HITST[p.st]) ai.cg = 70; else if (ai.cg > 0) ai.cg--;
+      if (ai.cg > 0 && p.st !== 'stun') i.G = true;
+      break;
     case 'jump': if (ai.t % 70 < 12) i.J = true; if (ai.t % 140 < 70) i.R = true; else i.L = true; break;
     case 'mash':
       if (ai.left <= 0) { const r = rnd(); ai.act = r < .35 ? 'jab' : r < .5 ? 'side' : r < .62 ? 'up' : r < .75 ? 'jump' : r < .9 ? 'guard' : 'wait'; ai.left = 10 + Math.floor(rnd() * 30); }
@@ -331,6 +336,7 @@ function stepOnce(){
     if (FX.calm > 90 && sim.p[0].combo) sim.p[0].combo = 0;
   }
   for (const p of sim.p) recordTrail(p);
+  if (GAME.mode === 'train' && sim.frame !== FM.f) { FM.f = sim.frame; fmRecord(); } // ヒットストップで止まっている間は数えない
   tickParts();
 }
 /* 一本のあと: 次の一本・次の相手・試合の終わり */
@@ -362,6 +368,7 @@ function onEvent(e){
     FX.last = { kind: e.stun ? '気絶中に当たり' : e.counter ? '出だしに当たり' : 'ヒット', mv: e.mv, adv: e.adv, dmg: e.dmg, combo: e.combo };
   } else if (e.t === 'block') {
     burst(wx, wy, 8, '#dfe9ff', 4, true);
+    if (GAME.mode === 'train' && OPT.dummy === 'cguard' && e.p === 1 && ai.cg > 0) FM.note = 'つながっていない — 間にガードされた';
     FX.shake = 2;
     FX.last = { kind: 'ガード', mv: e.mv, adv: e.adv, gd: e.gd };
   } else if (e.t === 'break') {
@@ -866,8 +873,10 @@ function whoName(i){
   if (GAME.mode === 'online' && ON) return COL[i].name + '　' + ON.names[i] + (i === ON.me ? '（あなた）' : '');
   return COL[i].name;
 }
+/* 画面の端の竹（壁）より内側に文字を置く */
+function hudM(){ const wl = MIR < 0 ? W - wx(A.WALL_R / FP + 30) : wx(A.WALL_L / FP - 30); return Math.max(16, W * 0.03, wl + 24 * cam.z + 10); }
 function drawHud(){
-  const m = Math.max(16, W * 0.03), bw = Math.min(W * 0.34, 380), top = GAME.mode === 'train' ? 14 : 12;
+  const m = hudM(), bw = Math.min(W * 0.34, 380), top = GAME.mode === 'train' ? 14 : 12;
   const red = sim.sd || lastBout() || WORLD.f > 0.5;
   for (let i = 0; i < 2; i++) {
     const p = sim.p[i], right = (i === 1) !== (MIR < 0), x = right ? W - m - bw : m;
@@ -882,7 +891,7 @@ function drawHud(){
   }
   const left = sim.sd ? Math.max(0, Math.ceil((A.C.sdF - (sim.frame - sim.sdStart)) / 60)) : Math.max(0, Math.ceil((A.C.roundF - sim.frame) / 60));
   cx.textAlign = 'center'; cx.font = `30px ${DISPLAY}`; cx.fillStyle = red ? '#ffe2d4' : INK;
-  cx.fillText(sim.sd ? '一太刀' : String(left), W / 2, top + 32);
+  cx.fillText(sim.sd ? '一太刀' : GAME.mode === 'train' ? '∞' : String(left), W / 2, top + 32);
   cx.font = `500 11px ${UIF}`;
   const sub = sim.sd ? '残り ' + left + ' 秒' : GAME.mode === 'train' ? '稽古' : GAME.mode === 'cpu' ? '勝ち抜き　其の' + kn(GAME.n) : lastBout() ? '互いに後なし' : kn(sim.roundNo) + '本目';
   cx.fillText(sub, W / 2, top + 50);
@@ -900,28 +909,74 @@ function drawIntro(){
   else { cx.globalAlpha = clamp(1 - (t - 70) / 10, 0, 1); cx.fillStyle = '#ffffff'; cx.font = `${Math.round(s * 0.17)}px ${DISPLAY}`; cx.fillText('始め', W / 2, H * 0.47); }
   cx.globalAlpha = 1;
 }
+/* ---------- 稽古: フレームメーター（1コマ＝1マス。発生・持続・硬直・やられ・無敵を色で） ---------- */
+const FM = { rows: [[], []], quiet: 99, max: 110 };
+const FMC = { n: '#4a4b44', s: '#2fb36f', a: '#e0405f', r: '#2f74c9', h: '#e3bf33', i: '#f2efe6', j: '#7f9a8c', d: '#9a72d6' };
+function fmCat(p){
+  switch (p.st) {
+    case 'atk': { const m = MV[p.mv]; return p.mvf < m.s ? 's' : p.mvf < m.s + m.a ? 'a' : 'r'; }
+    case 'roll': case 'adodge': return A.invuln(p) ? 'i' : 'r';
+    case 'land': case 'fall': case 'unguard': return 'r';
+    case 'hit': case 'tumble': case 'bstun': case 'stun': return 'h';
+    case 'down': case 'getup': case 'tech': return 'd';
+    case 'jsq': return 'j';
+    default: return 'n';
+  }
+}
+function fmRecord(){
+  if (sim.p[0].st === 'atk') FM.mv = sim.p[0].mv;
+  const c = sim.p.map(fmCat), busy = c.some(k => k !== 'n');
+  if (!busy) { FM.quiet++; if (FM.quiet > 1 && FM.quiet <= 6) c.forEach((k, i) => FM.rows[i].push(k)); return; }
+  if (FM.quiet > 20) { FM.rows = [[], []]; FM.note = ''; } // しばらく何もなかったら新しく数え直す
+  FM.quiet = 0;
+  c.forEach((k, i) => { FM.rows[i].push(k); if (FM.rows[i].length > FM.max) FM.rows[i].shift(); });
+}
 function drawFrames(){
   if (!OPT.frames || GAME.mode !== 'train') return;
-  const p = sim.p[0], x = Math.max(16, W * 0.03), y0 = 92;
-  const lines = [];
-  if (p.st === 'atk') { const m = MV[p.mv]; lines.push([`${m.n}　${p.mvf}F目`, INK]); lines.push([`発生 ${m.s}F　持続 ${m.a}F　硬直 ${m.r}F　全体 ${m.total}F${m.land ? '　着地 ' + m.land + 'F' : ''}`, '#3b3d33']); }
-  else if (p.st === 'roll' || p.st === 'adodge') { const d = A.DG[p.st === 'roll' ? p.rk : p.ak]; lines.push([`${d.n}　${p.f}F目`, INK]); lines.push([`無敵 ${d.i0}〜${d.i1}F　全体 ${d.total}F${d.land ? '　着地 ' + d.land + 'F' : ''}`, '#3b3d33']); }
-  else lines.push([`状態: ${STN[p.st] || p.st}`, '#3b3d33']);
-  const L = FX.last;
+  const m = hudM(), p = sim.p[0];
+  // 上の段: 技の数字（発生・持続・硬直・全体）と、直前の当たりの硬直差
+  const L = FX.last, mvId = p.st === 'atk' ? p.mv : FM.mv, mv = mvId && MV[mvId];
+  const mw = Math.min(W - m * 2, 820), cw = Math.max(3, Math.floor(mw / FM.max)), x0 = Math.round(W / 2 - cw * FM.max / 2), y0 = 126;
+  cx.fillStyle = 'rgba(16,17,14,.78)'; cx.fillRect(x0 - 8, y0 - 22, cw * FM.max + 16, FM.note ? 92 : 74);
+  cx.textBaseline = 'alphabetic'; cx.textAlign = 'left'; cx.font = `700 12.5px ${UIF}`; cx.fillStyle = PALE;
+  let sx = x0;
+  const put = (t, c, f) => { cx.font = f || `700 12.5px ${UIF}`; cx.fillStyle = c; cx.fillText(t, sx, y0 - 8); sx += cx.measureText(t).width + 12; };
+  if (p.st === 'roll' || p.st === 'adodge') { const d = A.DG[p.st === 'roll' ? p.rk : p.ak]; put(d.n, PALE); put(`無敵 ${d.i0}〜${d.i1}F`, FMC.i); put(`全体 ${d.total}F`, '#c9c2ae'); }
+  else if (mv) { put(mv.n, PALE); put(`発生 ${mv.s}F`, FMC.s); put(`持続 ${mv.a}F`, FMC.a); put(`硬直 ${mv.r}F`, '#7fb2f0'); put(`全体 ${mv.total}F` + (mv.land ? `　着地 ${mv.land}F` : ''), '#c9c2ae', `500 12px ${UIF}`); }
+  else put('技を出すと、ここにフレームが出ます', '#a39d8a', `500 12px ${UIF}`);
+  // 右寄せ: 硬直差（＋は先に動ける）
   if (L) {
-    const adv = L.adv == null ? '' : `　${L.adv >= 0 ? '+' : '−'}${Math.abs(L.adv)}F`;
-    const extra = L.dmg != null ? `　体力 −${(L.dmg / 100).toFixed(L.dmg % 100 ? 1 : 0)}` : L.gd != null ? `　ガード −${L.gd / 100}` : '';
-    lines.push([`直前: ${MV[L.mv] ? MV[L.mv].n : ''} ${L.kind}${adv}${extra}`, L.adv == null ? '#3b3d33' : L.adv >= 0 ? '#2c4f96' : '#c8372d']);
+    const adv = L.adv == null ? '—' : (L.adv >= 0 ? '+' : '−') + Math.abs(L.adv);
+    cx.textAlign = 'right'; cx.font = `500 11px ${UIF}`; cx.fillStyle = '#c9c2ae'; const rx = x0 + cw * FM.max;
+    cx.fillText(L.kind === 'ガード' ? 'ガード時' : L.kind, rx - 64, y0 - 8);
+    cx.font = `700 20px ${UIF}`; cx.fillStyle = L.adv == null ? PALE : L.adv >= 0 ? '#8fc0ff' : '#ff8c8c'; cx.fillText(adv, rx, y0 - 5);
+    cx.textAlign = 'left';
   }
-  if (p.combo >= 2) lines.push([`連撃 ${p.combo}　与えた体力 ${Math.round(p.comboDmg / 100)}`, '#3b3d33']);
-  cx.textAlign = 'left';
-  cx.fillStyle = 'rgba(239,232,214,.72)';
-  cx.fillRect(x - 8, y0 - 16, Math.min(W * 0.42, 440), lines.length * 18 + 10);
-  lines.forEach(([s, c], k) => { cx.font = `${k ? 500 : 700} 12.5px ${UIF}`; cx.fillStyle = c; cx.fillText(s, x, y0 + k * 18); });
-  // 入力の履歴
-  const hx = W - Math.max(16, W * 0.03), hy = 92;
-  cx.textAlign = 'right'; cx.font = `500 12px ${UIF}`;
-  FX.hist.slice(0, 12).forEach((h, k) => { cx.fillStyle = `rgba(20,21,18,${0.85 - k * 0.06})`; cx.fillText(`${h.s}　${h.n > 99 ? '99+' : h.n}`, hx, hy + k * 15); });
+  // メーター（上が朱、下が藍）
+  for (let i = 0; i < 2; i++) {
+    const row = FM.rows[i], y = y0 + i * 13;
+    cx.fillStyle = 'rgba(255,255,255,.06)'; cx.fillRect(x0, y, cw * FM.max, 11);
+    for (let k = 0; k < row.length; k++) { cx.fillStyle = FMC[row[k]]; cx.fillRect(x0 + k * cw, y, Math.max(1, cw - 1), 11); }
+    // 色の続く長さを数で（3コマ以上の区切りだけ）
+    cx.font = `700 9px ${UIF}`; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    for (let k = 0; k < row.length;) { let e = k; while (e < row.length && row[e] === row[k]) e++;
+      if (row[k] !== 'n' && e - k >= 3 && cw * (e - k) >= 12) { cx.fillStyle = row[k] === 'i' || row[k] === 'h' ? INK : '#fff'; cx.fillText(String(e - k), x0 + (k + e) / 2 * cw, y + 6); }
+      k = e; }
+    cx.textBaseline = 'alphabetic'; cx.textAlign = 'right'; cx.font = `700 10px ${UIF}`; cx.fillStyle = COL[i].light; cx.fillText(COL[i].name, x0 - 2, y + 9);
+  }
+  // 凡例と連撃
+  const ly = y0 + 38; let lx = x0; cx.textAlign = 'left'; cx.font = `500 10.5px ${UIF}`;
+  for (const [k, t] of [['s', '発生'], ['a', '持続'], ['r', '硬直'], ['h', 'やられ・ガード硬直'], ['i', '無敵'], ['d', 'ダウン']]) { cx.fillStyle = FMC[k]; cx.fillRect(lx, ly - 8, 8, 8); cx.fillStyle = '#c9c2ae'; cx.fillText(t, lx + 11, ly); lx += cx.measureText(t).width + 24; }
+  const ex = [];
+  if (p.combo >= 2) ex.push(`連撃 ${p.combo}　与えた体力 ${Math.round(p.comboDmg / 100)}`);
+  if (L && L.dmg != null) ex.push(`体力 −${(L.dmg / 100).toFixed(L.dmg % 100 ? 1 : 0)}`); else if (L && L.gd != null) ex.push(`ガード −${L.gd / 100}`);
+  if (ex.length) { cx.textAlign = 'right'; cx.fillStyle = PALE; cx.font = `700 11px ${UIF}`; cx.fillText(ex.join('　'), x0 + cw * FM.max, ly); }
+  if (FM.note) { cx.textAlign = 'left'; cx.font = `700 12.5px ${UIF}`; cx.fillStyle = '#ff8c8c'; cx.fillText(FM.note, x0, ly + 18); }
+  // 入力の履歴（右・壁の内側、下地つき）
+  const hx = W - m, hy = y0 + (FM.note ? 84 : 66), hs = FX.hist.slice(0, 6);
+  if (hs.length) { cx.font = `500 12px ${UIF}`; const hw = Math.max(...hs.map(h => cx.measureText(`${h.s}　${h.n > 99 ? '99+' : h.n}`).width)) + 14;
+    cx.fillStyle = 'rgba(16,17,14,.55)'; cx.fillRect(hx - hw + 4, hy - 13, hw, hs.length * 15 + 6); cx.textAlign = 'right';
+    hs.forEach((h, k) => { cx.fillStyle = `rgba(239,232,214,${0.95 - k * 0.07})`; cx.fillText(`${h.s}　${h.n > 99 ? '99+' : h.n}`, hx - 4, hy + k * 15); }); }
 }
 const STN = { fall: '無防備落下', idle: '待ち', walk: '歩き', dash: 'ダッシュ', crouch: 'しゃがみ', jsq: '踏み切り', air: '空中', land: '着地', guard: 'ガード', unguard: 'ガードを解く', bstun: 'ガード硬直', roll: '転がり', hit: 'のけぞり', tumble: '吹き飛び', down: 'ダウン', getup: '起き上がり', stun: '気絶', adodge: '空中回避', tech: '受け身', ko: '一本' };
 function drawPad(v){

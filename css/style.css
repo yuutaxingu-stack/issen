@@ -219,3 +219,6 @@ body{margin:0;background:var(--stage);color:var(--ink);font-family:var(--ui);use
 #zzoom.z-yata .zzbar button{border-color:rgba(255,255,255,.45);background:rgba(4,4,5,.7);color:#f4f4f6;}
 #zzoom.z-yata .zzbar button.on{background:#f2f2f6;border-color:#fff;color:#050506;}
 .zmark.z-yata{background:linear-gradient(160deg,#2a2a30,#020203);color:#fbfbfd;box-shadow:inset 0 0 0 1px #e8e8ee,0 0 8px rgba(255,255,255,.5);}
+.gbo{grid-column:1/-1;padding:8px 10px;border-radius:3px;border:1px dashed rgba(240,240,246,.6);background:rgba(10,10,12,.7);color:#f4f4f6;font-family:var(--ui);font-size:12.5px;letter-spacing:.08em;cursor:pointer;line-height:1.4;}
+.gbo.ask{border-style:solid;border-color:#e0405a;background:#5a0a14;color:#fff;}
+.gbo:disabled{opacity:.5;cursor:default;}

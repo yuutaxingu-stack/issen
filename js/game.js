@@ -1339,9 +1339,11 @@ function curBox(){ const l=liveBoxes(); if(!GA.box||!l.includes(GA.box)) GA.box=
 function pct(v){ return (Math.round(v*10)/10)+'%'; }
 function boxName(b){ const f=KMAP[b.pick]; return b.mei+(f?'「'+f.mei+'」':''); }
 function renderBox(){ const el=document.getElementById('g_box'); if(!el) return; const b=curBox(), l=liveBoxes().slice().reverse(), f=KMAP[b.pick], z=boxZ(b), busy=gBusy();
-  const key=b.id+'|'+l.length+'|'+busy; if(el.dataset.k===key) return; el.dataset.k=key;
+  const key=b.id+'|'+l.length+'|'+busy+'|'+(OPENB||[]).join()+'|'+GOD; if(el.dataset.k===key) return; el.dataset.k=key;
   // 左の札: 新しい箱ほど上
-  el.innerHTML=l.map(x=>{ const fk=KMAP[x.pick]; return '<button type="button" class="gbx'+zcls(fk)+(x===b?' on':'')+'" data-box="'+x.id+'"'+(busy?' disabled':'')+'><span class="n">'+x.mei+'</span><span class="m">'+(fk?fk.mei:'？')+'</span><span class="z"><i>絶</i>'+pct(boxZ(x))+'</span>'+(!boxOpen(x)?'<em class="pre">先</em>':x===latestBox()?'<em>新</em>':'')+'</button>'; }).join('');
+  const pre=GOD&&ACCT&&!boxOpen(b)?'<button type="button" class="gbo" id="g_bo"'+(busy?' disabled':'')+'>'+b.mei+'を全員に公開</button>':'';
+  el.innerHTML=pre+l.map(x=>{ const fk=KMAP[x.pick]; return '<button type="button" class="gbx'+zcls(fk)+(x===b?' on':'')+'" data-box="'+x.id+'"'+(busy?' disabled':'')+'><span class="n">'+x.mei+'</span><span class="m">'+(fk?fk.mei:'？')+'</span><span class="z"><i>絶</i>'+pct(boxZ(x))+'</span>'+(!boxOpen(x)?'<em class="pre">先</em>':x===latestBox()?'<em>新</em>':'')+'</button>'; }).join('');
+  const bo=document.getElementById('g_bo'); if(bo) bo.addEventListener('click',()=>openBoxForAll(b,bo));
   el.querySelectorAll('button[data-box]').forEach(btn=>btn.addEventListener('click',()=>{ if(gBusy()) return; const nb=BOXES.find(x=>x.id===btn.dataset.box); if(nb===GA.box) return; GA.box=nb; banStop(); refreshCoins(); }));
   // 看板と引くボタンを目玉の絶の色に
   const zc=zcls(f).trim(); ['g_ban','g_pull'].forEach(id=>{ const e=document.getElementById(id); if(!e) return; e.classList.remove('z-ouka','z-yata'); if(zc) e.classList.add(zc); });
@@ -1366,6 +1368,13 @@ function banSync(){
   if(!BAN&&KREADY){ const k=KMAP[curBox().pick]; if(k){ banSize(); BAN=zRun(document.getElementById('g_banc'),k,{ban:true}); } }
 }
 // お知らせから: その刀が目玉の箱が引けるなら、その箱でガチャを開く（まだなら false）
+// 神様: 公開前の箱を全員に公開する。一度目で確かめ、二度目で公開（取り消せない）
+function openBoxForAll(b,btn){
+  if(!btn.dataset.ask){ btn.dataset.ask='1'; btn.classList.add('ask'); btn.textContent='本当に公開する？（もう一度押す・取り消せません）'; setTimeout(()=>{ if(btn.isConnected&&btn.dataset.ask){ delete btn.dataset.ask; btn.classList.remove('ask'); btn.textContent=b.mei+'を全員に公開'; } },5000); return; }
+  btn.disabled=true; btn.textContent='公開しています…';
+  ACCT.openBox(b.id).then(()=>{ const el=document.getElementById('g_box'); if(el) el.dataset.k=''; refreshCoins(); if(window.IssenNet&&IssenNet.toast) IssenNet.toast(b.mei+'を全員に公開しました。この箱が最新になり、前の箱の絶は '+pct(ZOLD)+' になります',6000); },
+    e=>{ btn.disabled=false; delete btn.dataset.ask; btn.classList.remove('ask'); btn.textContent=b.mei+'を全員に公開'; if(window.IssenNet&&IssenNet.toast) IssenNet.toast(e.message,5000); });
+}
 function gachaFor(id){ const b=liveBoxes().find(x=>x.pick===id); if(!b) return false; openGacha('pull'); GA.box=b; refreshCoins(); return true; }
 function openGacha(tab){ banStop(); gachaEl.hidden=false; uiCache=''; GA.box=null; GA.phase='idle'; setTab(tab||'pull'); showSkip(); document.getElementById('g_res').hidden=true; refreshCoins(); gSize(); if(!GA.raf) GA.raf=requestAnimationFrame(gLoop); }
 function closeGacha(){ banStop(); gachaEl.hidden=true; uiCache=''; cancelAnimationFrame(GA.raf); GA.raf=0; }

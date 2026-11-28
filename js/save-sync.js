@@ -77,6 +77,14 @@
       apply(d);
       return d;
     },
+    async openBox(box){   // 神様だけ: 公開前の箱をみんなに公開する（サーバーが神様か確かめる）
+      await flush();
+      let d;
+      try { d = await rpc('god_open_box', { p_box: box }); }
+      catch (e) { throw new Error(missing(e) ? 'サーバーの準備がまだです（第二弾のSQLの実行待ち）' : N.jp(e)); }
+      apply(d);
+      return d;
+    },
     async forge(id){   // 玉鋼で刀を鍛える（玉鋼の計算はサーバー）
       await flush();
       if (queue().length) throw new Error('通信できませんでした。電波のよい所でもう一度どうぞ');

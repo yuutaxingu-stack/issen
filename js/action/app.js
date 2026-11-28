@@ -8,7 +8,7 @@ const A = window.IssenAction, FP = A.FP, MV = A.MV;
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
 const DISPLAY = "'Yuji Syuku','Hiragino Mincho ProN','Yu Mincho',serif";
 const UIF = "'Zen Kaku Gothic New','Hiragino Sans',sans-serif";
-const INK = '#141512', PALE = '#efe8d6';
+const INK = '#141512', PALE = '#efe8d6', INK0 = INK;
 const COL = [{ main: '#c8372d', light: '#f3a294', name: '朱' }, { main: '#2c4f96', light: '#a9c1f0', name: '藍' }];
 const TIERC = { '並': '#d9d3c4', '上': '#9cc4ea', '極': '#e8c35a', '幻': '#e9b8ff', '絶': '#ffffff', '分': '#bdb6a6' };
 const KN = ['〇','一','二','三','四','五','六','七','八','九','十'];
@@ -40,7 +40,7 @@ function viewAt(sx, sy){
 }
 
 /* ---------- 設定 ---------- */
-const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false, wazaStick: false }; // wazaStick: 技ボタンをスティックにする // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
+const OPT = { dummy: 'stand', frames: true, refill: true, boxes: false, dashRoll: false, wazaStick: false, fixStick: false }; // fixStick: 移動スティックを決まった場所に置く // wazaStick: 技ボタンをスティックにする // dashRoll: ダッシュ中の守で前方回避（切ると勢いを残したシールド）
 try { Object.assign(OPT, JSON.parse(localStorage.getItem('issen-action-opt') || '{}')); } catch (e) {}
 function saveOpt(){ try { localStorage.setItem('issen-action-opt', JSON.stringify(OPT)); } catch (e) {} }
 const DUMMY = [['stand', '立つだけ'], ['cguard', 'コンボ確認（当たったら守る）'], ['guard', '守り続ける'], ['jump', '跳び回る'], ['mash', '暴れる']];
@@ -70,6 +70,7 @@ function layoutPad(pd, w, h){
   const r = clamp(Math.min(w, h) * 0.085, 30, 54), sc = BLAY && BLAY.s ? BLAY.s : 1;
   pd.BTN = BDEF.map(([id, label, k]) => { const d = defaultPos(id, w, h, r), q = BLAY && BLAY[id];
     return { id, label, x: q ? q[0] * w : d[0], y: q ? q[1] * h : d[1], r: r * k * sc }; });
+  const m = BLAY && BLAY.M; pd.FS = { x: m ? m[0] * w : r * 2.6, y: m ? m[1] * h : h - r * 2.3 }; // 固定の移動スティックの場所
   pd.w = w; pd.h = h;
 }
 function inBtn(pd, x, y){ for (const b of pd.BTN) { const dx = x - b.x, dy = y - b.y; if (dx * dx + dy * dy <= (b.r * 1.25) ** 2) return b.id; } return null; }
@@ -79,10 +80,14 @@ cv.addEventListener('pointerdown', e => {
   const at = viewAt(e.clientX, e.clientY); if (!at) return;
   const pd = at.v.pad, x = at.x, y = at.y;
   const b = inBtn(pd, x, y);
+  if (EDIT && OPT.fixStick && !b && Math.hypot(x - pd.FS.x, y - pd.FS.y) < 70) { EDIT.sel = 'M'; OWN[e.pointerId] = { v: at.v, r: 'E', id: 'M', dx: x - pd.FS.x, dy: y - pd.FS.y }; return; }
   if (EDIT) { if (b) { EDIT.sel = b; OWN[e.pointerId] = { v: at.v, r: 'E', id: b, dx: x - pd.BTN.find(q => q.id === b).x, dy: y - pd.BTN.find(q => q.id === b).y }; } return; }
   if (b === 'A' && OPT.wazaStick) { const q = pd.BTN.find(z => z.id === 'A'); pd.wz = { ox: q.x, oy: q.y, x, y, fired: false }; OWN[e.pointerId] = { v: at.v, r: 'W' }; return; }
   if (b) { pd.btn[b] = true; OWN[e.pointerId] = { v: at.v, r: b }; return; }
-  if (x < at.v.w * 0.5 && !pd.stick) { pd.stick = { id: e.pointerId, ox: x, oy: y, x, y }; OWN[e.pointerId] = { v: at.v, r: 'S' }; }
+  if (x < at.v.w * 0.5 && !pd.stick) {
+    if (OPT.fixStick) { if (Math.hypot(x - pd.FS.x, y - pd.FS.y) > 120) return; pd.stick = { id: e.pointerId, ox: pd.FS.x, oy: pd.FS.y, x, y }; } // 固定: 輪の近くを押すと、輪の中心から指の向きへ
+    else pd.stick = { id: e.pointerId, ox: x, oy: y, x, y };
+    OWN[e.pointerId] = { v: at.v, r: 'S' }; }
 }, { passive: false });
 function localOf(v, sx, sy){ const [a, b, c, d, e, f] = v.m, det = a * d - b * c, X = sx - e, Y = sy - f; return [(d * X - c * Y) / det, (-b * X + a * Y) / det]; }
 cv.addEventListener('pointermove', e => {
@@ -108,6 +113,7 @@ function readHuman(pi){
   const i = { L: km ? k(km.L) : false, R: km ? k(km.R) : false, U: km ? k(km.U) : false, D: km ? k(km.D) : false,
     A: (km && k(km.A)) || !!pd.btn.A, J: (km && k(km.J)) || !!pd.btn.J, G: (km && k(km.G)) || !!pd.btn.G };
   i.S = i.A; // 技ボタンは向きなしでも刀の技
+  i.H = i.A || !!pd.wz; // 技を押し続けている（初虧・復円の溜め）
   // キーボード: 同じ向きを素早く二回押すとダッシュ
   if (km) {
     const kl = k(km.L), kr = k(km.R);
@@ -255,10 +261,10 @@ function cpuInput(){
 const GAME = { mode: 'menu', phase: 'intro', t: 0, n: 1, log: [], best: 0 };
 try { GAME.best = (JSON.parse(localStorage.getItem('issen-action-cpu-v1') || '{}').best) | 0; } catch (e) {}
 let sim = new A.Sim({ training: true });
-const FX = { ouka: [], grow: [null, null], pflash: 0, gone: [], parts: [], texts: [], shake: 0, finish: null, trails: [[], []], combo: [null, null], last: null, hist: [], calm: 0, flash: 0 };
+const FX = { ouka: [], grow: [null, null], pflash: 0, gone: [], parts: [], texts: [], shake: 0, finish: null, trails: [[], []], combo: [null, null], last: null, hist: [], calm: 0, flash: 0, yv: [], ys: [[], []], black: 0, lockPrev: null };
 const cam = { x: 800, y: 0, z: 1 };
 
-function clearFx(){ FX.cut = null; WORLD.f = WORLD.m = 0; FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; }
+function clearFx(){ FX.cut = null; WORLD.f = WORLD.m = 0; FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; FX.ys = [[], []]; FX.yv = []; FX.black = 0; FX.lockPrev = null; WORLD.tot = 0; }
 function resetRound(){ sim.resetRound(); clearFx(); }
 /* 持たせる刀（新・一閃の特殊技）。common＝今の共通の技、ouka＝桜華 */
 /* 持たせる刀: 一閃（index.html）で集めた刀から選ぶ。刀の技は桜華だけ固有、ほかは共通。
@@ -271,8 +277,11 @@ const owns = id => SNAP.owned.some(k => k.id === id);
 const KITS = [(SNAP.equip && owns(SNAP.equip[0])) ? SNAP.equip[0] : 'mumei', (SNAP.equip && owns(SNAP.equip[1])) ? SNAP.equip[1] : 'mumei'];
 try { const k = JSON.parse(localStorage.getItem('issen-action-kit2') || 'null'); if (Array.isArray(k)) k.forEach((v, i) => { if (owns(v)) KITS[i] = v; }); } catch (e) {}
 function saveKits(){ try { localStorage.setItem('issen-action-kit2', JSON.stringify(KITS)); } catch (e) {} }
-const kitOf = id => id === 'ouka' && owns('ouka') ? 'ouka' : 'common'; // 桜華の技は、ガチャなどで手に入れた人だけ
+const kitOf = id => (id === 'ouka' || id === 'yata') && owns(id) ? id : 'common'; // 絶の刀の技は、ガチャなどで手に入れた人だけ
 const rollFor = mode => [!!OPT.dashRoll, mode === 'vs' ? !!OPT.dashRoll : false];
+// 見た目の刀（技は kitsFor が決める）。CPU は相手ごとに並〜幻から一振り
+const cpuKat = n => { const ids = Object.keys(window.IssenKatLook || {}).filter(id => (IssenKatLook[id].t || '並') !== '絶'); return ids.length ? ids[(n * 7 + 3) % ids.length] : 'mumei'; };
+const katsFor = mode => mode === 'vs' ? [KITS[0], KITS[1]] : mode === 'cpu' ? [KITS[0], cpuKat(GAME.n || 1)] : [KITS[0], 'mumei'];
 const kitsFor = mode => mode === 'vs' ? [kitOf(KITS[0], mode), kitOf(KITS[1], mode)] : [kitOf(KITS[0], mode), 'common'];
 function recordWin(r){ // 勝った刀の戦績と銭
   const i = r.winner; if (i < 0 || GAME.mode === 'train' || (GAME.mode === 'cpu' && i !== 0)) return;
@@ -286,12 +295,14 @@ function startMode(mode){
   GAME.mode = mode; GAME.log = []; GAME.n = 1; GAME.t = 0; GAME.coins = 0;
   sim = new A.Sim(mode === 'train' ? { training: true, kits: kitsFor(mode), dashRoll: rollFor(mode) } : { toWin: mode === 'cpu' ? 1 : 2, kits: kitsFor(mode), dashRoll: rollFor(mode) });
   if (mode === 'cpu') cpuReset(1);
+  GAME.kats = katsFor(mode);
   GAME.phase = mode === 'train' ? 'fight' : 'intro';
   GAME.zin = mode !== 'train' && sim.p.some(p => p.kit === 'ouka') ? 110 : 0; // 絶の持ち主がいれば立ち合いの前に抜刀のカットイン
   clearFx(); FX.hist = []; FX.last = null;
   document.body.dataset.mode = mode;
   showMenu(false); showOver(false);
   layoutViews();
+  applyTune();
 }
 
 /* ---------- 一歩 ---------- */
@@ -346,7 +357,7 @@ function afterFinish(){
   GAME.log.push({ name: r.name, tier: r.tier, winner: r.winner });
   recordWin(r);
   if (GAME.mode === 'cpu') {
-    if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu'), dashRoll: rollFor('cpu') }); cpuReset(GAME.n); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
+    if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu'), dashRoll: rollFor('cpu') }); cpuReset(GAME.n); GAME.kats = katsFor('cpu'); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
     if (r.winner < 0) { resetRound(); GAME.phase = 'intro'; GAME.t = 0; return; } // 引き分けは同じ相手ともう一度
     const rec = GAME.n - 1;
     if (rec > GAME.best) { GAME.best = rec; try { localStorage.setItem('issen-action-cpu-v1', JSON.stringify({ best: rec })); } catch (e) {} }
@@ -360,6 +371,8 @@ function onEvent(e){
   if (e.t === 'hit' && sim.p[e.by].kit === 'ouka') { // 桜華の当たり: 花びらと紅の切り口
     petals(wx, wy, OUKA_MV[e.mv] ? 26 : 12, 6); burst(wx, wy, 10, '#8e0f22', 6, true);
     FX.ouka.push({ k: 'cut', x: wx, y: wy, t: 0, life: 16, a: rnd() * 3 }); if (OUKA_MV[e.mv]) FX.pflash = 4; SND.play('hit'); }
+  if (e.t === 'hit' && sim.p[e.by].kit === 'yata') { const big = e.mv === 'haneX' || e.mv === 'shokujin'; // 八咫の当たり: 白と黒の切り口と羽
+    FX.ouka.push({ k: 'ycut', x: wx, y: wy, t: 0, life: big ? 22 : 16, a: rnd() * 3, big }); feathers(wx, wy, big ? 16 : 6, big ? 6 : 4); SND.play('hit'); }
   if (e.t === 'hit') {
     burst(wx, wy, e.dmg >= 700 ? 18 : 10, INK, 5);
     burst(wx, wy, 6, COL[e.by].light, 3);
@@ -388,6 +401,15 @@ function onEvent(e){
     SND.play('bloom'); /* 段階が上がるときのカットインはなし（2026-11-26 ユーザー指定）、止まらない */ for (const q of STORM) { q.x = Math.random(); q.y = Math.random(); }
     FX.grow[e.p] = 0; FX.shake = 6 + e.stage * 3; FX.pflash = 6 + e.stage * 2; }
   else if (e.t === 'start' && OUKA_MV[e.mv]) oukaStart(e);
+  else if (e.t === 'sj') { // 食甚: 暗転し、自分と相手を結ぶ線が画面の端から端まで走る。空は一瞬皆既に
+    FX.ouka.push({ k: 'sjline', x0: e.x0 / FP, y0: e.y0 / FP + 50, x1: e.x1 / FP, y1: e.y1 / FP + 50, t: 0, life: 30 }); FX.black = 5; WORLD.tot = 1;
+    FX.ouka.push({ k: 'ysun', x: (e.x0 + e.x1) / 2 / FP, y: (e.y0 + e.y1) / 2 / FP + 50, t: 0, life: 34 }); FX.ouka.push({ k: 'yband', s: '食甚', x: e.x1 / FP, y: e.y1 / FP + 170, t: 0, life: 50 });
+    feathers(e.x1 / FP, e.y1 / FP + 60, 18, 6); SND.play('ySj'); }
+  else if (e.t === 'fukuen') { const x = e.x / FP, y = e.y / FP + 66; FX.ouka.push({ k: 'ydia', x, y, t: 0, life: 44, r: 70 }); FX.ouka.push({ k: 'yring', x, y, t: 0, life: 30, r: 240 }); FX.ouka.push({ k: 'yband', s: '復円', x, y: y + 110, t: 0, life: 56 }); feathers(x, y, 24, 5, 0.7); FX.flash = 5; SND.play('yFuku'); }
+  else if (e.t === 'charged') { const p = sim.p[e.p]; FX.ouka.push({ k: 'yring', x: p.x / FP + p.face * 26, y: p.y / FP + 66, t: 0, life: 16, r: 46 }); }
+  else if (e.t === 'sjReady') { const x = e.x / FP, y = e.y / FP + 66; FX.ouka.push({ k: 'ydia', x, y, t: 0, life: 30, r: 52 }); feathers(x, y, 10, 3, 0.7); SND.play('yHane'); }
+  else if (e.t === 'crowLock') { FX.ouka.push({ k: 'yband', s: '八咫烏', x: e.x / FP, y: e.y / FP + 200, t: 0, life: A.CROW.lock }); SND.play('yCrow'); }
+  else if (e.t === 'hane') { const p = sim.p[e.p], x = p.x / FP, y = p.y / FP + 60; feathers(x, y, 14, 3); FX.ouka.push({ k: 'yring', x, y, t: 0, life: 14, r: 70 }); SND.play('yHane'); } // 羽跳: 羽ばたいて羽が散る
   else if (e.t === 'fallBurst') { const x = e.x / FP, y = e.y / FP; for (const d of [1, -1]) for (let k = 0; k < 40; k++) FX.parts.push({ x, y: y + 10 + rnd() * 40, vx: d * (2 + rnd() * 9), vy: 1 + rnd() * 4, life: 50 + rnd() * 30, t: 0, col: k % 3 ? SAKURA[k % 3] : CRIM[k % 3], r: 3 + rnd() * 3, petal: true, rot: rnd() * 6 });
     FX.ouka.push({ k: 'ring', x, y: y + 4, t: 0, life: 34, r: 420, flat: true }); FX.shake = 16; FX.pflash = 9; SND.play('drum'); SND.play('kotoChord'); }
   else if (e.t === 'treeGone') { petals(e.x / FP, e.y / FP + 70, 30, 3); FX.gone.push({ x: e.x / FP, y: e.y / FP, t: 0, p: e.p }); }
@@ -429,6 +451,12 @@ const SND = (function(){
     drum: t => drum(t, 0.7),
     kotoChord: t => [5, 8, 10].forEach(n => koto(N[n], t, 1.8, 0.28)),
     hit: t => koto(N[12], t, 0.7, 0.22),
+    yHane: t => { shaku(N[12], t, 0.35, 0.1); koto(N[10], t, 0.6, 0.16); },
+    yShoki: t => { koto(N[1], t, 1.4, 0.34); koto(N[6], t + 0.04, 1.2, 0.24); },
+    ySj: t => { drum(t, 0.6); koto(N[13], t + 0.05, 1.6, 0.26); koto(N[11], t + 0.09, 1.6, 0.22); shaku(N[6], t + 0.1, 1.2, 0.12, true); },
+    yFuku: t => { for (let i = 0; i < 6; i++) koto(N[1 + i * 2], t + i * 0.06, 1.6, 0.24); shaku(N[11], t + 0.3, 1.4, 0.13, true); },
+    yCrow: t => { drum(t, 0.7); shaku(N[1], t, 1.6, 0.16, true); koto(N[0], t + 0.1, 2.2, 0.36); },
+    yCrowEnd: t => { drum(t, 0.5); [6, 9, 13].forEach((n, i) => koto(N[n], t + i * 0.03, 1.6, 0.26)); },
     finish: t => { drum(t, 0.7); for (let i = 0; i < 12; i++) koto(N[2 + i % 12], t + 0.1 + i * 0.07, 2.2, 0.24); shaku(N[9], t + 0.5, 2.6, 0.17, true); },
   };
   return { play(n){ if (!ac || ac.state !== 'running' || !P[n]) return; try { P[n](ac.currentTime + 0.01); } catch (e) {} } };
@@ -453,11 +481,14 @@ function burst(x, y, n, col, sp, spark){
   for (let k = 0; k < n; k++) { const a = rnd() * Math.PI * 2, v = sp * (0.4 + rnd()); FX.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 1, life: 18 + rnd() * 18, t: 0, col, r: spark ? 1.6 : 1.5 + rnd() * 3.5, spark }); }
 }
 function tickParts(){
+  for (const p of sim.p) if (p.st === 'atk' && p.mv === 'hane' && (Math.abs(p.vx) > 900 || Math.abs(p.vy) > 900)) for (let k = 0; k < 2; k++) // 羽跳: 跳んだ跡に黒い羽
+    FX.parts.push({ x: p.x / FP + (rnd() - 0.5) * 30, y: p.y / FP + 30 + rnd() * 60, vx: -p.vx / FP * 0.08 + (rnd() - 0.5), vy: -p.vy / FP * 0.08 - 0.3, life: 26 + rnd() * 16, t: 0, col: '#121212', r: 2.5 + rnd() * 2.5, petal: true, fe: true, dark: k > 0, rot: rnd() * 6 });
   for (const q of FX.parts) { q.t++; q.x += q.vx; q.y += q.vy; if (q.petal) { q.vy = Math.max(-1.2, q.vy - 0.08); q.vx = q.vx * 0.96 + Math.sin((q.t + q.rot * 20) * 0.08) * 0.08; q.rot += 0.08; } else { q.vy -= 0.25; q.vx *= 0.94; } }
   for (const g of FX.gone) g.t++; FX.gone = FX.gone.filter(g => g.t < 40);
   for (let i = 0; i < 2; i++) if (FX.grow[i] != null && FX.grow[i] < 30) FX.grow[i]++;
   if (FX.pflash > 0) FX.pflash--;
   for (const o of FX.ouka) o.t++;
+  tickYata();
   // 花嵐の花びらは尾を引く。紅と黒が混じる
   for (const q of sim.pj) if (q.petal) for (let k = 0, n = q.hana ? 1 + Math.round(q.w / q.w0) : 2; k < n; k++) FX.parts.push({ x: q.x / FP + (rnd() - 0.5) * q.w * 0.6, y: q.y / FP + (rnd() - 0.5) * q.h * 0.6, vx: -Math.sign(q.vx) * (1 + rnd() * 2), vy: (rnd() - 0.3) * 1.5, life: 26 + rnd() * 20, t: 0, col: k ? SAKURA[FR % 3] : CRIM[(FR + k) % 3], r: 2.5 + rnd() * 2, petal: true, rot: rnd() * 6 });
   // 天桜: 体のまわりを花びらが渦を巻いて昇る / 降下は花の嵐
@@ -513,13 +544,55 @@ function leg(c, hx, hy, fx, fy, bend){
   const kx = hx + Math.cos(a + b) * L, ky = hy + Math.sin(a + b) * L;
   c.moveTo(hx, hy); c.lineTo(kx, ky); c.lineTo(hx + Math.cos(a) * d, hy + Math.sin(a) * d);
 }
+/* ---------- 持っている刀の見た目 ----------
+   刀帳と同じ絵（初めの刀の絵を柄巻・鍔・刃の色で塗り替えたもの、絶は本物の絵）を、手から切っ先へ沿わせて描く。
+   見た目だけで、計算（sim）には入らない。表は js/action/katlook-data.js（tools/action-katlook.js が作る） */
+const KLOOK = window.IssenKatLook || {}, KMETAL = { gold: null, silver: [198, 204, 214], copper: [206, 122, 82], black: [44, 40, 38] };
+const KIMG_W = 900, KIMG_H = 106, KTSUBA = 226, KCV = {};
+const KBASE = new Image(); if (window.ISSEN_KATANA_IMAGE) KBASE.src = window.ISSEN_KATANA_IMAGE;
+const lookOf = id => KLOOK[id] || KLOOK.mumei || { m: 'gold', s: {} };
+const hsl = (h, s, l) => { h = ((h % 360) + 360) % 360 / 360; const f = n => { const k = (n + h * 12) % 12, a = s * Math.min(l, 1 - l); return 255 * (l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1))); }; return [f(0), f(8), f(4)]; };
+function katCanvas(id){
+  if (KCV[id]) return KCV[id] === 1 ? null : KCV[id];
+  const L = lookOf(id);
+  let img = KBASE;
+  if (L.src) { if (!L.img) { L.img = new Image(); L.img.src = L.src; } img = L.img; }
+  if (!img.complete || !img.naturalWidth) return null; // 読み込み中は線で描く
+  const cv = document.createElement('canvas'); cv.width = KIMG_W; cv.height = KIMG_H; const x = cv.getContext('2d');
+  if (L.src) { if (!L.up) { x.translate(0, KIMG_H); x.scale(1, -1); } x.drawImage(img, 0, 0, KIMG_W, KIMG_H); } // 戦うときは刃が上（絵の上 = 刀の刃）にそろえる
+  else {
+    x.translate(0, KIMG_H); x.scale(1, -1); x.drawImage(img, 0, 0, KIMG_W, KIMG_H); x.setTransform(1, 0, 0, 1, 0, 0);
+    try {
+      const d = x.getImageData(0, 0, KIMG_W, KIMG_H), a = d.data;
+      for (let i = 0; i < a.length; i += 4) { if (a[i + 3] < 8) continue; const px = (i >> 2) % KIMG_W; let r = a[i], g = a[i + 1], b = a[i + 2]; const l = (r + g + b) / 3;
+        const blue = b > r + 12 && b > g + 12, warm = r > b + 40 && g > b + 15;
+        if (px < 250 && blue) { if (L.w) { const k = Math.min(1.45, b / 70); r = L.w[0] * k; g = L.w[1] * k; b = L.w[2] * k; } }
+        else if (warm && px < 285) { const m = KMETAL[L.m]; if (m) { const k = l / 150; r = m[0] * k; g = m[1] * k; b = m[2] * k; } }
+        else if (px >= 255 && L.b) { let t = L.b; if (t === 'iris') t = hsl(180 + (px / KIMG_W) * 320, 0.7, 0.72).concat(0.4);
+          const am = t[3], q = l / 255; r = r * (1 - am) + t[0] * q * am * 1.3; g = g * (1 - am) + t[1] * q * am * 1.3; b = b * (1 - am) + t[2] * q * am * 1.3; }
+        a[i] = r; a[i + 1] = g; a[i + 2] = b; }
+      x.putImageData(d, 0, 0);
+    } catch (e) {}
+  }
+  // 小さく描くので、先に縮めておく（細い刃がちらつかないように）
+  const sm = document.createElement('canvas'); sm.width = 300; sm.height = 36; const y = sm.getContext('2d'); y.imageSmoothingQuality = 'high'; y.drawImage(cv, 0, 0, 300, 36);
+  return (KCV[id] = sm);
+}
+// 斬った筋の色（刀帳の「一閃の色」と同じ）
+function slashLook(id){
+  const s = lookOf(id).s || {};
+  if (s._c) return s._c;
+  const rgb = h => { h = (h || '#ffffff').replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
+  const c = rgb(s.col), dark = (c[0] + c[1] + c[2]) / 3 < 90;
+  return (s._c = { c, dark, glow: s.glow || null, rainbow: !!s.rainbow, double: !!s.double, feathers: !!s.feathers });
+}
 function drawFighter(p, fr){
-  const P = pose(p, fr), col = COL[p.i];
+  const P = pose(p, fr), col = COL[p.i], INK = WORLD.y * Math.max(WORLD.e, WORLD.tot) > 0.5 ? '#e6e6ec' : INK0; // 皆既の闇では白い墨で描いて見やすく
   const sx = wx(p.x / FP), sy = wy(p.y / FP), z = cam.z;
   const c = cx;
   c.save(); c.translate(sx, sy); c.scale(z * p.face * MIR, -z);
   c.globalAlpha = P.alpha;
-  if (WORLD.f > 0.3) { c.shadowColor = `rgba(255,214,224,${0.8 * WORLD.f})`; c.shadowBlur = 8; } // 落花の夜でも姿が見えるように縁を光らせる
+  if (WORLD.f > 0.3) { c.shadowColor = `rgba(255,214,224,${0.8 * WORLD.f})`; c.shadowBlur = 8; } else if (WORLD.y * Math.max(WORLD.e, WORLD.tot) > 0.3) { c.shadowColor = 'rgba(255,255,255,.9)'; c.shadowBlur = 10; } // 皆既の闇でも姿が見えるように // 落花の夜でも姿が見えるように縁を光らせる
   if (P.rot) { c.translate(0, P.hip); c.rotate(rad(P.rot)); c.translate(0, -P.hip); }
   const hx = 0, hy = P.hip;
   const shx = hx + Math.sin(rad(P.lean)) * 44, shy = hy + Math.cos(rad(P.lean)) * 44;
@@ -549,7 +622,13 @@ function drawFighter(p, fr){
   const tipx = hnx + Math.cos(sa) * 82, tipy = hny + Math.sin(sa) * 82;
   const ext = p.st === 'atk' ? (MV[p.mv].ext || 0) : 0; // 刀より先まで届く技は軌跡も伸ばす
   const etx = tipx + Math.cos(sa) * ext, ety = tipy + Math.sin(sa) * ext;
-  if (!P.sheath) {
+  const kc = !P.sheath && katCanvas((GAME.kats || [])[p.i] || 'mumei');
+  if (kc) { // 鍔を手に、切っ先を刀の先に合わせて絵を置く
+    const k = 82 / (KIMG_W - KTSUBA), lk = lookOf((GAME.kats || [])[p.i]);
+    c.save(); c.translate(hnx, hny); c.rotate(sa); c.scale(k * KIMG_W / 300, k * KIMG_H / 36);
+    if (lk.t === '幻' || lk.t === '絶') { c.shadowColor = (lk.s && lk.s.glow) || 'rgba(255,255,255,.8)'; c.shadowBlur = 6; }
+    c.drawImage(kc, -KTSUBA * 300 / KIMG_W, -18); c.restore();
+  } else if (!P.sheath) {
     c.strokeStyle = '#2b2520'; c.lineWidth = 5; c.beginPath(); c.moveTo(hnx - Math.cos(sa) * 12, hny - Math.sin(sa) * 12); c.lineTo(hnx, hny); c.stroke();
     c.strokeStyle = '#c9a54a'; c.lineWidth = 3; c.beginPath(); c.moveTo(hnx + Math.cos(sa + 1.57) * 5, hny + Math.sin(sa + 1.57) * 5); c.lineTo(hnx - Math.cos(sa + 1.57) * 5, hny - Math.sin(sa + 1.57) * 5); c.stroke();
     c.strokeStyle = p.kit === 'ouka' ? '#f6dde6' : '#e8e6df'; c.lineWidth = 2.6; c.beginPath(); c.moveTo(hnx, hny); c.lineTo(tipx, tipy); c.stroke();
@@ -626,6 +705,16 @@ function drawOukaFx(){
       g.addColorStop(0, `rgba(${c},0)`); g.addColorStop(0.5, `rgba(${c},${0.45 * fade})`); g.addColorStop(1, `rgba(${c},0)`);
       cx.fillStyle = g; cx.fillRect(x - w, y0 - h, w * 2, h);
       cx.fillStyle = `rgba(255,245,248,${0.6 * fade})`; cx.fillRect(x - 3 * cam.z, y0 - h, 6 * cam.z, h);
+    } else if (o.k === 'sjline') { // 食甚の線: 白い芯と黒い縁。線の向きに画面の端から端まで
+      const ax = wx(o.x0), ay = wy(o.y0), bx = wx(o.x1), by = wy(o.y1); let dx = bx - ax, dy = by - ay; const L = Math.hypot(dx, dy) || 1; dx /= L; dy /= L;
+      const E = (W + H) * 1.2, p0 = [ax - dx * E, ay - dy * E], p1 = [ax + dx * E, ay + dy * E], gr = Math.min(1, o.t / 3);
+      const q0 = [ax + (p0[0] - ax) * gr, ay + (p0[1] - ay) * gr], q1 = [ax + (p1[0] - ax) * gr, ay + (p1[1] - ay) * gr];
+      cx.lineCap = 'butt'; cx.strokeStyle = `rgba(10,10,12,${0.85 * fade})`; cx.lineWidth = (14 * fade + 3) * cam.z; cx.beginPath(); cx.moveTo(q0[0], q0[1]); cx.lineTo(q1[0], q1[1]); cx.stroke();
+      cx.strokeStyle = `rgba(255,255,255,${fade})`; cx.lineWidth = (4 * fade + 1) * cam.z; cx.beginPath(); cx.moveTo(q0[0], q0[1]); cx.lineTo(q1[0], q1[1]); cx.stroke();
+    } else if (o.k === 'eclring') { // 復円: 欠けた日が満ちる白黒の輪
+      const x = wx(o.x), y = wy(o.y), R = o.r * ease * cam.z;
+      cx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`; cx.lineWidth = 4 * fade * cam.z + 1; cx.beginPath(); cx.arc(x, y, R, 0, Math.PI * 2); cx.stroke();
+      cx.fillStyle = `rgba(10,10,12,${0.5 * fade})`; cx.beginPath(); cx.arc(x + R * 0.25 * (1 - ease), y, R * 0.8, 0, Math.PI * 2); cx.fill();
     } else if (o.k === 'ring') { // 輪
       const x = wx(o.x), y = wy(o.y), R = o.r * ease * cam.z;
       cx.strokeStyle = `rgba(255,190,210,${0.9 * fade})`; cx.lineWidth = 5 * fade * cam.z + 1;
@@ -652,7 +741,272 @@ function drawOukaFx(){
     cx.restore();
   }
 }
+/* ---------- 八咫: 日食・枯れ木の野・烏の羽（色は輝く白と日食の黒） ---------- */
+// 日食のコロナ: 細い筋を何百本も重ねた光を一度だけ別の canvas に描き、ゆっくり回して重ねる
+const CORONA = {};
+function coronaCanvas(r, seed){
+  r = Math.max(8, Math.round(r)); const key = r + '_' + seed; if (CORONA[key]) return CORONA[key];
+  const R = r * 3.6, c = document.createElement('canvas'); c.width = c.height = Math.ceil(R * 2); const x = c.getContext('2d'); x.translate(R, R);
+  let sd = seed * 9301 + 49297; const r1 = () => (sd = (sd * 16807) % 2147483647) / 2147483647, gauss = () => { let u = 0; for (let i = 0; i < 4; i++) u += r1(); return (u - 2) / 2; };
+  const g = x.createRadialGradient(0, 0, r * 0.96, 0, 0, R); g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(.04, 'rgba(240,244,255,.7)'); g.addColorStop(.12, 'rgba(215,222,240,.32)');
+  g.addColorStop(.3, 'rgba(170,178,205,.10)'); g.addColorStop(.6, 'rgba(120,126,150,.03)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.beginPath(); x.arc(0, 0, R, 0, 7); x.fill();
+  x.globalCompositeOperation = 'lighter'; x.lineCap = 'round';
+  const lobes = [[0.25, 0.32, 2.4], [Math.PI + 0.1, 0.36, 2.6], [1.95, 0.22, 1.6], [4.4, 0.2, 1.5], [0.95, 0.15, 1.2]];
+  for (let i = 0; i < 360; i++) { let a, len;
+    if (r1() < 0.62) { const L = lobes[Math.floor(r1() * lobes.length)]; a = L[0] + gauss() * L[1]; len = r * (0.35 + Math.pow(r1(), 1.6) * L[2]); }
+    else { a = r1() * Math.PI * 2; len = r * (0.15 + Math.pow(r1(), 2.2) * 0.75); }
+    const r0 = r * (0.97 + r1() * 0.04), bend = (r1() - 0.5) * 0.35, x0 = Math.cos(a) * r0, y0 = Math.sin(a) * r0, rr = r0 + len;
+    const a1 = a + bend * len / r * 0.25, x1 = Math.cos(a1) * rr, y1 = Math.sin(a1) * rr, am = (a + a1) / 2 + bend * 0.12, rm = r0 + len * 0.5;
+    const lg = x.createLinearGradient(x0, y0, x1, y1), al = 0.05 + r1() * 0.11; lg.addColorStop(0, `rgba(250,252,255,${al})`); lg.addColorStop(.35, `rgba(232,238,255,${al * 0.55})`); lg.addColorStop(1, 'rgba(220,228,255,0)');
+    x.strokeStyle = lg; x.lineWidth = 0.6 + r1() * (r1() < 0.15 ? 5 : 2.2); x.beginPath(); x.moveTo(x0, y0); x.quadraticCurveTo(Math.cos(am) * rm, Math.sin(am) * rm, x1, y1); x.stroke(); }
+  x.globalCompositeOperation = 'source-over';
+  const g2 = x.createRadialGradient(0, 0, r * 0.99, 0, 0, r * 1.12); g2.addColorStop(0, 'rgba(255,255,255,.9)'); g2.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g2; x.beginPath(); x.arc(0, 0, r * 1.12, 0, 7); x.fill();
+  return (CORONA[key] = { c, R, r });
+}
+function drawEclipseAt(x, y, r, t, al){ // 黒い日と真珠色のコロナ（r は画面の大きさ。コロナは近い大きさのものを伸ばして使う）
+  if (al < 0.01) return; const q = coronaCanvas(48, 1), s = r / q.r, R = q.R * s;
+  cx.save(); cx.globalAlpha = al; cx.globalCompositeOperation = 'lighter';
+  cx.save(); cx.translate(x, y); cx.rotate(t * 0.012); cx.globalAlpha = al * (0.88 + 0.08 * Math.sin(t * 0.7)); cx.drawImage(q.c, -R, -R, R * 2, R * 2); cx.restore();
+  cx.save(); cx.translate(x, y); cx.rotate(-t * 0.008 + 0.6); cx.globalAlpha = al * (0.32 + 0.12 * Math.sin(t * 0.45 + 1)); cx.drawImage(q.c, -R * 1.05, -R * 1.05, R * 2.1, R * 2.1); cx.restore();
+  cx.globalCompositeOperation = 'source-over'; cx.fillStyle = '#000'; cx.beginPath(); cx.arc(x, y, r, 0, 7); cx.fill();
+  cx.strokeStyle = 'rgba(255,255,255,.85)'; cx.lineWidth = 1.2; cx.beginPath(); cx.arc(x, y, r + 0.4, 0, 7); cx.stroke(); cx.restore();
+}
+/* 烏の羽: 羽軸と片側が長い羽弁。黒い羽は白い縁で闇から浮かせ、白い羽は光る */
+function drawFeather(x, y, s, rot, dark, al){
+  const L = s * 3.4, Wd = s * 0.62; cx.save(); cx.globalAlpha = al; cx.translate(x, y); cx.rotate(rot); cx.scale(1, 0.5 + 0.5 * Math.abs(Math.cos(rot * 1.3)));
+  cx.beginPath(); cx.moveTo(-L / 2, 0); cx.bezierCurveTo(-L * 0.2, -Wd * 1.2, L * 0.32, -Wd * 1.15, L / 2, -Wd * 0.1);
+  cx.bezierCurveTo(L * 0.38, Wd * 0.5, L * 0.2, Wd * 0.55, L * 0.12, Wd * 0.42); cx.lineTo(L * 0.05, Wd * 0.25); cx.lineTo(0, Wd * 0.6);
+  cx.bezierCurveTo(-L * 0.12, Wd * 0.62, -L * 0.2, Wd * 0.45, -L * 0.24, Wd * 0.32); cx.lineTo(-L * 0.3, Wd * 0.2); cx.quadraticCurveTo(-L * 0.4, Wd * 0.25, -L / 2, 0); cx.closePath();
+  if (dark) { cx.fillStyle = 'rgba(6,6,8,.96)'; cx.fill(); cx.strokeStyle = 'rgba(235,238,248,.6)'; cx.lineWidth = 1; cx.stroke(); }
+  else { cx.fillStyle = 'rgba(248,248,252,.95)'; cx.fill(); }
+  cx.strokeStyle = dark ? 'rgba(210,214,228,.7)' : 'rgba(110,110,120,.55)'; cx.lineWidth = 0.9; cx.beginPath(); cx.moveTo(-L / 2 - L * 0.12, Wd * 0.05); cx.quadraticCurveTo(0, -Wd * 0.1, L / 2, -Wd * 0.1); cx.stroke();
+  cx.restore();
+}
+function feathers(x, y, n, sp, white){ // 羽が散る（world の座標）
+  for (let k = 0; k < n; k++) { const a = rnd() * Math.PI * 2, v = sp * (0.3 + rnd()); FX.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v + 1, life: 40 + rnd() * 40, t: 0, col: '#0a0a0c', r: 3 + rnd() * 2.5, petal: true, fe: true, dark: rnd() > (white == null ? 0.3 : white), rot: rnd() * 6 }); }
+}
+// 枯れ木の野: 同じ大きさの枯れ木を一列に。枝分かれは一度だけ作り、太さごとにまとめて描く
+const DEADTREES = []; (function(){ let s = 8383; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 8; k++) { const segs = [[], [], [], []], perch = [];
+    const br = (x, y, a, len, d) => { const ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len; segs[3 - d].push([x, y, (x + ex) / 2 + (r() - 0.5) * len * 0.25, (y + ey) / 2, ex, ey]);
+      if (d === 1 && r() < 0.22 && perch.length < 1 && ey > 300) perch.push([ex, ey, Math.cos(a) > 0 ? 1 : -1]);
+      if (d <= 0) return; const n = 2 + (r() < 0.35 ? 1 : 0); for (let j = 0; j < n; j++) br(ex, ey, a + (j - (n - 1) / 2) * (0.6 + r() * 0.3) + (r() - 0.5) * 0.4, len * (0.55 + r() * 0.15), d - 1); };
+    br(0, 0, Math.PI / 2 + (r() - 0.5) * 0.12, 190 + r() * 60, 3);
+    DEADTREES.push({ x: 40 + k * 218 + (r() - 0.5) * 70, segs, perch }); } })();
+function drawYataWorld(fr){
+  const Y = WORLD.y; if (Y < 0.01) return;
+  const gy = wy(0), e = WORLD.e, tot = Math.max(e, WORLD.tot);
+  // 空: 日が欠けて灰に沈む昼 / 互いに後なしは日が欠けきった闇
+  let g = cx.createLinearGradient(0, 0, 0, gy); g.addColorStop(0, '#36363e'); g.addColorStop(0.6, '#77777f'); g.addColorStop(1, '#b6b4b0');
+  cx.globalAlpha = Y * (1 - e); cx.fillStyle = g; cx.fillRect(0, 0, W, gy + 2);
+  g = cx.createLinearGradient(0, 0, 0, gy); g.addColorStop(0, '#000'); g.addColorStop(0.6, '#0b0b0e'); g.addColorStop(1, '#24242a');
+  cx.globalAlpha = Y * e; cx.fillStyle = g; cx.fillRect(0, 0, W, gy + 2);
+  if (WORLD.tot > e) { cx.globalAlpha = Y * (WORLD.tot - e) * 0.85; cx.fillStyle = '#020203'; cx.fillRect(0, 0, W, gy + 2); } // 食甚の一瞬、空が皆既になる
+  // 日: 白い日に黒い月が少しずつかかっていく
+  const mx = W * 0.72, my = H * 0.22, R = Math.min(W, H) * 0.095, cov = 0.42 + 0.3 * Math.min(1, sim.frame / 3600), off = R * 2 * (1 - cov) * (1 - tot);
+  cx.globalAlpha = Y * (1 - tot); const sg = cx.createRadialGradient(mx, my, R * 0.9, mx, my, R * 3.4); sg.addColorStop(0, 'rgba(255,255,255,.6)'); sg.addColorStop(1, 'rgba(255,255,255,0)');
+  cx.fillStyle = sg; cx.fillRect(mx - R * 3.4, my - R * 3.4, R * 6.8, R * 6.8); cx.fillStyle = '#fbfbfd'; cx.beginPath(); cx.arc(mx, my, R, 0, 7); cx.fill();
+  cx.globalAlpha = 1; drawEclipseAt(mx, my, R, fr / 60, Y * tot);
+  cx.globalAlpha = Y; cx.fillStyle = '#08080a'; cx.beginPath(); cx.arc(mx - off * 0.92, my - off * 0.25, R * 0.99, 0, 7); cx.fill();
+  // 地平の霞
+  g = cx.createLinearGradient(0, gy - H * 0.22, 0, gy); g.addColorStop(0, 'rgba(236,236,242,0)'); g.addColorStop(1, `rgba(236,236,242,${0.28 * (1 - e)})`); cx.fillStyle = g; cx.fillRect(0, gy - H * 0.22, W, H * 0.22);
+  // 枯れ木（闇では白い縁で浮かせる）。枝に烏がとまる
+  const z = cam.z, sway = Math.sin(fr * 0.012) * 0.6;
+  for (const pass of e > 0.05 ? [0, 1] : [1]) { cx.globalAlpha = pass ? Y : Y * e * 0.22; cx.strokeStyle = pass ? (e > 0.5 ? '#000' : '#18181c') : '#fff'; cx.lineCap = 'round';
+    for (let d = 0; d < 4; d++) { cx.lineWidth = ([13, 7, 3.6, 1.8][d] + (pass ? 0 : 3)) * z; cx.beginPath();
+      for (const t of DEADTREES) for (const s of t.segs[d]) { const k = (s[5] / 420) * sway; cx.moveTo(wx(t.x + s[0]), wy(s[1])); cx.quadraticCurveTo(wx(t.x + s[2] + k * 4), wy(s[3]), wx(t.x + s[4] + k * 8), wy(s[5])); }
+      cx.stroke(); }
+    if (pass) for (const t of DEADTREES) for (const [px, py, d] of t.perch) { const x = wx(t.x + px), y = wy(py) - 4 * z, s = 9 * z, dd = d * MIR; cx.fillStyle = cx.strokeStyle;
+      cx.beginPath(); cx.ellipse(x, y, s * 0.9, s * 0.55, -0.2 * dd, 0, 7); cx.fill(); cx.beginPath(); cx.arc(x + dd * s * 0.75, y - s * 0.45, s * 0.38, 0, 7); cx.fill();
+      cx.beginPath(); cx.moveTo(x - dd * s * 0.7, y); cx.lineTo(x - dd * s * 1.6, y + s * 0.5); cx.lineTo(x - dd * s * 0.6, y + s * 0.35); cx.fill(); } }
+  cx.globalAlpha = 1;
+}
+function drawYataGround(){ // 地面と足場を八咫の野の色に
+  const Y = WORLD.y; if (Y < 0.01) return; const gy = wy(0), e = WORLD.e;
+  const g = cx.createLinearGradient(0, gy, 0, H); g.addColorStop(0, e > 0.5 ? '#0c0c0e' : '#3a3a40'); g.addColorStop(1, e > 0.5 ? '#000' : '#141418');
+  cx.globalAlpha = Y; cx.fillStyle = g; cx.fillRect(0, gy, W, H - gy); cx.fillStyle = `rgba(255,255,255,${0.25 + 0.15 * e})`; cx.fillRect(0, gy, W, 2); cx.globalAlpha = 1;
+}
+/* 画面いっぱいに舞う烏の羽（画面の座標。闇では多く） */
+const FEATH = []; for (let k = 0; k < 90; k++) FEATH.push({ x: Math.random(), y: Math.random(), s: 0.6 + Math.random(), r: Math.random() * 6, v: Math.random(), k: Math.random() });
+function drawYataFeathers(fr){
+  const Y = WORLD.y; if (Y < 0.01) return; const e = WORLD.e, n = Math.floor((26 + 50 * e) * Y), mv = CUR === VIEWS[0];
+  for (let i = 0; i < n; i++) { const q = FEATH[i];
+    if (mv) { q.x += (0.0005 + 0.0007 * Math.sin(fr * 0.01 + i)) * q.s; q.y += 0.0011 * q.s; q.r += 0.02 * q.s; }
+    if (q.y > 1.05) { q.y = -0.05; q.x = Math.random(); } if (q.x > 1.05) q.x = -0.05; if (q.x < -0.05) q.x = 1.05;
+    drawFeather(q.x * W, q.y * H, H * 0.006 * (1 + q.s), q.r * 0.5 + Math.sin(fr * 0.03 + i) * 0.6, e > 0.5 ? q.k < 0.5 : q.k < 0.72, (0.55 + q.v * 0.4) * Y); }
+}
+/* 八咫の技の演出: 状態から描く分（初虧の溜め・復円の溜め・羽跳の軌跡）と、FX.ouka に積む分（三日月・皆既・ダイヤモンドリング・帯の字など） */
+function tickYata(){
+  for (const p of sim.p) { if (p.kit !== 'yata') continue;
+    const v = FX.yv[p.i] || (FX.yv[p.i] = {}), m = p.st === 'atk' ? MV[p.mv] : null, x = p.x / FP, y = p.y / FP;
+    if (m && m.shoki && p.mvf >= m.s && p.mvf < m.s + m.a && !(v.mv === p.mv && v.f >= m.s)) { // 初虧: 斬った瞬間に白い三日月
+      FX.ouka.push({ k: 'ycres', x: x + p.face * 40, y: y + 66, f: p.face, t: 0, life: 20, b: p.chg / A.SHOKI.max }); feathers(x + p.face * 50, y + 66, 6 + Math.round(p.chg / 8), 4); SND.play('yShoki'); }
+    const hane = m && p.mv === 'hane' && (Math.abs(p.vx) > 900 || Math.abs(p.vy) > 900), lunge = m && m.shoki && p.mvf >= m.lunge[0] && p.mvf <= m.lunge[1];
+    if (m && p.mv === 'hane' && p.hane2 && !v.h2) { FX.ouka.push({ k: 'yring', x, y: y + 60, t: 0, life: 16, r: 90 }); feathers(x, y + 60, 10, 4); SND.play('yHane'); } // 二度目の羽ばたき
+    v.h2 = !!(m && p.mv === 'hane' && p.hane2); v.mv = m ? p.mv : null; v.f = p.mvf;
+    const s = FX.ys[p.i]; for (const q of s) q.l--; if (hane || lunge) s.push({ x, y: y + 64, l: hane ? 14 : 9 }); FX.ys[p.i] = s.filter(q => q.l > 0).slice(-26); }
+  for (const q of sim.pj) if (q.crow && FR % 2 === 0) FX.parts.push({ x: q.x / FP - Math.sign(q.vx) * 30, y: q.y / FP + (rnd() - 0.5) * 30, vx: -Math.sign(q.vx) * (0.5 + rnd()), vy: (rnd() - 0.6), life: 30 + rnd() * 20, t: 0, col: '#0a0a0c', r: 2.5 + rnd() * 2, petal: true, fe: true, dark: rnd() < 0.8, rot: rnd() * 6 });
+  const L = sim.lock; // 八咫烏: 捕まえている間は羽が降り、終わると白い一閃と羽が弾ける
+  if (L) { const d = sim.p[L.d], x = d.x / FP, y = d.y / FP + 70;
+    if (!FX.lockPrev) feathers(x, y, 46, 9, 0.35); // 捕まえた瞬間に羽が弾ける
+    for (let k = 0; k < 2; k++) { const a = rnd() * Math.PI * 2, R = 60 + rnd() * 90; FX.parts.push({ x: x + Math.cos(a) * R, y: y + Math.sin(a) * R, vx: -Math.sin(a) * 1.6, vy: Math.cos(a) * 1.6 - 0.4, life: 34 + rnd() * 20, t: 0, col: '#0a0a0c', r: 3 + rnd() * 2.5, petal: true, fe: true, dark: rnd() < 0.6, rot: rnd() * 6 }); } } // 日のまわりを羽が舞う
+  if (FX.lockPrev && !L) { const d = sim.p[FX.lockPrev.d], x = d.x / FP, y = d.y / FP + 50; FX.ouka.push({ k: 'yslash', x, y, t: 0, life: 22 }); feathers(x, y, 40, 8); FX.flash = 6; SND.play('yCrowEnd'); }
+  FX.lockPrev = L ? { d: L.d } : null;
+  if (FX.black > 0) FX.black--; WORLD.tot *= 0.95;
+}
+function drawYataFx(){
+  // 羽跳・初虧の踏み込み: 黒い帯に白い芯の軌跡
+  for (let i = 0; i < 2; i++) { const s = FX.ys[i]; if (!s || s.length < 2) continue;
+    cx.save(); cx.lineCap = 'round'; cx.lineJoin = 'round';
+    for (let k = 1; k < s.length; k++) { const a = s[k - 1], b = s[k], al = Math.min(1, b.l / 8), w = (6 + 16 * k / s.length) * cam.z * al;
+      cx.strokeStyle = `rgba(8,8,10,${0.75 * al})`; cx.lineWidth = w; cx.beginPath(); cx.moveTo(wx(a.x), wy(a.y)); cx.lineTo(wx(b.x), wy(b.y)); cx.stroke();
+      cx.strokeStyle = `rgba(255,255,255,${0.9 * al})`; cx.lineWidth = Math.max(1, w * 0.22); cx.beginPath(); cx.moveTo(wx(a.x), wy(a.y)); cx.lineTo(wx(b.x), wy(b.y)); cx.stroke(); }
+    cx.restore(); }
+  for (const p of sim.p) { if (p.kit !== 'yata' || p.st !== 'atk') continue; const m = MV[p.mv], x = wx(p.x / FP), y = wy(p.y / FP + 66), z = cam.z;
+    if (m.shoki && p.mvf < m.s) { // 初虧の溜め: 手元に欠けはじめた白い日。前へ、届く間合いの細い線
+      const u = p.chg / A.SHOKI.max, r = (9 + 9 * u) * z, hx = x + p.face * MIR * 26 * z, reach = (A.SHOKI.d0 + A.SHOKI.dPer * p.chg + A.SHOKI.dw) * z;
+      cx.save(); const g = cx.createRadialGradient(hx, y, 0, hx, y, r * 4); g.addColorStop(0, `rgba(255,255,255,${0.35 + 0.4 * u})`); g.addColorStop(1, 'rgba(255,255,255,0)'); cx.fillStyle = g; cx.fillRect(hx - r * 4, y - r * 4, r * 8, r * 8);
+      cx.fillStyle = '#fbfbfd'; cx.beginPath(); cx.arc(hx, y, r, 0, 7); cx.fill(); cx.fillStyle = '#08080a'; cx.beginPath(); cx.arc(hx + p.face * MIR * r * (1.7 - 0.6 * u), y - r * 0.3, r * 0.95, 0, 7); cx.fill();
+      const gy = wy(p.y / FP) - 2; cx.strokeStyle = `rgba(255,255,255,${0.35 + 0.4 * u})`; cx.lineWidth = 1.5; cx.beginPath(); cx.moveTo(x, gy); cx.lineTo(x + p.face * MIR * reach, gy); cx.stroke();
+      cx.fillStyle = '#fff'; cx.fillRect(x + p.face * MIR * reach - 1.5, gy - 6 * z, 3, 8 * z); cx.restore(); }
+    if (m.fuku && p.fuku > 0) { // 復円の溜め: 黒い月から白い日がよみがえる輪
+      const u = p.fuku / A.FUKU.max, R = 52 * z, a0 = -Math.PI / 2, a1 = a0 + u * Math.PI * 2;
+      cx.save(); cx.strokeStyle = 'rgba(8,8,10,.55)'; cx.lineWidth = 6 * z; cx.beginPath(); cx.arc(x, y, R, 0, 7); cx.stroke();
+      cx.shadowColor = '#fff'; cx.shadowBlur = 10; cx.strokeStyle = 'rgba(255,255,255,.95)'; cx.lineWidth = 3.5 * z; cx.beginPath(); cx.arc(x, y, R, a0, a1); cx.stroke();
+      cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(x + Math.cos(a1) * R, y + Math.sin(a1) * R, 4 * z, 0, 7); cx.fill(); cx.restore(); }
+  }
+  if (FX.black > 0) { cx.fillStyle = `rgba(0,0,0,${0.8 * Math.min(1, FX.black / 3)})`; cx.fillRect(0, 0, W, H); } // 食甚の暗転
+  for (const o of FX.ouka) {
+    const u = o.t / o.life, ease = 1 - Math.pow(1 - u, 3), fade = 1 - u;
+    if (o.k === 'ycres') { // 初虧: 前へ開く白い三日月の刃
+      const x = wx(o.x), y = wy(o.y), R = (60 + 50 * o.b) * cam.z * (0.7 + 0.3 * ease), d = o.f * MIR;
+      cx.save(); cx.translate(x, y); cx.scale(d, 1); cx.shadowColor = '#fff'; cx.shadowBlur = 14 * fade;
+      cx.fillStyle = `rgba(255,255,255,${0.95 * fade})`; cx.beginPath(); cx.arc(0, 0, R, -1.2, 1.2); cx.arc(-R * 0.42, 0, R * 0.88, 1.05, -1.05, true); cx.closePath(); cx.fill();
+      cx.shadowBlur = 0; cx.strokeStyle = `rgba(8,8,10,${0.9 * fade})`; cx.lineWidth = 2.5; cx.beginPath(); cx.arc(-R * 0.42, 0, R * 0.88, 1.05, -1.05, true); cx.stroke();
+      cx.fillStyle = `rgba(255,255,255,${fade})`; cx.fillRect(-R * 0.6, -1, R * 2.2 * ease, 2); cx.restore();
+    } else if (o.k === 'ysun') { // 食甚: 斬り抜けた所に皆既の日
+      const x = wx(o.x), y = wy(o.y); drawEclipseAt(x, y, (26 + 24 * ease) * cam.z, o.t, fade);
+    } else if (o.k === 'yring' || o.k === 'ydia') { // 白い輪 / 復円のダイヤモンドリング
+      const x = wx(o.x), y = wy(o.y), R = o.r * ease * cam.z;
+      cx.save(); cx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`; cx.lineWidth = (o.k === 'ydia' ? 5 : 3) * fade * cam.z + 1; cx.shadowColor = '#fff'; cx.shadowBlur = 12; cx.beginPath(); cx.arc(x, y, R, 0, 7); cx.stroke();
+      if (o.k === 'ydia') { const px = x + Math.cos(-0.8) * R, py = y + Math.sin(-0.8) * R, L = Math.max(4, 40 + 120 * (1 - Math.abs(u * 2 - 0.6))) * cam.z; // 負の半径は例外になり、その後の描画（操作ボタンなど）が止まる
+        cx.fillStyle = `rgba(8,8,10,${0.55 * fade})`; cx.beginPath(); cx.arc(x, y, R * 0.94, 0, 7); cx.fill();
+        const g = cx.createRadialGradient(px, py, 0, px, py, L * 0.5); g.addColorStop(0, `rgba(255,255,255,${fade})`); g.addColorStop(1, 'rgba(255,255,255,0)'); cx.fillStyle = g; cx.fillRect(px - L, py - L, L * 2, L * 2);
+        cx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`; cx.lineWidth = 1.5; cx.beginPath(); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4, l = k % 2 ? L * 0.45 : L; cx.moveTo(px - Math.cos(a) * l, py - Math.sin(a) * l); cx.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); } cx.stroke(); }
+      cx.restore();
+    } else if (o.k === 'yslash') { // 八咫烏の締め: 画面を横に断つ白い一閃
+      const y = wy(o.y), gr = Math.min(1, o.t / 4), w = (10 * fade + 2) * cam.z;
+      cx.save(); cx.fillStyle = `rgba(8,8,10,${0.8 * fade})`; cx.fillRect(0, y - w * 1.6, W * gr, w * 3.2); cx.shadowColor = '#fff'; cx.shadowBlur = 16; cx.fillStyle = `rgba(255,255,255,${fade})`; cx.fillRect(0, y - w / 2, W * gr, w); cx.restore();
+    } else if (o.k === 'ycut') { // 八咫の当たり: 白い切り口に黒の縁
+      const x = wx(o.x), y = wy(o.y), L = (o.big ? 110 : 70) * cam.z * (0.4 + ease);
+      cx.save(); cx.translate(x, y); for (const a of o.big ? [o.a, o.a + 1.3] : [o.a]) { cx.save(); cx.rotate(a); cx.fillStyle = `rgba(8,8,10,${fade})`;
+        cx.beginPath(); cx.moveTo(-L, 0); cx.lineTo(0, -6 * cam.z * fade - 1); cx.lineTo(L, 0); cx.lineTo(0, 6 * cam.z * fade + 1); cx.closePath(); cx.fill();
+        cx.fillStyle = `rgba(255,255,255,${fade})`; cx.fillRect(-L * 0.8, -1, L * 1.6, 2); cx.restore(); } cx.restore();
+    } else if (o.k === 'yband') { // 技の名: 墨の帯に白い字
+      const x = wx(o.x), y = wy(o.y) - o.t * 0.25, a = Math.min(1, o.t / 6) * (o.t > o.life - 14 ? (o.life - o.t) / 14 : 1), bw = 110 * cam.z * Math.min(1, o.t / 8) + 20, s = Math.round(34 * cam.z + 10);
+      cx.save(); cx.globalAlpha = a; cx.fillStyle = 'rgba(6,6,8,.86)'; cx.beginPath(); cx.moveTo(x - bw, y - s * 0.45); cx.lineTo(x + bw, y - s * 0.62); cx.lineTo(x + bw * 0.92, y + s * 0.5); cx.lineTo(x - bw * 1.04, y + s * 0.4); cx.closePath(); cx.fill();
+      cx.fillStyle = '#f4f4f8'; cx.fillRect(x - bw, y + s * 0.42, bw * 2, 1.5);
+      cx.font = `${s}px ${DISPLAY}`; cx.textAlign = 'center'; cx.textBaseline = 'middle'; cx.shadowColor = 'rgba(255,255,255,.9)'; cx.shadowBlur = 14; cx.fillStyle = '#fff'; cx.fillText(o.s, x, y); cx.textBaseline = 'alphabetic'; cx.restore();
+    }
+  }
+}
+/* 八咫烏の絵: 墨の筆で描いた烏。翼を大きく広げ、風切羽が指のように分かれ、太い嘴と爪を出した三本の足。
+   羽ばたきの8コマを一度だけ別の canvas に描いておき、拡大縮小して使う（白い縁で闇からも浮く） */
+const CPH0 = -0.5, CPH1 = 2.0, CROWSPR = { f: [], S: 2, w: 300, h: 300, ox: 160, oy: 180 };
+// ph = 翼の角度を32段、tk = たたみ具合を6段、lf = 足（-1 たたむ / 0 / 1 前へ爪）を5段に刻んだ姿ごとに描いておく
+function crowSprite(phq, tkq, lfq){
+  const key = phq + '_' + tkq + '_' + lfq; if (CROWSPR.f[key]) return CROWSPR.f[key];
+  const S = CROWSPR.S, c = document.createElement('canvas'); c.width = CROWSPR.w * S; c.height = CROWSPR.h * S;
+  const x = c.getContext('2d'); x.scale(S, S); x.translate(CROWSPR.ox, CROWSPR.oy);
+  let sd = 777; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const ph = CPH0 + (CPH1 - CPH0) * phq / 31, tk = tkq / 5, lf = lfq / 2 - 1; // 翼の角度（大きいほど上）・たたみ具合・足
+  const V = a => [-Math.cos(a), -Math.sin(a)];
+  const feather = (bx, by, a, len, w, path) => { // 先の尖った羽一枚（少し反る）
+    const [dx, dy] = V(a), nx = -dy, ny = dx, tx = bx + dx * len, ty = by + dy * len, bend = len * 0.08;
+    path.moveTo(bx + nx * w / 2, by + ny * w / 2);
+    path.quadraticCurveTo(bx + dx * len * 0.55 + nx * (w * 0.55 + bend), by + dy * len * 0.55 + ny * (w * 0.55 + bend), tx, ty);
+    path.quadraticCurveTo(bx + dx * len * 0.5 - nx * (w * 0.4 - bend), by + dy * len * 0.5 - ny * (w * 0.4 - bend), bx - nx * w / 2, by - ny * w / 2); path.closePath(); };
+  const wing = (sx, sy, a, k) => { // a: 腕の向き, k: 大きさ
+    const p = new Path2D(), [dx, dy] = V(a), wx = sx + dx * 52 * k, wy = sy + dy * 52 * k;
+    const sa = a - (1.45 - 1.13 * tk), [ex, ey] = V(sa); // たたむときは次列風切も後ろへ流す
+    p.moveTo(sx + 10, sy + 6); p.lineTo(sx + 2, sy - 6); p.quadraticCurveTo(sx + dx * 30 * k + dy * 8, sy + dy * 30 * k - dx * 8, wx, wy); // 前縁はふくらむ
+    p.lineTo(wx + ex * 26 * k, wy + ey * 26 * k); p.lineTo(sx + ex * 30 * k - 6, sy + ey * 30 * k + 6); p.closePath();
+    for (let j = 0; j < 14; j++) { const t = j / 13; feather(sx + (wx - sx) * (0.08 + t * 0.92), sy + (wy - sy) * (0.08 + t * 0.92), sa + (r() - 0.5) * 0.06 + t * 0.2, (32 + 12 * t + r() * 3) * k * (1 - 0.15 * tk), 6.5 * k, p); } // 次列風切
+    for (let j = 0; j < 11; j++) feather(wx - dx * j * 1.1, wy - dy * j * 1.1, a + 0.1 - j * 0.11 + (r() - 0.5) * 0.03, (88 - j * 4 + r() * 5) * k, (6.5 - j * 0.2) * k, p); // 初列風切（指のように分かれる）
+    return p; };
+  const body = new Path2D(); // 胴・頭・太い嘴
+  body.moveTo(88, -8); body.quadraticCurveTo(74, -18, 62, -20); body.quadraticCurveTo(52, -24, 44, -18); body.quadraticCurveTo(24, -15, 6, -13);
+  body.quadraticCurveTo(-16, -9, -30, -4); body.lineTo(-36, 0); body.quadraticCurveTo(-22, 6, -4, 9); body.quadraticCurveTo(18, 12, 34, 6);
+  body.quadraticCurveTo(46, 0, 56, -6); body.quadraticCurveTo(68, -7, 78, -6); body.quadraticCurveTo(84, -6, 88, -8); body.closePath();
+  const tail = new Path2D(); // 扇に開く尾、先がささくれる
+  for (let j = 0; j < 10; j++) feather(-28, -2 + j * 0.4, -0.22 + j * 0.05 + (r() - 0.5) * 0.03, 50 + r() * 6 - Math.abs(j - 4.5) * 2, 6, tail);
+  const legs = new Path2D(), claws = new Path2D(); // 三本の足と鉤爪（前へ掴みかかる）
+  for (let j = 0; j < 3; j++) { const bx = 6 + j * 7, by = 8, mx = bx + 4, my = by + 12, n0x = bx + 14 + j * 3, n0y = by + 22 - j * 2, tx2 = lf < 0 ? bx - 14 - j * 2 : bx + 30 + j * 4, ty2 = lf < 0 ? by + 8 : by + 18 - j * 3, u = Math.abs(lf), kx = n0x + (tx2 - n0x) * u, ky = n0y + (ty2 - n0y) * u;
+    legs.moveTo(bx, by); legs.quadraticCurveTo(mx - 6, my, kx, ky);
+    for (let t = 0; t < 3; t++) { const a = -0.5 + t * 0.6, L = 8; claws.moveTo(kx, ky); claws.quadraticCurveTo(kx + Math.cos(a) * L, ky + Math.sin(a) * L, kx + Math.cos(a + 1.2) * L * 0.95, ky + Math.sin(a + 1.2) * L * 0.95 + 2); } }
+  const far = wing(24, -16, ph + 0.25 - 0.13 * tk, 1.0 - 0.15 * tk), near = wing(12, -11, ph, 1.15 - 0.15 * tk);
+  // 飛沫と斜めのかすれ（背の後ろ）
+  x.save(); x.strokeStyle = 'rgba(8,8,10,.4)'; x.lineCap = 'round';
+  for (let j = 0; j < 14; j++) { const px = -10 + r() * 70 - 40 * r(), py = -20 + r() * 60, L = 14 + r() * 50; x.lineWidth = 0.4 + r() * 1.2; x.beginPath(); x.moveTo(px, py); x.lineTo(px - L, py + L * 0.42); x.stroke(); }
+  x.fillStyle = 'rgba(8,8,10,.6)'; for (let j = 0; j < 18; j++) { x.beginPath(); x.arc(-100 + r() * 200, -90 + r() * 170, 0.4 + r() * 1.3, 0, 7); x.fill(); }
+  x.restore();
+  // 白い縁（闇から浮かせる）→ 墨
+  x.lineJoin = 'round'; x.lineCap = 'round';
+  x.strokeStyle = 'rgba(255,255,255,.7)'; x.lineWidth = 2.4; for (const p of [far, tail, near, body]) x.stroke(p); x.lineWidth = 4.5; x.stroke(legs); x.lineWidth = 3.6; x.stroke(claws);
+  x.fillStyle = '#1d1d22'; x.fill(far); x.fillStyle = '#060607'; x.fill(tail); x.fill(body); x.fill(near);
+  x.strokeStyle = '#060607'; x.lineWidth = 2.2; x.stroke(legs); x.lineWidth = 1.5; x.stroke(claws);
+  // 筆のかすれ: 羽の向きに細い白い掻き傷
+  x.save(); x.clip(near); x.globalCompositeOperation = 'destination-out'; x.lineCap = 'round';
+  for (let j = 0; j < 18; j++) { const [dx, dy] = V(ph - 0.3 + r() * 0.4), px = 12 + dx * (30 + r() * 60) + (r() - 0.5) * 30, py = -10 + dy * r() * 80 + (r() - 0.5) * 30, L = 6 + r() * 18;
+    x.strokeStyle = `rgba(0,0,0,${0.15 + r() * 0.25})`; x.lineWidth = 0.4 + r() * 0.5; x.beginPath(); x.moveTo(px, py); x.lineTo(px + dx * L, py + dy * L); x.stroke(); }
+  x.restore();
+  x.save(); x.clip(body); x.globalCompositeOperation = 'destination-out'; x.lineCap = 'round';
+  for (let j = 0; j < 8; j++) { const px = -30 + r() * 80, py = -12 + r() * 24, L = 8 + r() * 20; x.strokeStyle = `rgba(0,0,0,${0.2 + r() * 0.3})`; x.lineWidth = 0.4 + r() * 0.7; x.beginPath(); x.moveTo(px, py); x.lineTo(px - L, py + L * 0.2); x.stroke(); }
+  x.restore();
+  // 眼: 白い光
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(56, -15, 1.7, 0, 7); x.fill(); x.strokeStyle = 'rgba(255,255,255,.45)'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(64, -10); x.quadraticCurveTo(76, -8, 87, -8); x.stroke();
+  return (CROWSPR.f[key] = c);
+}
+function drawCrow(x, y, d, z, fr, al, pose, tilt){ // 八咫烏（z = 1 で体の長さ ~95px）。pose = { ph: 翼の角度, tk: たたみ 0〜1, lf: 足 -1〜1 }、なければ羽ばたき
+  const P = pose || { ph: 0.55 + 0.95 * Math.cos(fr * 0.35), tk: 0, lf: 0 };
+  const c = crowSprite(Math.round(Math.max(0, Math.min(31, (P.ph - CPH0) / (CPH1 - CPH0) * 31))), Math.round(Math.max(0, Math.min(1, P.tk)) * 5), Math.round((Math.max(-1, Math.min(1, P.lf)) + 1) * 2)), s = z * 0.62;
+  cx.save(); if (al != null) cx.globalAlpha = al; cx.translate(x, y); cx.scale(d * s, s); if (tilt) cx.rotate(tilt);
+  cx.drawImage(c, -CROWSPR.ox, -CROWSPR.oy, CROWSPR.w, CROWSPR.h); cx.restore();
+}
+const ease3 = u => u < 0 ? 0 : u > 1 ? 1 : u * u * (3 - 2 * u);
+/* 飛ぶ八咫烏（見た目だけ。位置と判定は sim のまま）:
+   0〜6F 翼を大きく振り上げ → 6〜12F 力強く打ち下ろす（風の弧と羽） → 12〜20F 翼をたたむ → 矢のように滑らかに急降下で突っ込む
+   → 相手の手前で翼を広げて爪を出す。出だしは少し上から降りてくるように見せる */
+function drawCrowPj(q){
+  const age = A.CROW.life - q.life, d = Math.sign(q.vx) * MIR, z = cam.z * 1.35, o = sim.p[1 - q.o];
+  const dx = (o.x - q.x) * Math.sign(q.vx) / FP, near = ease3((170 - dx) / 70) * (dx > -40 ? 1 : 0); // 手前170px〜100pxで翼を広げていく
+  const lift = Math.max(0, 1 - age / 20), up = 50 * lift * lift; // 上から降りてくる
+  const x = wx(q.x / FP), y = wy(q.y / FP + up);
+  let ph, tk, lf;
+  if (age < 6) { ph = 0.9 + 1.05 * ease3(age / 6); tk = 0; lf = 0; }                     // 振り上げ
+  else if (age < 12) { ph = 1.95 - 2.4 * ease3((age - 6) / 6); tk = 0; lf = 0; }          // 打ち下ろし
+  else { const f = ease3((age - 12) / 8); ph = -0.45 + 0.61 * f; tk = f; lf = -f; }        // たたむ
+  if (near > 0) { ph = ph + (1.95 - ph) * near; tk = tk * (1 - near); lf = lf + (1 - lf) * near; } // 襲いかかる
+  const tilt = (0.16 * lift + 0.04) * (1 - near) - 0.2 * near, dive = tk * (1 - near);
+  if (age >= 8 && age < 16) { const u = (age - 8) / 8; cx.save(); cx.strokeStyle = `rgba(255,255,255,${0.7 * (1 - u)})`; cx.lineCap = 'round'; // 打ち下ろしの風の弧
+    for (let k = 0; k < 3; k++) { const R = (34 + k * 16 + u * 40) * z; cx.lineWidth = (2.5 - k * 0.6) * z; cx.beginPath(); cx.ellipse(x - d * 10 * z, y + 26 * z, R, R * 0.35, 0, 0.15 * Math.PI, 0.85 * Math.PI); cx.stroke(); } cx.restore(); }
+  if (dive > 0.3) { // 風の筋と残像（揺らさない）
+    cx.save(); cx.strokeStyle = `rgba(255,255,255,${0.5 * dive})`; cx.lineCap = 'round';
+    for (let k = 0; k < 5; k++) { const yy = y + (k - 2) * 9 * z, L = (60 + (k * 37) % 50) * z; cx.lineWidth = 1 + (k % 2); cx.beginPath(); cx.moveTo(x - d * 34 * z, yy); cx.lineTo(x - d * (34 * z + L), yy - up * 0.25); cx.stroke(); }
+    cx.restore();
+    for (let k = 3; k >= 1; k--) drawCrow(x - d * k * 20 * z, y - k * 4 * lift * z, d, z, 0, 0.14 * (4 - k) / 3 * dive, { ph, tk, lf }, tilt);
+  }
+  drawCrow(x, y, d, z, age, 1, { ph, tk, lf }, tilt);
+}
+function drawCrowLock(){ // 八咫烏: 捕まえると闇に沈み、烏の羽が散る中に皆既の日が昇る（烏の姿は見せない。2026-11-28 ユーザー指定）
+  const L = sim.lock; if (!L) return; const d = sim.p[L.d], t = A.CROW.lock - L.f, k = Math.min(1, t / 8) * Math.min(1, L.f / 6), z = cam.z;
+  cx.save(); cx.fillStyle = `rgba(2,2,3,${0.8 * k})`; cx.fillRect(0, 0, W, H); cx.restore();
+  const x = wx(d.x / FP), y = wy(d.y / FP + 70), e = 1 - Math.pow(1 - Math.min(1, t / 18), 3);
+  drawEclipseAt(x, y, (30 + 34 * e) * z, t, k);
+}
 function drawTrails(){
+  const fr0 = GAME.t || 0;
   for (let i = 0; i < 2; i++) {
     const tr = FX.trails[i]; if (tr.length < 2) continue;
     const ox = sim.p[i].x / FP, oy = sim.p[i].y / FP;
@@ -660,7 +1014,10 @@ function drawTrails(){
     cx.globalCompositeOperation = 'lighter';
     for (let k = 1; k < tr.length; k++) {
       const a = tr[k - 1], b = tr[k], al = Math.min(1, b.life / 10);
-      cx.fillStyle = b.iai ? `rgba(255,255,255,${0.85 * al})` : sim.p[i].kit === 'ouka' ? `rgba(250,200,218,${0.6 * al})` : `rgba(240,236,226,${0.55 * al})`;
+      const sl = slashLook((GAME.kats || [])[i]);
+      let col = sl.c; if (sl.rainbow) col = hsl(fr0 * 4 + k * 26, 0.8, 0.75);
+      if (sl.dark && !b.iai) { cx.globalCompositeOperation = 'source-over'; cx.shadowColor = sl.glow || '#fff'; cx.shadowBlur = 8; } else { cx.globalCompositeOperation = 'lighter'; cx.shadowBlur = 0; }
+      cx.fillStyle = b.iai ? `rgba(255,255,255,${0.85 * al})` : `rgba(${col[0] | 0},${col[1] | 0},${col[2] | 0},${(sl.dark ? 0.8 : 0.6) * al})`;
       cx.beginPath();
       const mid = (q, f) => [ox + q.h[0] + (q.t[0] - q.h[0]) * f, oy + q.h[1] + (q.t[1] - q.h[1]) * f];
       const a1 = mid(a, 0.3), b1 = mid(b, 0.3);
@@ -708,37 +1065,42 @@ function drawBg(fr){
     cx.restore();
   }
   drawSakuraWorld(fr);
+  drawYataWorld(fr);
   // 地面
   const gy = wy(0);
   cx.fillStyle = sdOn ? '#2a0806' : '#3a3d30'; cx.fillRect(0, gy, W, H - gy);
   if (WORLD.b > 0.01) { cx.globalAlpha = WORLD.b * (1 - WORLD.f); cx.fillStyle = '#5b2f3b'; cx.fillRect(0, gy, W, H - gy); cx.globalAlpha = WORLD.f; cx.fillStyle = '#160204'; cx.fillRect(0, gy, W, H - gy); cx.globalAlpha = 1;
     cx.globalAlpha = 1; }
-  cx.fillStyle = sdOn ? 'rgba(255,120,90,.2)' : 'rgba(239,232,214,.18)'; cx.fillRect(0, gy, W, 2);
+  drawYataGround();
+  if (WORLD.y < 0.5) cx.fillStyle = sdOn ? 'rgba(255,120,90,.2)' : 'rgba(239,232,214,.18)'; cx.fillRect(0, gy, W, 2);
   // 端の太い竹
-  for (const ex of [A.WALL_L / FP - 30, A.WALL_R / FP + 30]) { const x = wx(ex); cx.fillStyle = sdOn ? '#200403' : '#2d3227'; cx.fillRect(x - 24 * cam.z, 0, 48 * cam.z, gy); }
+  for (const ex of [A.WALL_L / FP - 30, A.WALL_R / FP + 30]) { const x = wx(ex); cx.fillStyle = WORLD.y > 0.5 ? '#0c0c0f' : sdOn ? '#200403' : '#2d3227'; cx.fillRect(x - 24 * cam.z, 0, 48 * cam.z, gy); }
   // 足場（倒れた竹）
   for (const pl of A.PLATS) {
     const xa = wx(pl.x0 / FP), xb = wx(pl.x1 / FP), x0 = Math.min(xa, xb), x1 = Math.max(xa, xb), y = wy(pl.y / FP);
-    cx.fillStyle = sdOn ? '#3a0c08' : '#5d6447'; cx.fillRect(x0, y - 1, x1 - x0, 11 * cam.z);
+    cx.fillStyle = WORLD.y > 0.5 ? '#1e1e23' : sdOn ? '#3a0c08' : '#5d6447'; cx.fillRect(x0, y - 1, x1 - x0, 11 * cam.z);
     cx.fillStyle = 'rgba(0,0,0,.3)'; for (let x = x0 + 40 * cam.z; x < x1; x += 70 * cam.z) cx.fillRect(x, y - 1, 2.5 * cam.z, 11 * cam.z);
     cx.fillStyle = 'rgba(255,255,240,.15)'; cx.fillRect(x0, y - 1, x1 - x0, 2);
   }
   // 笹（桜の世界では花びらに替わる）
-  if (WORLD.b > 0.5) return;
+  if (WORLD.b > 0.5 || WORLD.y > 0.5) return;
   cx.fillStyle = sdOn ? 'rgba(200,40,30,.7)' : 'rgba(70,84,60,.5)';
   for (let k = 0; k < 14; k++) { const t = (fr * 0.6 + k * 97) % (H + 80), x = (k * 173 + Math.sin((fr + k * 40) * 0.02) * 40) % W; cx.save(); cx.translate(x, t - 40); cx.rotate(Math.sin(fr * 0.03 + k) * 0.8); cx.fillRect(-6, -1.5, 12, 3); cx.restore(); }
 }
 
 /* ---------- 桜華の世界 ----------
    木が満開になると竹林が桜の森に、落花になると赤黒い夜に花が吹き荒れる世界に塗り替わる（両方の画面とも） */
-const WORLD = { b: 0, f: 0, k: 0, m: 0 };
+const WORLD = { b: 0, f: 0, k: 0, m: 0, y: 0, e: 0, tot: 0 }; // y = 八咫の野, e = 皆既（互いに後なし）, tot = 食甚の一瞬の皆既
 const SKTREES = []; (function(){ let s = 4242; const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   // 奥行きなし: 同じ大きさ・同じ色の木を一列に（2026-11-26 ユーザー指定）
   for (let k = 0; k < 9; k++) { const blobs = []; for (let j = 0; j < 9; j++) blobs.push([(r() - 0.5) * 1.6, r() * 0.7, 0.35 + r() * 0.45]);
     SKTREES.push({ layer: 1, x: 20 + k * 195 + (r() - 0.5) * 60, h: 470 * (0.9 + r() * 0.2), w: 175 * (0.9 + r() * 0.2), blobs }); } })();
 function updateWorld(){
   let st = 0; for (const p of sim.p) if (p.tree && p.tree.stage > st) st = p.tree.stage;
-  const zetsu = sim.p.some(p => p.kit === 'ouka'); // 絶の刀を持つ者がいる戦場は、最初から桜の森
+  const yata = sim.p.some(p => p.kit === 'yata'); // 八咫を持つ者がいる戦場は枯れ木の野（桜華の満開・落花が来れば桜に塗り替わる）
+  const zetsu = !yata && sim.p.some(p => p.kit === 'ouka'); // 絶の刀を持つ者がいる戦場は、最初から桜の森
+  WORLD.y += ((yata && st < 2 ? 1 : 0) - WORLD.y) * 0.05; const eBuf = sim.p.some(p => p.kit === 'yata' && p.ebuf > 0); // 復円の後の強化の間も皆既の闇（2026-11-28 ユーザー指定）
+  WORLD.e += ((sim.sd || lastBout() || eBuf ? 1 : 0) - WORLD.e) * 0.04;
   WORLD.b += ((zetsu || st >= 2 ? 1 : 0) - WORLD.b) * 0.06; WORLD.f += ((st >= 3 ? 1 : 0) - WORLD.f) * 0.05;
   WORLD.k += ((zetsu ? 1 : 0) - WORLD.k) * 0.05; WORLD.m += ((st >= 2 ? 1 : 0) - WORLD.m) * 0.05;
   if (FX.finish && FX.finish.zetsu) { WORLD.k = 1; WORLD.m = Math.min(1, WORLD.m + 0.05); }
@@ -887,7 +1249,7 @@ function drawHud(){
     bar(x, top + 20, bw, 12, p.hp / A.HP_MAX, red ? '#f2e6d8' : INK, right);
     bar(x, top + 36, bw * 0.8 + 0, 5, p.gd / A.GD_MAX, p.gd <= 2000 ? COL[0].main : '#3d5a6c', right);
     cx.font = `500 11px ${UIF}`; cx.fillStyle = red ? '#f2e6d8' : '#3b3d33';
-    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : ''), right ? W - m : m, top + 56);
+    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : p.kit === 'yata' ? '　八咫　横 ' + A.ECLN[p.ecl] + (p.ecl >= 1 ? ' ' + (p.ecl === 1 && p.fuku >= A.FUKU.max ? '満' : '●'.repeat(Math.floor(p.fuku * 5 / A.FUKU.max)) + '○'.repeat(5 - Math.floor(p.fuku * 5 / A.FUKU.max))) : '') + (p.ebuf > 0 ? '　強 ' + Math.ceil(p.ebuf / 60) + '秒' : '') + (p.haneUsed && !p.ground ? '' : '　羽跳◆') : ''), right ? W - m : m, top + 56);
   }
   const left = sim.sd ? Math.max(0, Math.ceil((A.C.sdF - (sim.frame - sim.sdStart)) / 60)) : Math.max(0, Math.ceil((A.C.roundF - sim.frame) / 60));
   cx.textAlign = 'center'; cx.font = `30px ${DISPLAY}`; cx.fillStyle = red ? '#ffe2d4' : INK;
@@ -987,6 +1349,9 @@ function drawPad(v){
     cx.strokeStyle = 'rgba(20,21,18,.35)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(pd.stick.ox, pd.stick.oy, 46, 0, Math.PI * 2); cx.stroke();
     const dx = pd.stick.x - pd.stick.ox, dy = pd.stick.y - pd.stick.oy, d = Math.hypot(dx, dy), k = d > 46 ? 46 / d : 1;
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.beginPath(); cx.arc(pd.stick.ox + dx * k, pd.stick.oy + dy * k, 20, 0, Math.PI * 2); cx.fill();
+  } else if (OPT.fixStick) {
+    cx.strokeStyle = EDIT && EDIT.sel === 'M' ? 'rgba(179,20,42,.7)' : 'rgba(20,21,18,.3)'; cx.lineWidth = 2; cx.beginPath(); cx.arc(pd.FS.x, pd.FS.y, 46, 0, Math.PI * 2); cx.stroke();
+    cx.fillStyle = 'rgba(20,21,18,.22)'; cx.beginPath(); cx.arc(pd.FS.x, pd.FS.y, 20, 0, Math.PI * 2); cx.fill();
   } else if (matchMedia('(pointer: coarse)').matches) {
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.font = `500 11px ${UIF}`; cx.textAlign = 'center'; cx.fillText('左半分を押して動かす', W * 0.22, H - 22);
   }
@@ -1101,12 +1466,14 @@ function drawView(v){
       for (let k = 0; k < 5; k++) { const a = FR * 0.25 + k * 1.2566, rr = r * (0.35 + 0.45 * ((k * 37) % 10) / 10);
         cx.save(); cx.translate(Math.cos(a) * rr, Math.sin(a) * rr); cx.rotate(a + FR * 0.1); cx.fillStyle = SAKURA[k % 3]; cx.beginPath(); cx.ellipse(0, 0, 7 * cam.z, 4 * cam.z, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); }
       cx.restore(); continue; }
+    if (q.crow) { drawCrowPj(q); continue; } // 八咫烏
     const x = wx(q.x / FP), y = wy(q.y / FP), d = Math.sign(q.vx) * MIR, r = 30 * cam.z;
     cx.save(); cx.globalCompositeOperation = 'lighter'; cx.translate(x, y); cx.scale(d, 1);
     for (let k = 0; k < 3; k++) { cx.fillStyle = `rgba(245,240,228,${0.6 - k * 0.18})`; cx.beginPath();
       cx.arc(-k * 14 * cam.z, 0, r, -1.2, 1.2); cx.arc(-k * 14 * cam.z - r * 0.45, 0, r * 0.82, 1.1, -1.1, true); cx.closePath(); cx.fill(); }
     cx.restore();
   }
+  cx.save(); try { drawYataFx(); drawCrowLock(); } catch (e) { console.error(e); } cx.restore(); // 演出の不具合で操作ボタンまで消えないように
   // カウンターの構え（受付中は刃が光る）
   for (const p of sim.p) if (p.st === 'atk' && p.mv === 'counter') { const m = MV.counter; if (p.mvf >= m.s && p.mvf < m.s + m.a) {
     cx.strokeStyle = `rgba(255,246,220,${0.5 + Math.sin(FR * 0.6) * 0.3})`; cx.lineWidth = 3; cx.beginPath(); cx.arc(wx(p.x / FP), wy(p.y / FP + 70), 44 * cam.z, 0, Math.PI * 2); cx.stroke(); } }
@@ -1116,10 +1483,12 @@ function drawView(v){
     cx.strokeStyle = A.invuln(p) ? 'rgba(255,255,255,.9)' : 'rgba(44,79,150,.85)'; cx.lineWidth = 1.5;
     cx.strokeRect(wx(p.x / FP + hb[0]), wy(p.y / FP + hb[1] + hb[3]), hb[2] * cam.z * MIR, hb[3] * cam.z);
     if (p.st === 'atk') { const m = MV[p.mv];
+      if (m.shoki && p.mvf >= m.lunge[0] && p.mvf < m.s) { const b = A.box(p, [0, 10, A.SHOKI.dw, A.SHOKI.dh]); cx.strokeStyle = 'rgba(200,55,45,.8)'; cx.setLineDash([5, 4]); cx.strokeRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z * MIR, (b[3] - b[1]) / FP * cam.z); cx.setLineDash([]); } // 初虧の索敵
       if (!m.noBox && p.mvf >= m.s && p.mvf < m.s + m.a) { const b = A.box(p, A.curBox(p)); cx.fillStyle = 'rgba(200,55,45,.45)'; cx.fillRect(wx(b[0] / FP), wy(b[3] / FP), (b[2] - b[0]) / FP * cam.z * MIR, (b[3] - b[1]) / FP * cam.z); } }
   }
   drawOukaFx();
   for (const q of FX.parts) { cx.globalAlpha = 1 - q.t / q.life; cx.fillStyle = q.col; const r = q.r * cam.z;
+    if (q.fe) { drawFeather(wx(q.x), wy(q.y), r * 1.1, q.rot, q.dark, 1 - q.t / q.life); continue; }
     if (q.petal) { cx.save(); cx.translate(wx(q.x), wy(q.y)); cx.rotate(q.rot); cx.beginPath(); cx.ellipse(0, 0, r * 1.3, r * 0.7, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); }
     else cx.fillRect(wx(q.x) - r, wy(q.y) - r, r * 2, r * 2); }
   cx.globalAlpha = 1;
@@ -1139,6 +1508,7 @@ function drawView(v){
   if (FX.pflash) { const g = cx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.2, W / 2, H / 2, Math.max(W, H) * 0.7); g.addColorStop(0, `rgba(255,190,210,${FX.pflash * 0.012})`); g.addColorStop(1, `rgba(60,4,12,${FX.pflash * 0.07})`); cx.fillStyle = g; cx.fillRect(0, 0, W, H); }
   cx.restore();
   drawStorm(FR);
+  drawYataFeathers(FR);
   drawCutin();
   drawHud();
   drawFrames();
@@ -1156,6 +1526,8 @@ function setupBar(){
   const bx = document.getElementById('a_boxes'); bx.checked = OPT.boxes; bx.addEventListener('change', () => { OPT.boxes = bx.checked; saveOpt(); });
   for (const id of ['a_droll', 'mn_droll']) { const el = document.getElementById(id); el.checked = !!OPT.dashRoll;
     el.addEventListener('change', () => { OPT.dashRoll = el.checked; saveOpt(); ['a_droll', 'mn_droll'].forEach(q => { document.getElementById(q).checked = OPT.dashRoll; }); for (const p of sim.p) if (GAME.mode === 'train' || GAME.mode === 'vs' || p.i === 0) p.dashRoll = OPT.dashRoll; el.blur(); }); }
+  for (const id of ['a_fstick', 'mn_fstick']) { const el = document.getElementById(id); el.checked = !!OPT.fixStick;
+    el.addEventListener('change', () => { OPT.fixStick = el.checked; saveOpt(); ['a_fstick', 'mn_fstick'].forEach(q => { document.getElementById(q).checked = OPT.fixStick; }); el.blur(); }); }
   for (const id of ['a_wstick', 'mn_wstick']) { const el = document.getElementById(id); el.checked = !!OPT.wazaStick;
     el.addEventListener('change', () => { OPT.wazaStick = el.checked; saveOpt(); ['a_wstick', 'mn_wstick'].forEach(q => { document.getElementById(q).checked = OPT.wazaStick; }); el.blur(); }); }
   const rf = document.getElementById('a_refill'); rf.checked = OPT.refill; rf.addEventListener('change', () => { OPT.refill = rf.checked; saveOpt(); });
@@ -1208,7 +1580,7 @@ function setupMenu(){
   $('ed_small').onclick = () => editScale(1 / 1.12); $('ed_big').onclick = () => editScale(1.12);
   $('ed_reset').onclick = () => { BLAY = null; for (const v of VIEWS) layoutPad(v.pad, v.w, v.h); };
   $('ed_ok').onclick = () => endEdit(true); $('ed_cancel').onclick = () => endEdit(false);
-  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : '')]);
+  const KOPT = SNAP.owned.map(k => [k.id, k.mei + '〔' + k.tier + '〕' + (k.id === 'ouka' ? '　花嵐・天桜・植樹' : k.id === 'yata' ? '　羽跳・初虧/食甚/復円・八咫烏（作りかけ）' : '')]);
   for (const [id, i] of [['kt0', 0], ['kt1', 1], ['a_kit', 0]]) { const el = $(id);
     const opts = KOPT.slice();
     opts.forEach(([v, l]) => { const o = document.createElement('option'); o.value = v; o.textContent = l; el.appendChild(o); });
@@ -1227,6 +1599,8 @@ const FRAME_MS = 1000 / 60;
          onLocal(f, code) 自分の入力を送る, onOver(log, wins) 決着を知らせる, onExit() 戻る } */
 function onlineStart(o){
   GAME.mode = 'online'; GAME.log = []; GAME.coins = 0; GAME.n = 1;
+  GAME.kats = (o.kats || []).map(id => (window.IssenKatLook || {})[id] ? id : 'mumei');
+  applyTune(); // ネット対戦はいつもの値
   sim = new A.Sim({ toWin: 2, kits: o.kits, dashRoll: o.dashRoll || [false, false] });
   const zin = sim.p.some(p => p.kit === 'ouka') ? 110 : 0;
   ON = Object.assign({ L: { ph: 'intro', t: 0, zin, log: [] }, played: new Map(), hashes: {}, round: sim.roundNo, msg: '', done: false, wait: 0 }, o);
@@ -1304,7 +1678,99 @@ function recordOnlineWin(l){ // 勝った一本ごとに、自分の刀の戦績
 }
 function onlineEnd(){ ON = null; }
 
-resize(); setupBar(); setupMenu();
+/* ---------- 技の調整（神様アカウントの稽古だけ） ----------
+   技の数字をフレーム単位で変えて、その場で試せる。変えた値はこの端末に覚え、稽古の間だけ効く
+   （CPU戦・二人対戦・ネット対戦はいつもの値）。「書き出す」で変えた所をまとめて写せる */
+const GOD = SNAP.coins === -1;
+const TUNE_KEY = 'issen-action-tune-v1';
+let TUNE = {}; try { TUNE = JSON.parse(localStorage.getItem(TUNE_KEY) || '{}') || {}; } catch (e) { TUNE = {}; }
+// 2026-11-27: 硬直差を「持続の1F目で当てた値」から「どこで当てても同じ値」に変えたので、覚えている値を読み替える
+try { if (localStorage.getItem(TUNE_KEY + '-ver') !== '2') { for (const id in TUNE) { const t = TUNE[id], m = MV[id]; if (!m) continue; const a = t.a != null ? t.a : m.a;
+  if (t.hit != null) t.hit += a - 1; if (t.blk != null) t.blk += a - 1; } localStorage.setItem(TUNE_KEY, JSON.stringify(TUNE)); localStorage.setItem(TUNE_KEY + '-ver', '2'); } } catch (e) {}
+const ORIG = {}; for (const id in MV) { const m = MV[id]; ORIG[id] = { s: m.s, a: m.a, r: m.r, hit: m.hit, blk: m.blk, hs: m.hs, bs: m.bs, total: m.total, dmg: m.dmg, gd: m.gd, kb: m.kb ? m.kb.slice() : null, kd: m.kd, dfall: m.dfall, box: m.box ? m.box.slice() : null, boxes: m.boxes ? m.boxes.map(b => b.slice()) : null }; }
+const TF0 = [ // [鍵, 名前, 単位の説明, 刻み]
+  ['s', '発生', 'F', 1], ['a', '持続', 'F', 1], ['r', '硬直', 'F', 1],
+  ['hit', 'ヒット時の硬直差', 'F', 1], ['blk', 'ガード時の硬直差', 'F', 1], // 持続のどこで当てても同じ
+  ['kd', '当たった相手のダウン', [[-1, 'いつも通り（高く飛べばダウン）'], [1, '必ずダウン'], [0, 'ダウンしない']]],
+  ['dfall', '当たった相手の無防備落下', [[1, 'する（受け身も取れない）'], [0, 'しない']]],
+  ['dmg', 'ダメージ（体力）', '', 0.5], ['gd', 'ガード削り', '', 1],
+  ['kbx', '吹っ飛び 横', '', 50], ['kby', '吹っ飛び 縦', '', 50],
+  ['bw', '判定の幅', '%', 10], ['bh', '判定の高さ', '%', 10], ['bx', '判定 前へずらす', 'px', 5], ['by', '判定 上へずらす', 'px', 5],
+];
+// 技ごとの特別な数（八咫）。[鍵, 名前, 単位, 刻み, 入れ物, 中の名前]
+const TX = { hane: [['hsp', '跳ぶ速さ（1Fに進む距離）', 'px', 2, A.HANE, 'sp', 100], ['hd1', '一度目に跳ぶ長さ', 'F', 1, A.HANE, 'd1'], ['hgap', '二度目までの間', 'F', 1, A.HANE, 'gap'], ['hd2', '二度目に跳ぶ長さ', 'F', 1, A.HANE, 'd2'], ['hwin', '二度目の向きの受付', 'F', 1, A.HANE, 'win']],
+  shoki: [['smax', '溜めの最大', 'F', 1, A.SHOKI, 'max'], ['sd0', '踏み込み（溜めなし）', 'px', 5, A.SHOKI, 'd0'], ['sdp', '溜め1Fで伸びる', 'px', 1, A.SHOKI, 'dPer'], ['sdw', '前の索敵の幅', 'px', 5, A.SHOKI, 'dw'], ['sdh', '前の索敵の高さ', 'px', 5, A.SHOKI, 'dh']],
+  fukuen: [['fmax', '溜めきるまで（食甚の溜めも同じ）', 'F', 5, A.FUKU, 'max'], ['fdur', '強化の長さ', 'F', 30, A.FUKU, 'dur'], ['fspd', '強化の移動速度（10で1倍）', '', 1, A.FUKU, 'spd'], ['fatk', '強化の攻撃力（10で1倍）', '', 1, A.FUKU, 'atk']],
+  yatagarasu: [['csp', '烏の速さ（1Fに進む距離）', 'px', 1, A.CROW, 'speed', 100], ['clife', '烏が飛ぶ長さ', 'F', 5, A.CROW, 'life']],
+  shokujin: [['sjt', '羽跳の二度当ての後の余裕', 'F', 1, A.SJ, 'tight']] };
+const TXO = new Map(); for (const id in TX) for (const f of TX[id]) if (!TXO.has(f[4])) TXO.set(f[4], Object.assign({}, f[4]));
+const txVal = f => f[6] ? f[4][f[5]] / f[6] : f[4][f[5]];
+function tuneBase(id){ // 元の値（調整画面に出す形）
+  const o = ORIG[id];
+  return { s: o.s, a: o.a, r: o.r, hit: o.hs != null ? o.hs - o.r : 0, blk: o.bs - o.r, // 硬直差 = 相手の硬直 − 自分の残りの硬直（持続のどこで当てても同じ）
+    kd: o.kb ? (o.kd === 1 || o.kd === true ? 1 : o.kd === 0 ? 0 : -1) : null, dfall: o.kb ? (o.dfall ? 1 : 0) : null,
+    dmg: typeof o.dmg === 'number' ? o.dmg / 100 : null, gd: typeof o.gd === 'number' ? o.gd / 100 : null,
+    kbx: o.kb ? o.kb[0] : null, kby: o.kb ? o.kb[1] : null, bw: 100, bh: 100, bx: 0, by: 0,
+    ...Object.fromEntries((TX[id] || []).map(f => [f[0], f[6] ? TXO.get(f[4])[f[5]] / f[6] : TXO.get(f[4])[f[5]]])) };
+}
+function tuneVal(id, k){ const t = TUNE[id]; return t && t[k] != null ? t[k] : tuneBase(id)[k]; }
+function restoreMV(){ for (const id in ORIG) { const m = MV[id], o = ORIG[id]; Object.assign(m, { s: o.s, a: o.a, r: o.r, hit: o.hit, blk: o.blk, hs: o.hs, bs: o.bs, total: o.total, dmg: o.dmg, gd: o.gd, kd: o.kd, dfall: o.dfall });
+  if (o.kb) m.kb = o.kb.slice(); if (o.box) m.box = o.box.slice(); if (o.boxes) m.boxes = o.boxes.map(b => b.slice()); } }
+function applyTune(){
+  restoreMV(); for (const [o, v] of TXO) Object.assign(o, v);
+  if (!GOD || GAME.mode !== 'train') return;
+  for (const id in TUNE) { const m = MV[id], o = ORIG[id]; if (!m || !o) continue; const v = k => tuneVal(id, k);
+    m.s = Math.max(1, v('s')); m.a = Math.max(1, v('a')); m.r = Math.max(0, v('r'));
+    const span = m.a - 1 + m.r; m.total = m.s + span;
+    m.hs = Math.max(1, v('hit') + m.r); m.hit = m.hs - span;
+    m.bs = Math.max(1, v('blk') + m.r); m.blk = m.bs - span;
+    if (o.kb) { const k = v('kd'); m.kd = k === 1 ? 1 : k === 0 ? 0 : undefined; m.dfall = v('dfall') ? 1 : 0; }
+    if (typeof o.dmg === 'number') m.dmg = Math.round(v('dmg') * 100);
+    if (typeof o.gd === 'number') m.gd = Math.round(v('gd') * 100);
+    if (o.kb) m.kb = [v('kbx'), v('kby')];
+    const bw = v('bw'), bh = v('bh'), bx = v('bx'), by = v('by');
+    const tf = b => { const cx0 = b[0] + b[2] / 2, cy0 = b[1] + b[3] / 2, w = Math.round(b[2] * bw / 100), h = Math.round(b[3] * bh / 100); return [Math.round(cx0 - w / 2 + bx), Math.round(cy0 - h / 2 + by), w, h]; };
+    if (o.boxes) m.boxes = o.boxes.map(tf); if (o.box) m.box = tf(o.box);
+    for (const f of TX[id] || []) { const q = v(f[0]); if (q != null) f[4][f[5]] = Math.max(0, Math.round(f[6] ? q * f[6] : q)); }
+  }
+  // 羽跳の持続は 一度目＋間＋二度目
+  if (GOD && GAME.mode === 'train') for (const id of ['hane', 'haneX']) { const m = MV[id]; m.a = A.HANE.d1 + A.HANE.gap + A.HANE.d2; m.total = m.s + m.a - 1 + m.r; }
+}
+function saveTune(){ try { localStorage.setItem(TUNE_KEY, JSON.stringify(TUNE)); } catch (e) {} applyTune(); }
+let TSEL = 'jab1';
+function tuneOpen(on){
+  const el = $('tune'); el.hidden = !on; PAUSED = on; if (!on) return;
+  if (FM.mv && MV[FM.mv]) TSEL = FM.mv;
+  const sel = $('tn_mv'); if (!sel.options.length) for (const id in MV) { if (MV[id].k === 'p' && !MV[id].dmg) continue; const op = document.createElement('option'); op.value = id; op.textContent = MV[id].n + '（' + id + '）'; sel.appendChild(op); }
+  sel.value = TSEL; tuneRender();
+}
+function tuneRender(){
+  const id = TSEL, base = tuneBase(id), t = TUNE[id] || {}, TF = TF0.concat(TX[id] || []);
+  $('tn_rows').innerHTML = TF.filter(([k]) => base[k] != null).map(([k, n, u, st]) => {
+    const v = tuneVal(id, k), ch = t[k] != null && t[k] !== base[k];
+    if (Array.isArray(u)) return `<div class="tr${ch ? ' ch' : ''}"><span class="tn">${n}</span><select data-k="${k}">${u.map(([q, lb]) => `<option value="${q}"${q === v ? ' selected' : ''}>${lb}</option>`).join('')}</select><span class="tb">元 ${(u.find(x => x[0] === base[k]) || [0, ''])[1].replace(/（.*）/, '')}</span></div>`;
+    return `<div class="tr${ch ? ' ch' : ''}"><span class="tn">${n}</span><button type="button" data-k="${k}" data-d="-${st}">−</button><input data-k="${k}" type="number" step="${st}" value="${v}"><button type="button" data-k="${k}" data-d="${st}">＋</button><span class="tu">${u}</span><span class="tb">元 ${base[k]}</span></div>`;
+  }).join('');
+  const m = MV[id]; $('tn_sum').textContent = `全体 ${m.total}F（${m.total + 1}F目に動ける）　相手の硬直 ヒット ${m.hs}F・ガード ${m.bs}F（持続の終わりで当てたとき。早く当てるほど長くなり、硬直差は同じ）`;
+}
+function tuneSet(k, v){ const id = TSEL, base = tuneBase(id); if (!isFinite(v)) return; if (k === 's' || k === 'a') v = Math.max(1, Math.round(v)); if (k === 'r') v = Math.max(0, Math.round(v)); if (k === 'bw' || k === 'bh') v = Math.max(10, v);
+  TUNE[id] = TUNE[id] || {}; if (v === base[k]) delete TUNE[id][k]; else TUNE[id][k] = v; if (!Object.keys(TUNE[id]).length) delete TUNE[id]; saveTune(); tuneRender(); }
+function setupTune(){
+  if (!GOD) return;
+  $('a_tune').hidden = false; $('a_tune').onclick = () => { $('bar').classList.remove('open'); $('a_more').textContent = '設定'; tuneOpen(true); };
+  $('tn_close').onclick = () => tuneOpen(false);
+  $('tn_mv').onchange = e => { TSEL = e.target.value; tuneRender(); e.target.blur(); };
+  $('tn_rows').addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (!b) return; tuneSet(b.dataset.k, Math.round((tuneVal(TSEL, b.dataset.k) + +b.dataset.d) * 100) / 100); });
+  $('tn_rows').addEventListener('change', e => { const i = e.target.closest('input[data-k],select[data-k]'); if (i) { tuneSet(i.dataset.k, +i.value); i.blur && i.blur(); } });
+  $('tn_reset').onclick = () => { delete TUNE[TSEL]; saveTune(); tuneRender(); };
+  $('tn_all').onclick = () => { const b = $('tn_all'); if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'もう一度押すと全部戻す'; setTimeout(() => { b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; }, 2500); return; } TUNE = {}; saveTune(); tuneRender(); b.dataset.armed = ''; b.textContent = '全部の技を元に戻す'; };
+  $('tn_out').onclick = () => { const lines = Object.keys(TUNE).map(id => MV[id].n + '（' + id + '）: ' + Object.entries(TUNE[id]).map(([k, v]) => (TF0.concat(TX[id] || []).find(f => f[0] === k) || [k, k])[1] + ' ' + tuneBase(id)[k] + '→' + v).join('、'));
+    const txt = lines.length ? '新・一閃 技の調整\n' + lines.join('\n') + '\n' + JSON.stringify(TUNE) : '（変えた技はありません）';
+    $('tn_text').value = txt; $('tn_text').hidden = false; $('tn_text').select();
+    try { navigator.clipboard.writeText(txt).then(() => { $('tn_out').textContent = '写しました'; setTimeout(() => { $('tn_out').textContent = '書き出す'; }, 2000); }); } catch (e) {} };
+}
+
+resize(); setupBar(); setupMenu(); setupTune();
 { const m = (location.search.match(/[?&]m=(\w+)/) || [])[1]; if (m === 'train' || m === 'cpu' || m === 'vs') startMode(m); else if (!/[?&]match=/.test(location.search)) showMenu(true); }
 
 const DBG = { pause: false };

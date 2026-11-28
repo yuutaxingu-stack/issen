@@ -89,6 +89,8 @@ create table if not exists public.saves (
 
 alter table public.saves add column if not exists steel bigint not null default 0 check (steel >= 0);
 alter table public.saves add column if not exists forges int not null default 0;   -- 鍛えた回数
+-- 新・一閃で決めた分だけ（{ 刀id: { 決着名: 回数 } }）。rec は旧と新の合計のまま。図鑑で旧と新を分けて見せるのに使う（2026-11-28）
+alter table public.saves add column if not exists rec_new jsonb not null default '{}';
 
 -- ---------- 運営アカウント（2026-11-26） ----------
 -- ここに入っている人だけ、ガチャで銭が減らず、ピックアップ（選んだ刀が必ず出る）で引ける
@@ -203,7 +205,7 @@ $$;
 -- ゲームに返す形
 create or replace function public.save_json(s public.saves) returns jsonb
 language sql stable set search_path = '' as $$
-  select jsonb_build_object('coins', s.coins, 'steel', s.steel, 'best', s.cpu_best, 'owned', s.owned, 'rec', s.rec, 'equip', s.equip,
+  select jsonb_build_object('coins', s.coins, 'steel', s.steel, 'best', s.cpu_best, 'owned', s.owned, 'rec', s.rec, 'rec_new', s.rec_new, 'equip', s.equip,
     'imports', s.imports, 'cost', (select c.pull_cost from public.app_config c where c.id = 1),
     'god', exists (select 1 from public.god_accounts g where g.id = s.id),
     'open_boxes', (select coalesce(jsonb_agg(b.id order by b.ord), '[]') from public.gacha_boxes b where b.open));
@@ -293,12 +295,14 @@ $$;
 
 -- 勝ったことを記録し、決着に応じた銭を足す（銭の額はサーバーが決める）
 -- p_mode: 'vs' = 同じ端末の二人対戦（銭は app_config.vs_coin_div 分の1、切り上げ）。なし = CPU戦・ネット対戦（そのまま）
+-- p_game: 'new' = 新・一閃の勝ち（rec に加えて rec_new にも数える）。なし = 旧・一閃
 drop function if exists public.record_win(text, text);
-create or replace function public.record_win(p_finish text, p_katana text, p_mode text default null) returns jsonb
+drop function if exists public.record_win(text, text, text);
+create or replace function public.record_win(p_finish text, p_katana text, p_mode text default null, p_game text default null) returns jsonb
 language plpgsql security definer set search_path = '' as $$
 declare
   s public.saves;
-  c int; gain int; cap int; cur jsonb; dv int;
+  c int; gain int; cap int; cur jsonb; nw jsonb; dv int;
 begin
   s := public.save_lock();
   select x.coins into c from public.finish_coins x where x.finish = p_finish;
@@ -322,7 +326,13 @@ begin
   cur := coalesce(s.rec -> p_katana, '{}');
   cur := jsonb_set(cur, array[p_finish], to_jsonb(coalesce((cur ->> p_finish)::bigint, 0) + 1));
 
-  update public.saves set coins = s.coins + gain, rec = jsonb_set(s.rec, array[p_katana], cur),
+  if p_game = 'new' then
+    nw := coalesce(s.rec_new -> p_katana, '{}');
+    nw := jsonb_set(nw, array[p_finish], to_jsonb(coalesce((nw ->> p_finish)::bigint, 0) + 1));
+    s.rec_new := jsonb_set(s.rec_new, array[p_katana], nw);
+  end if;
+
+  update public.saves set coins = s.coins + gain, rec = jsonb_set(s.rec, array[p_katana], cur), rec_new = s.rec_new,
     win_min = s.win_min, win_count = s.win_count, coin_day = s.coin_day, day_coins = s.day_coins + gain, updated_at = now()
   where id = s.id returning * into s;
   return public.save_json(s) || jsonb_build_object('gained', gain);
@@ -493,11 +503,11 @@ $$;
 -- ---------- 関数を呼べる人 ----------
 revoke execute on function
   public.save_num(jsonb, bigint), public.save_json(public.saves), public.save_lock(), public.save_has(public.saves, text),
-  public.get_save(), public.import_local(jsonb), public.record_win(text, text, text), public.record_cpu_best(int),
+  public.get_save(), public.import_local(jsonb), public.record_win(text, text, text, text), public.record_cpu_best(int),
   public.pull_gacha(int, text, text), public.set_equip(text, text), public.forge_katana(text),
   public.box_latest(), public.box_rates(text), public.god_open_box(text)
   from public, anon, authenticated;
 grant execute on function
-  public.get_save(), public.import_local(jsonb), public.record_win(text, text, text), public.record_cpu_best(int),
+  public.get_save(), public.import_local(jsonb), public.record_win(text, text, text, text), public.record_cpu_best(int),
   public.pull_gacha(int, text, text), public.set_equip(text, text), public.forge_katana(text), public.god_open_box(text)
   to authenticated;

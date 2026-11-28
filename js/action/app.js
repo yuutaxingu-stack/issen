@@ -201,8 +201,8 @@ function cpuInput(){
   const back = q => { if (dir > 0) q.L = true; else q.R = true; };
   const cf = dir > 0 ? 'r' : 'l';
   const set = (n, f) => { CPU.plan = f; CPU.n = n; CPU.k = 0; };
-  // 気絶した相手には寄って斬る（居合はない）
-  if (o.st === 'stun') { if (dist > 70) fwd(i); else if (sim.frame % 7 === 0) i.A = true; return i; }
+  // 気絶した相手には寄って居合
+  if (o.st === 'stun') { if (dist > 120) fwd(i); else if (sim.frame % 2) i.G = true; return i; }
   if (p.st === 'down') { if (p.f <= 0 && crnd() < 0.08) { const r = crnd(); if (r < 0.4) i.J = true; else if (r < 0.75) fwd(i); else i.A = true; } return i; }
   if (p.st === 'tumble') { if (p.y < 60 * FP && p.vy < 0 && crnd() < lerp(0.02, 0.25, x)) i.G = true; return i; }
   if (p.st === 'hit' || p.st === 'bstun' || p.st === 'stun') { CPU.plan = null; if (p.st === 'bstun') i.G = true; return i; }
@@ -287,7 +287,7 @@ function recordWin(r){ // 勝った刀の戦績と銭
   const i = r.winner; if (i < 0 || GAME.mode === 'train' || (GAME.mode === 'cpu' && i !== 0)) return;
   const id = KITS[i]; if (!owns(id)) return;
   const vs = GAME.mode === 'vs', coin = vs ? Math.ceil((COIN[r.tier] || 0) / 3) : COIN[r.tier] || 0; // 同じ端末の二人対戦は銭3分の1
-  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); const o = { f: r.name, k: id, acct: !!SNAP.acct, t: Date.now() }; if (vs) o.m = 'vs'; a.push(o); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
+  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); const o = { f: r.name, k: id, acct: !!SNAP.acct, t: Date.now(), g: 'new' }; if (vs) o.m = 'vs'; a.push(o); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
   GAME.coins = (GAME.coins || 0) + coin;
   if (coin) FX.texts.push({ s: '銭 +' + coin, x: 0, y: 0, t: 0, life: 110, screen: true });
 }
@@ -360,7 +360,8 @@ function afterFinish(){
     if (r.winner === 0) { GAME.n++; sim = new A.Sim({ toWin: 1, kits: kitsFor('cpu'), dashRoll: rollFor('cpu') }); cpuReset(GAME.n); GAME.kats = katsFor('cpu'); clearFx(); GAME.phase = 'intro'; GAME.t = 0; return; }
     if (r.winner < 0) { resetRound(); GAME.phase = 'intro'; GAME.t = 0; return; } // 引き分けは同じ相手ともう一度
     const rec = GAME.n - 1;
-    if (rec > GAME.best) { GAME.best = rec; try { localStorage.setItem('issen-action-cpu-v1', JSON.stringify({ best: rec })); } catch (e) {} }
+    if (rec > GAME.best) { GAME.best = rec; try { localStorage.setItem('issen-action-cpu-v1', JSON.stringify({ best: rec })); } catch (e) {}
+      const N = window.IssenNet; if (N && N.user && N.sb) N.sb.rpc('record_action_cpu_best', { p_n: rec }).then(() => {}, () => {}); } // 番付用にアカウントへ（届かなければ一閃の画面で送り直す）
     GAME.phase = 'over'; showOver(true); return;
   }
   if (r.matchOver) { GAME.phase = 'over'; showOver(true); return; }
@@ -1356,7 +1357,7 @@ function drawPad(v){
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.font = `500 11px ${UIF}`; cx.textAlign = 'center'; cx.fillText('左半分を押して動かす', W * 0.22, H - 22);
   }
   for (const b of pd.BTN) {
-    const iai = false; // ガードを壊しても居合はない
+    const iai = b.id === 'G' && stunO;
     const on = !!pd.btn[b.id] || readKeyFor(me, b.id);
     cx.globalAlpha = on ? 0.95 : 0.7;
     const pulse = iai ? 1 + Math.sin(performance.now() / 90) * 0.06 : 1;
@@ -1673,7 +1674,7 @@ function onlineTick(){
 function recordOnlineWin(l){ // 勝った一本ごとに、自分の刀の戦績と銭
   const id = ON.kat; if (!owns(id)) return;
   const coin = COIN[l.tier] || 0;
-  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); a.push({ f: l.name, k: id, acct: !!SNAP.acct, t: Date.now() }); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
+  try { const a = JSON.parse(localStorage.getItem('issen-action-out-v1') || '[]'); a.push({ f: l.name, k: id, acct: !!SNAP.acct, t: Date.now(), g: 'new' }); localStorage.setItem('issen-action-out-v1', JSON.stringify(a.slice(-200))); } catch (e) {}
   GAME.coins = (GAME.coins || 0) + coin;
 }
 function onlineEnd(){ ON = null; }

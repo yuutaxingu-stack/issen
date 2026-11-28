@@ -305,7 +305,7 @@ function buildKatanas(){
 let GOD=false;   // 運営アカウント（サーバーが god:true を返す）: 銭が減らず、ピックアップで刀を選べる
 let ACCT=null;   // ログイン中だけ入る、アカウントへ保存する出入り口 {win,best,pull,equip}
 let ARM;
-function loadGuestArm(){ ARM={owned:{mumei:1},equip:['mumei','mumei'],rec:{}};
+function loadGuestArm(){ ARM={owned:{mumei:1},equip:['mumei','mumei'],rec:{},recNew:{}};
   try{ const a=JSON.parse(localStorage.getItem('issen-armory-v1')||'null'); if(a) ARM=Object.assign(ARM,a); }catch(e){} }
 loadGuestArm();
 function saveArm(){ if(ACCT) return; try{ localStorage.setItem('issen-armory-v1',JSON.stringify(ARM)); }catch(e){} }
@@ -355,7 +355,7 @@ function guestData(){ // この端末に保存されている記録（ログイ�
   let a=null,w=null; try{ a=JSON.parse(localStorage.getItem('issen-armory-v1')||'null'); w=JSON.parse(localStorage.getItem('issen-wallet-v1')||'null'); }catch(e){}
   a=a||{}; w=w||{}; return {coins:w.coins||0,best:w.best||0,steel:w.steel||0,owned:a.owned||{},rec:a.rec||{},equip:a.equip||['mumei','mumei']}; }
 function applySave(d,pend){ // アカウントの持ち物を画面に映す。pend: まだサーバーに届いていない銭
-  ARM.owned=Object.assign({mumei:1},d.owned||{}); ARM.rec=d.rec||{}; ARM.equip=Array.isArray(d.equip)&&d.equip.length===2?d.equip.slice():['mumei','mumei'];
+  ARM.owned=Object.assign({mumei:1},d.owned||{}); ARM.rec=d.rec||{}; ARM.recNew=d.rec_new||{}; ARM.equip=Array.isArray(d.equip)&&d.equip.length===2?d.equip.slice():['mumei','mumei'];
   WALLET.coins=(d.coins||0)+(pend||0); WALLET.best=d.best||0; WALLET.steel=d.steel||0; if(d.cost>0) PULLCOST=d.cost; GOD=!!d.god; if(Array.isArray(d.open_boxes)) OPENB=d.open_boxes;
   uiCache=''; if(!gachaEl.hidden){ refreshCoins(); if(!document.getElementById('g_book').hidden) renderBook(); } }
 function useAccount(api){ ACCT=api; setTimeout(importAction,0); }
@@ -368,7 +368,8 @@ function importAction(){
   const keep=[]; let n=0;
   for(const r of a){ if(!r||!FIN[r.f]||!KMAP[r.k]){ continue; } if(!!r.acct!==!!ACCT){ keep.push(r); continue; } if(!ARM.owned[r.k]) continue;
     let coin=COIN[FIN[r.f].tier]||0; if(r.m==='vs') coin=vsCoin(coin); ARM.rec[r.k]=ARM.rec[r.k]||{}; ARM.rec[r.k][r.f]=(ARM.rec[r.k][r.f]||0)+1;
-    if(coin){ WALLET.coins+=coin; } if(ACCT) ACCT.win(r.f,r.k,coin,r.m==='vs'?'vs':null); n++; }
+    if(r.g==='new'){ const nw=ARM.recNew||(ARM.recNew={}); nw[r.k]=nw[r.k]||{}; nw[r.k][r.f]=(nw[r.k][r.f]||0)+1; } // 新・一閃の分（図鑑で旧と新を分けて見せる）
+    if(coin){ WALLET.coins+=coin; } if(ACCT) ACCT.win(r.f,r.k,coin,r.m==='vs'?'vs':null,r.g==='new'?'new':null); n++; }
   try{ localStorage.setItem(AOUT,JSON.stringify(keep)); }catch(e){}
   if(n){ saveArm(); saveWallet(); uiCache=''; }
 }

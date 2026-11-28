@@ -16,6 +16,8 @@
 --   * 連勝の倍率: 1連勝目 ×1.0、そこから1勝ごとに +0.1、6連勝目以降は ×1.5
 --   * 増減は最低 1。戦闘力は 100 より下がらない
 --   * 同じ相手との対戦は、1日（日本時間）5戦まで戦闘力に数える（なれあいの水増し対策）
+--   * 一閃（今までの一閃）と新・一閃は、戦闘力も記録も別々に数える（ratings.game / rating_log.game）。
+--     2026-11-28 より前の戦闘力と記録は、すべて一閃（'issen'）の分
 --
 -- 守りの考え方:
 --   * 戦闘力は、二人の結果報告が一致して確定した試合（matches.status = 'done'）からだけ、
@@ -64,6 +66,28 @@ create table if not exists public.rating_log (
 );
 create index if not exists rating_log_pair on public.rating_log (user_id, opp_id, created_at);
 
+-- ---------- 一閃と新・一閃を分ける（2026-11-28） ----------
+-- game: 'issen' = 一閃 / 'action' = 新・一閃。今ある行はすべて 'issen' になる（消えない）
+alter table public.ratings add column if not exists game text not null default 'issen';
+alter table public.rating_log add column if not exists game text not null default 'issen';
+alter table public.ratings drop constraint if exists ratings_game_check;
+alter table public.ratings add constraint ratings_game_check check (game in ('issen', 'action'));
+alter table public.rating_log drop constraint if exists rating_log_game_check;
+alter table public.rating_log add constraint rating_log_game_check check (game in ('issen', 'action'));
+-- 一人につき一閃の行と新・一閃の行を持てるように、鍵を (id, game) にする（一度だけ）
+do $$ begin
+  if not exists (
+    select 1 from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any (c.conkey)
+    where c.conrelid = 'public.ratings'::regclass and c.contype = 'p' and a.attname = 'game'
+  ) then
+    alter table public.ratings drop constraint ratings_pkey;
+    alter table public.ratings add primary key (id, game);
+  end if;
+end $$;
+
+-- 新・一閃の CPU 戦の最高記録（今までの cpu_best は一閃の分）
+alter table public.saves add column if not exists action_cpu_best int not null default 0;
+
 alter table public.rating_config enable row level security;
 alter table public.ratings enable row level security;
 alter table public.rating_log enable row level security;
@@ -79,6 +103,7 @@ declare
   rw public.ratings; rl public.ratings;
   e numeric; mult numeric; gain int; loss int; n int; ok boolean;
   today_start timestamptz;
+  g text := coalesce(to_jsonb(new) ->> 'game', 'issen');   -- どちらの一閃の試合か（action-online.sql）
 begin
   if new.status <> 'done' or old.status = 'done' then return new; end if;
   if (to_jsonb(new) ->> 'room_id') is not null then return new; end if;   -- 団体戦の試合は数えない（team.sql）
@@ -89,19 +114,20 @@ begin
   s0 := (s ->> 0)::numeric; s1 := (s ->> 1)::numeric;
   if s0 = s1 then return new; end if;                       -- 勝ち負けがない試合は数えない
   if s0 > s1 then w := new.p0; l := new.p1; else w := new.p1; l := new.p0; end if;
+  if g not in ('issen', 'action') then return new; end if;
 
   select * into cfg from public.rating_config where id = 1;
-  insert into public.ratings (id, rating, peak) values (w, cfg.start_rating, cfg.start_rating), (l, cfg.start_rating, cfg.start_rating)
-    on conflict (id) do nothing;
+  insert into public.ratings (id, game, rating, peak) values (w, g, cfg.start_rating, cfg.start_rating), (l, g, cfg.start_rating, cfg.start_rating)
+    on conflict (id, game) do nothing;
   -- いつも同じ順で鍵をかける（同時に2つの試合が確定しても固まらない）
-  perform 1 from public.ratings where id in (w, l) order by id for update;
-  select * into rw from public.ratings where id = w;
-  select * into rl from public.ratings where id = l;
+  perform 1 from public.ratings where id in (w, l) and game = g order by id for update;
+  select * into rw from public.ratings where id = w and game = g;
+  select * into rl from public.ratings where id = l and game = g;
 
   -- 同じ二人の今日（日本時間）の試合数
   today_start := (date_trunc('day', now() at time zone 'Asia/Tokyo')) at time zone 'Asia/Tokyo';
   select count(*) into n from public.rating_log x          -- 1試合に2行あるので、勝った側の行だけ数える
-    where x.won and x.counted and x.created_at >= today_start
+    where x.won and x.counted and x.created_at >= today_start and x.game = g
       and ((x.user_id = w and x.opp_id = l) or (x.user_id = l and x.opp_id = w));
   ok := n < cfg.pair_per_day;
 
@@ -115,21 +141,21 @@ begin
     gain := 0; loss := 0;
   end if;
 
-  insert into public.rating_log (match_id, user_id, opp_id, won, before, after, delta, streak, counted) values
-    (new.id, w, l, true,  rw.rating, rw.rating + gain, gain,  case when ok then rw.streak + 1 else rw.streak end, ok),
-    (new.id, l, w, false, rl.rating, rl.rating - loss, -loss, case when ok then 0 else rl.streak end, ok);
+  insert into public.rating_log (match_id, user_id, opp_id, won, before, after, delta, streak, counted, game) values
+    (new.id, w, l, true,  rw.rating, rw.rating + gain, gain,  case when ok then rw.streak + 1 else rw.streak end, ok, g),
+    (new.id, l, w, false, rl.rating, rl.rating - loss, -loss, case when ok then 0 else rl.streak end, ok, g);
 
   update public.ratings set
     rating = rating + gain, peak = greatest(peak, rating + gain), wins = wins + 1,
     streak = case when ok then streak + 1 else streak end,
     best_streak = greatest(best_streak, case when ok then streak + 1 else streak end),
     updated_at = now()
-  where id = w;
+  where id = w and game = g;
   update public.ratings set
     rating = rating - loss, losses = losses + 1,
     streak = case when ok then 0 else streak end,
     updated_at = now()
-  where id = l;
+  where id = l and game = g;
   return new;
 exception when others then
   -- 戦闘力の計算で何か起きても、試合の結果の記録は止めない
@@ -149,8 +175,22 @@ language sql stable security definer set search_path = '' as $$
   from public.rating_log r where r.match_id = p_id and r.user_id = auth.uid();
 $$;
 
+-- 新・一閃の CPU 戦の最高記録（上がるときだけ変わる）
+create or replace function public.record_action_cpu_best(p_n int) returns int
+language plpgsql security definer set search_path = '' as $$
+declare s public.saves; n int;
+begin
+  s := public.save_lock();
+  update public.saves set action_cpu_best = greatest(action_cpu_best, least(greatest(coalesce(p_n, 0), 0), 1000)), updated_at = now()
+  where id = s.id returning action_cpu_best into n;
+  return n;
+end;
+$$;
+
 -- 自分とフレンドの番付。三つの番付に使う値をまとめて返す
-create or replace function public.friend_ranking() returns jsonb
+-- p_game: 'issen' = 一閃 / 'action' = 新・一閃（戦闘力と CPU 戦の記録が変わる。刀帳は共通）
+drop function if exists public.friend_ranking();
+create or replace function public.friend_ranking(p_game text default 'issen') returns jsonb
 language plpgsql stable security definer set search_path = '' as $$
 declare
   me uuid := auth.uid();
@@ -159,6 +199,7 @@ declare
   rows jsonb;
 begin
   if me is null then raise exception 'ログインしていません'; end if;
+  if p_game is null or p_game not in ('issen', 'action') then raise exception 'その遊び方はありません'; end if;
   select c.start_rating into st from public.rating_config c where c.id = 1;
   select count(*) into total from public.katana_catalog;
   with people as (
@@ -172,7 +213,7 @@ begin
       'id', p.id,
       'name', pr.name,
       'me', p.id = me,
-      'cpu', coalesce(s.cpu_best, 0),
+      'cpu', coalesce(case when p_game = 'action' then s.action_cpu_best else s.cpu_best end, 0),
       'katana', 1 + coalesce((select count(*) from jsonb_each(s.owned) o
                                join public.katana_catalog c on c.id = o.key
                                where o.key <> 'mumei' and jsonb_typeof(o.value) = 'number' and (o.value)::text::numeric > 0), 0),
@@ -186,11 +227,11 @@ begin
   from people p
   join public.profiles pr on pr.id = p.id
   left join public.saves s on s.id = p.id
-  left join public.ratings r on r.id = p.id;
-  return jsonb_build_object('total', total, 'rows', rows);
+  left join public.ratings r on r.id = p.id and r.game = p_game;
+  return jsonb_build_object('total', total, 'rows', rows, 'game', p_game);
 end;
 $$;
 
 -- ---------- 関数を呼べる人 ----------
-revoke execute on function public.rating_apply(), public.match_rating(uuid), public.friend_ranking() from public, anon, authenticated;
-grant execute on function public.match_rating(uuid), public.friend_ranking() to authenticated;
+revoke execute on function public.rating_apply(), public.match_rating(uuid), public.friend_ranking(text), public.record_action_cpu_best(int) from public, anon, authenticated;
+grant execute on function public.match_rating(uuid), public.friend_ranking(text), public.record_action_cpu_best(int) to authenticated;

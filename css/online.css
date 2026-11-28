@@ -86,3 +86,11 @@
 .oinvl .ost{flex:1;min-width:8em}
 #menu.locked .mb:not(#m_online){opacity:.38}
 #menu.locked #m_online{box-shadow:0 0 0 1px rgba(178,52,40,.8)}
+/* 番付: 一閃と新・一閃の切り替え */
+.rgame{display:flex;justify-content:center;align-items:center;gap:14px;flex:none;margin-top:-2px;}
+.rgame span{opacity:.25;font-size:13px;}
+.rgame button{background:none;border:none;color:#e9e2cf;opacity:.45;font-family:var(--display);font-size:15px;letter-spacing:.18em;padding:4px 2px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.rgame button::before{content:"";width:6px;height:6px;border-radius:50%;background:transparent;border:1px solid rgba(233,226,207,.4);}
+.rgame button.on{opacity:1;}
+.rgame button.on::before{background:#a8322a;border-color:#a8322a;}
+.rgame button:focus-visible{outline:2px solid #a8322a;outline-offset:3px;}

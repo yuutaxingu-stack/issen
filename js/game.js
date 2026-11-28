@@ -971,6 +971,16 @@ function brushStroke(c,x0,y0,x1,y1,w,col,seed){ const r=mulberry32(seed); const 
   for(let k=0;k<14;k++){ const off=(r()-0.5)*w, a=0.25+r()*0.5; c.globalAlpha=a; c.lineWidth=Math.max(1,w*(0.05+r()*0.12)); c.beginPath();
     for(let i=0;i<=n;i++){ const u=i/n; if(u>0.9+r()*0.1) break; const px=lerp(x0,x1,u), py=lerp(y0,y1,u)+off*Math.sin(Math.PI*u)+(r()-0.5)*w*0.04; i?c.lineTo(px,py):c.moveTo(px,py); } c.stroke(); }
   c.restore(); }
+// 白く光る円相を別の canvas に一度だけ描いておく（筆の線は660本あり、線ごとの shadowBlur は重すぎる）
+let ENSOG=null;
+function ensoGlow(){
+  const R=Math.round(FH*1.1)*DPR; if(ENSOG&&ENSOG.R===R) return ENSOG;
+  const pad=Math.ceil(R*0.25), h=R+pad, a=document.createElement('canvas'); a.width=a.height=h*2; const ax=a.getContext('2d');
+  enso(ax,h,h,R,'rgba(248,248,252,0.95)',31);
+  const b=document.createElement('canvas'); b.width=b.height=h*2; const bx=b.getContext('2d');
+  bx.shadowColor='rgba(255,255,255,1)'; bx.shadowBlur=14*DPR; for(let i=0;i<3;i++) bx.drawImage(a,0,0); bx.shadowBlur=0; bx.drawImage(a,0,0); // 影を重ねて、筆ごとにぼかしていた頃の明るさに
+  return ENSOG={c:b,R,h};
+}
 function enso(c,cx,cy,R,col,seed){ const r=mulberry32(seed); const a0=-1.9, span=Math.PI*1.82, n=220; c.save(); c.strokeStyle=col; c.lineCap='round';
   let pa=a0, pr=R;
   for(let i=1;i<=n;i++){ const u=i/n, a=a0+span*u, w=R*(0.02+0.055*Math.sin(Math.PI*Math.pow(u,0.6)));
@@ -1152,7 +1162,10 @@ function drawMutualBurst(c,now){
   c.save(); c.fillStyle=FE?'rgba(6,6,8,'+(0.85*(1-t))+')':'rgba(150,28,20,'+(0.85*(1-t))+')';
   for(let i=0;i<26;i++){ const an=r()*Math.PI*2, d=FH*(0.2+r()*1.4)*ease(t), s=FH*(0.02+r()*0.07)*(1-t*0.5); c.beginPath(); c.ellipse(x+Math.cos(an)*d,y+Math.sin(an)*d*0.6,s*1.6,s,an,0,7); c.fill(); }
   c.restore();
-  c.save(); c.globalAlpha=0.8*(1-t); if(FE){ c.shadowColor='rgba(255,255,255,0.9)'; c.shadowBlur=18; } enso(c,x,y,FH*(0.5+0.6*ease(t)),FE?'rgba(248,248,252,0.95)':'rgba(200,40,30,0.9)',31); c.restore();
+  c.save(); c.globalAlpha=0.8*(1-t);
+  if(FE){ const R=FH*(0.5+0.6*ease(t)), E=ensoGlow(), k=R/E.R; c.globalAlpha=Math.min(1,1.5*(1-t)); c.drawImage(E.c,x-E.h*k,y-E.h*k,E.h*2*k,E.h*2*k); } // 八咫: 光る白い円相は一度だけ描いた絵を広げる（筆の線ごとに影をぼかすとガクガクする）
+  else enso(c,x,y,FH*(0.5+0.6*ease(t)),'rgba(200,40,30,0.9)',31);
+  c.restore();
 }
 function drawIssenFx(c,now){
   const fx=G.fx; if(!fx||fx.kind!=='issen') return; const e=Math.min(fxE(fx,now),fx.dur);
@@ -1831,14 +1844,23 @@ function drawEclipse(x,cx,cy,r,t){
   x.strokeStyle='rgba(255,255,255,.85)'; x.lineWidth=1.2; x.beginPath(); x.arc(cx,cy,r+0.4,0,7); x.stroke(); x.restore();
 }
 /* 烏の羽: 羽軸と、片側が長い羽弁。黒い羽は白い縁で闇から浮かせる */
+/* 白い羽は光の縁（shadowBlur）が重いので、一度だけ絵にしておき、向きと大きさを変えて貼る（八咫の後なしで羽が何十枚も舞うとガクガクしたため） */
+const FSPR={};
+function featherSprite(){
+  const d=Math.max(1,Math.min(3,DPR||1)); if(FSPR[d]) return FSPR[d];
+  const S=24, L=S*3.4, pad=14, w=Math.ceil((L*1.3+pad*2)*d), h=Math.ceil((S*1.6+pad*2)*d), c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d'); x.scale(d,d); drawFeather(x,{x:w/d/2,y:h/d/2,s:S,r:0,w:0,d:false,c:'rgba(248,248,252,.95)',raw:true});
+  return FSPR[d]={c,S,w:w/d,h:h/d};
+}
 function drawFeather(x,p){
+  if(!p.d&&!p.raw){ const F=featherSprite(), k=p.s/F.S; x.save(); x.translate(p.x,p.y); x.rotate(p.r*0.5+Math.sin(p.w+p.r)*0.7); x.scale(k,k*(0.5+0.5*Math.abs(Math.cos(p.r*1.1)))); x.drawImage(F.c,-F.w/2,-F.h/2,F.w,F.h); x.restore(); return; }
   const L=p.s*3.4, Wd=p.s*0.62; x.save(); x.translate(p.x,p.y); x.rotate(p.r*0.5+Math.sin(p.w+p.r)*0.7); x.scale(1,0.5+0.5*Math.abs(Math.cos(p.r*1.1)));
   // 羽弁: 根元は細く、先は丸く。下側に二つの切れ込み
   x.beginPath(); x.moveTo(-L/2,0); x.bezierCurveTo(-L*0.2,-Wd*1.2,L*0.32,-Wd*1.15,L/2,-Wd*0.1);
   x.bezierCurveTo(L*0.38,Wd*0.5,L*0.2,Wd*0.55,L*0.12,Wd*0.42); x.lineTo(L*0.05,Wd*0.25); x.lineTo(L*0.0,Wd*0.6);
   x.bezierCurveTo(-L*0.12,Wd*0.62,-L*0.2,Wd*0.45,-L*0.24,Wd*0.32); x.lineTo(-L*0.3,Wd*0.2); x.quadraticCurveTo(-L*0.4,Wd*0.25,-L/2,0); x.closePath();
   if(p.d){ x.fillStyle='rgba(6,6,8,.96)'; x.fill(); x.strokeStyle='rgba(235,238,248,.6)'; x.lineWidth=1; x.stroke(); }
-  else { x.fillStyle=p.c; x.shadowColor='rgba(255,255,255,.9)'; x.shadowBlur=10; x.fill(); x.shadowBlur=0; }
+  else { x.fillStyle=p.c; x.shadowColor='rgba(255,255,255,.9)'; x.shadowBlur=10*(p.k||1); x.fill(); x.shadowBlur=0; }
   // 羽軸と羽枝
   x.strokeStyle=p.d?'rgba(210,214,228,.7)':'rgba(110,110,120,.55)'; x.lineWidth=0.9; x.beginPath(); x.moveTo(-L/2-L*0.12,Wd*0.05); x.quadraticCurveTo(0,-Wd*0.1,L/2,-Wd*0.1); x.stroke();
   x.lineWidth=0.5; x.beginPath(); for(let i=1;i<6;i++){ const u=-L/2+L*i/6.5; x.moveTo(u,-Wd*0.08); x.lineTo(u+L*0.1,-Wd*0.7); } x.stroke();

@@ -1,7 +1,7 @@
 /* =====================================================================
    一閃 図鑑
    決着（旧・一閃／新・一閃）・二つ名・背景の札の条件を一覧で見る。
-   決着の回数は端末（ログイン中はアカウント）の刀ごとの戦績 ARM.rec を合計する（旧と新は分けずに数えている）。
+   決着の回数は刀ごとの戦績の合計。ARM.rec は旧と新の合計、ARM.recNew（サーバーは saves.rec_new）は新・一閃の分だけ。
    二つ名・背景はサーバーの zukan()（supabase/zukan.sql）から読む。
    隠し二つ名は、一度でも手にした人にだけ名前と条件が返ってくる。
    ===================================================================== */
@@ -62,10 +62,20 @@
   let tab = store.get('issen-zukan-tab', 'fin'), mode = store.get('issen-zukan-mode', 'old');
   let data = null, loading = false, err = '';
 
-  function counts(){
-    const rec = (I.arm && I.arm().rec) || {}, c = {};
-    Object.keys(rec).forEach(k => { const r = rec[k] || {}; Object.keys(r).forEach(n => { c[n] = (c[n] || 0) + (+r[n] || 0); }); });
+  // 決着ごとの回数。rec は旧と新の合計、recNew は新・一閃の分だけ。旧 = 合計 − 新
+  function sum(rec){
+    const c = {};
+    Object.keys(rec || {}).forEach(k => { const r = rec[k] || {}; Object.keys(r).forEach(n => { c[n] = (c[n] || 0) + (+r[n] || 0); }); });
     return c;
+  }
+  function counts(m){
+    const a = (I.arm && I.arm()) || {}, all = sum(a.rec), nw = sum(a.recNew);
+    if (m === 'new') { // 新・一閃にしかない決着は、分けて数える前の分も新・一閃に
+      NEW.forEach(f => { if (!OLD.some(o => o[0] === f[0])) nw[f[0]] = Math.max(nw[f[0]] || 0, all[f[0]] || 0); });
+      return nw;
+    }
+    Object.keys(nw).forEach(n => { all[n] = Math.max(0, (all[n] || 0) - nw[n]); });
+    return all;
   }
 
   function open(){ el.hidden = false; el.scrollTop = 0; render(); load(); }
@@ -94,7 +104,7 @@
   }
 
   function finHtml(){
-    const list = mode === 'new' ? NEW : OLD, c = counts();
+    const list = mode === 'new' ? NEW : OLD, c = counts(mode);
     const got = list.filter(f => c[f[0]] > 0).length;
     let h = '<div class="zmode" role="tablist">' +
       '<button type="button" data-mode="old"' + (mode === 'old' ? ' class="on"' : '') + '>旧・一閃<small>居合と見切り</small></button>' +
@@ -113,7 +123,7 @@
     const d = DRAW[mode] || DRAW.old;
     h += '<section class="zsec t-分"><h3><i>分</i>ひきわけ</h3><ol class="zlist"><li class="zfin draw"><div class="zname"><b>' + esc(d[0]) + '</b><small>' + esc(d[1]) + '</small></div><p class="zcond">' + esc(d[2]) + '</p><span class="zcnt"></span></li></ol></section>';
     h += '<p class="gnote">いくつも当てはまるときは、上の階級の決着になります。' + (mode === 'new' ? '「後がない」は二本先取で、互いに一本ずつ取ったとき。' : '') +
-      '<br>回数は旧・一閃と新・一閃を合わせて数えています。</p>';
+      '<br>旧と新が同じ名の決着は、11月28日より前の回数を旧・一閃に数えています。</p>';
     return h;
   }
 

@@ -14,12 +14,21 @@ Q="psql -h $D -p 5499 -U postgres -v ON_ERROR_STOP=1 -q"
 $Q -f tests/supabase-stub.sql
 $Q -f supabase/schema.sql
 $Q -f supabase/save-data.sql
-$Q -f supabase/ranking.sql
+$Q -f supabase/action-online.sql
+echo '--- 本番と同じ順: まず前の ranking.sql で戦闘力をためる'
+$Q -f tests/ranking-old.sql
 $Q -f tests/ranking-db-test.sql
-$Q -Atc "select id, rating, peak, wins, losses, streak, best_streak from public.ratings order by id; select count(*) from public.rating_log" > "$D/before.txt"
+$Q -Atc "select id, rating, peak, wins, losses, streak, best_streak from public.ratings order by id; select count(*) from public.rating_log" > "$D/old.txt"
+echo '--- 新しい ranking.sql（一閃と新・一閃を分ける）を実行'
+$Q -f supabase/ranking.sql
+$Q -Atc "select id, rating, peak, wins, losses, streak, best_streak from public.ratings where game = 'issen' order by id; select count(*) from public.rating_log where game = 'issen'" > "$D/new.txt"
+if cmp -s "$D/old.txt" "$D/new.txt"; then echo 'OK 今までの戦闘力と記録は、すべて一閃の分としてそのまま残る'; else echo 'NG 変わった'; diff "$D/old.txt" "$D/new.txt"; exit 1; fi
+$Q -f tests/ranking-action-test.sql
+$Q -Atc "select id, game, rating, peak, wins, losses, streak, best_streak from public.ratings order by id, game; select count(*) from public.rating_log" > "$D/before.txt"
 echo '--- 3つのSQLをもう一度実行（アップデートのまね）'
 $Q -f supabase/schema.sql
 $Q -f supabase/save-data.sql
+$Q -f supabase/action-online.sql
 $Q -f supabase/ranking.sql
-$Q -Atc "select id, rating, peak, wins, losses, streak, best_streak from public.ratings order by id; select count(*) from public.rating_log" > "$D/after.txt"
+$Q -Atc "select id, game, rating, peak, wins, losses, streak, best_streak from public.ratings order by id, game; select count(*) from public.rating_log" > "$D/after.txt"
 if cmp -s "$D/before.txt" "$D/after.txt"; then echo 'OK もう一度実行しても戦闘力と記録は変わらない'; else echo 'NG 変わった'; diff "$D/before.txt" "$D/after.txt"; exit 1; fi

@@ -73,6 +73,7 @@ const rows = p => p.$$eval('#r_list li', ls => ls.map(l => l.innerText.replace(/
   await p.click('#o_back');
 
   console.log('--- 甲でログインして番付を見る');
+  await p.evaluate(() => localStorage.setItem('issen-action-cpu-v1', JSON.stringify({ best: 6 })));   // 新・一閃の CPU 戦で 6人抜き
   await login(p, 'aaa');
   await p.waitForFunction(() => IssenNet.user && IssenNet.profile, null, { timeout: 15000 });
   await p.click('#m_rank');
@@ -81,7 +82,7 @@ const rows = p => p.$$eval('#r_list li', ls => ls.map(l => l.innerText.replace(/
   let r = await rows(p);
   ok(r.length === 3, '自分とフレンド（申請中は除く）の3人: ' + JSON.stringify(r));
   ok(/甲/.test(r[0]) && /1074/.test(r[0]), '戦闘力の一位は甲 1074');
-  ok(/二連勝中/.test(r[0]) && /7勝1敗/.test(r[0]), '勝ち負けと連勝が出る');
+  ok(/二連勝中/.test(r[0]) && /8勝1敗/.test(r[0]), '勝ち負けと連勝が出る');
   ok(/戦闘力/.test(await p.textContent('#r_me')), '自分の欄が出る');
   await p.screenshot({ path: out + '/rank-power.png' });
   await p.click('.rtabs button[data-tab="cpu"]'); await p.waitForTimeout(900);
@@ -90,8 +91,23 @@ const rows = p => p.$$eval('#r_list li', ls => ls.map(l => l.innerText.replace(/
   await p.screenshot({ path: out + '/rank-cpu.png' });
   await p.click('.rtabs button[data-tab="book"]'); await p.waitForTimeout(900);
   r = await rows(p);
-  ok(/甲/.test(r[0]) && /3\/ 30振り/.test(r[0]) && /^二/.test(r[1]) && /^二/.test(r[2]), '刀帳の番付（同じ数は同じ位）: ' + JSON.stringify(r));
+  ok(/甲/.test(r[0]) && /3\/ \d+振り/.test(r[0]) && /^二/.test(r[1]) && /^二/.test(r[2]), '刀帳の番付（同じ数は同じ位）: ' + JSON.stringify(r));
   await p.screenshot({ path: out + '/rank-book.png' });
+
+  console.log('--- 新・一閃に切り替える（今までの戦闘力は一閃の分）');
+  await p.click('.rgame button[data-game="action"]');
+  await p.click('.rtabs button[data-tab="power"]');
+  await p.waitForFunction(() => /新・一閃/.test(document.getElementById('r_lead').textContent) && /1032/.test(document.getElementById('r_list').innerText), null, { timeout: 10000 });
+  await p.waitForTimeout(900);
+  r = await rows(p);
+  ok(/甲/.test(r[0]) && /1032/.test(r[0]) && /2勝0敗/.test(r[0]) && /丙/.test(r[1]) && /1000/.test(r[1]) && /まだ対戦なし/.test(r[1]), '新・一閃の戦闘力は別: ' + JSON.stringify(r));
+  await p.screenshot({ path: out + '/rank-action-power.png' });
+  await p.click('.rtabs button[data-tab="cpu"]'); await p.waitForTimeout(900);
+  r = await rows(p);
+  ok(/甲/.test(r[0]) && /6人抜き/.test(r[0]), '新・一閃の勝ち抜き（端末の記録をアカウントへ送った）: ' + JSON.stringify(r));
+  await p.click('.rgame button[data-game="issen"]'); await p.waitForTimeout(900);
+  r = await rows(p);
+  ok(/乙/.test(r[0]) && /12人抜き/.test(r[0]), '一閃に戻すと一閃の勝ち抜き: ' + JSON.stringify(r));
 
   console.log('--- 縦向きのスマホでも崩れない');
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);

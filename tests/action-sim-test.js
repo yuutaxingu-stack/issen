@@ -19,10 +19,10 @@ function drain(s){ const e = s.ev; s.ev = []; return e; }
   ok(a1 - a0 === 8, '動けるようになる差 = 8F (' + (a1 - a0) + ')'); }
 // 3) 全体フレーム: 弱斬りは17F
 { const s = sim(400); run(s, 1, () => I({ A: 1 })); let n = 1; while (s.p[0].st === 'atk') { s.step([I(), I()]); n++; } ok(n === 17 && A.MV.jab1.total === 17, '弱斬り 全体17F（18F目に動ける） n=' + n); }
-// 4) ガードを削りきると気絶、守が居合になって一本
+// 4) ガードを削りきると気絶。居合はない（2026-11-28）
 { const s = simM(60); s.p[1].gd = 500; run(s, 2, null, () => I({ G: 1 })); run(s, 1, () => I({ A: 1 }), () => I({ G: 1 })); run(s, 30, null, () => I({ G: 1 }));
   ok(s.p[1].st === 'stun', 'ガードが割れて気絶');
-  run(s, 1, () => I({ G: 1 })); run(s, 40); ok(s.result && s.result.how === 'iai', '気絶中の居合で一本 ' + (s.result && s.result.name)); }
+  run(s, 1, () => I({ G: 1 })); run(s, 40); ok(!s.result && s.p[0].mv !== 'iai', 'ガードを割っても居合は出ない（一本にならない）'); }
 // 5) 連撃で体力を削りきる
 { const s = simM(60); s.p[1].hp = 200; let k = 0; run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.result && s.result.how === 'ko', '体力0で斬り伏せ ' + (s.result && s.result.name)); }
 // 6) 弱斬りの連撃が三段まで出る

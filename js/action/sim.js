@@ -126,7 +126,7 @@ const DG = {
 /* 決着名 */
 const FIN = {
   '一閃':{tier:'絶'}, '明鏡止水':{tier:'幻'}, '紙一重':{tier:'極'}, '鏡返し':{tier:'極'}, '死中活':{tier:'極'}, '流転':{tier:'極'}, '百花':{tier:'極'},
-  '二の太刀':{tier:'上'}, '陽炎':{tier:'上'}, '止め':{tier:'上'}, '落花':{tier:'上'}, '背水':{tier:'上'}, '刹那':{tier:'上'},
+  '陽炎':{tier:'上'}, '止め':{tier:'上'}, '落花':{tier:'上'}, '背水':{tier:'上'}, '刹那':{tier:'上'},
   '散華':{tier:'絶'}, '先の先':{tier:'並'}, '隙穿ち':{tier:'並'}, '疾風':{tier:'並'}, '斬り伏せ':{tier:'並'}, '睨み合い':{tier:'分'}
 };
 
@@ -288,7 +288,7 @@ Sim.prototype.dodge = function(p, k, dir){
 Sim.prototype.think = function(p, o){
   const h = horiz(p), i = p.inp;
   const oppStun = o.st === 'stun';
-  const canIai = oppStun && p.buf.G > 0;
+  const canIai = false; // ガードを壊しても居合はない（2026-11-28 ユーザー指定）。気絶した相手には連撃で
   // 八咫: 羽跳を二度当てた後は、跳び終わった後の硬直・無防備落下・着地の硬直を食甚で打ち消せる（最速で出せばちょうど確定）
   if (p.sjOK && p.ecl === 1 && p.fuku >= FUKU.max && (p.st === 'fall' || p.st === 'land' || (p.st === 'atk' && p.mv === 'hane' && p.mvf >= MV.hane.s + MV.hane.a)) && (o.st === 'hit' || o.st === 'tumble')) {
     const side = (p.wk && p.wk.d !== 'u' && p.wk.d !== 'd') || (p.spB && !i.U && !i.D && !p.wk);
@@ -770,7 +770,6 @@ Sim.prototype.finish = function(w, l, how, m, s){
   else if (w.hp <= 2000) name = '死中活';
   else if (iai && w.gdLow) name = '流転';
   else if (!iai && w.combo >= 10) name = '百花';
-  else if (iai && l.stunCount >= 2) name = '二の太刀';
   else if (back) name = '陽炎';
   else if (!iai && w.comboDmg >= 5000) name = '止め';
   else if (air) name = '落花';

@@ -43,9 +43,14 @@
         try {
           let d;
           if (op.t === 'win') {
-            const a = { p_finish: op.f, p_katana: op.k }; if (op.m) a.p_mode = op.m;
+            const a = { p_finish: op.f, p_katana: op.k }; if (op.m) a.p_mode = op.m; if (op.g) a.p_game = op.g;
             try { d = await rpc('record_win', a); }
-            catch (e) { if (!op.m || !missing(e)) throw e; d = await rpc('record_win', { p_finish: op.f, p_katana: op.k }); } // サーバーのSQLがまだ古い
+            catch (e) { // サーバーのSQLがまだ古い: 足した引数を外して送り直す
+              if (!missing(e) || !(op.m || op.g)) throw e;
+              const b = { p_finish: op.f, p_katana: op.k }; if (op.m) b.p_mode = op.m;
+              try { d = await rpc('record_win', b); }
+              catch (e2) { if (!op.m || !missing(e2)) throw e2; d = await rpc('record_win', { p_finish: op.f, p_katana: op.k }); }
+            }
           }
           else if (op.t === 'best') d = await rpc('record_cpu_best', { p_n: op.n });
           else if (op.t === 'equip') d = await rpc('set_equip', { p_a: op.a, p_b: op.b });
@@ -65,7 +70,7 @@
 
   /* ---------- ゲームから呼ばれる出入り口 ---------- */
   const api = {
-    win(f, k, c, m){ const op = { t: 'win', f, k, c: c || 0 }; if (m) op.m = m; push(op); },   // m: 'vs' = 同じ端末の二人対戦
+    win(f, k, c, m, g){ const op = { t: 'win', f, k, c: c || 0 }; if (m) op.m = m; if (g) op.g = g; push(op); },   // g: 'new' = 新・一閃   // m: 'vs' = 同じ端末の二人対戦
     best(n){ push({ t: 'best', n }); },
     equip(eq){ push({ t: 'equip', a: eq[0], b: eq[1] }); },
     async pull(n, pick, box){   // pick: ピックアップする刀（運営アカウントだけ）、box: 引く箱（なし = 最新の箱）

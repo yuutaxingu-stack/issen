@@ -1,3 +1,4 @@
+-- 古い差分（2026-11-27）。今の record_win は save-data.sql（p_game 付き）。これは実行しないこと
 -- 銭の1日の上限を外す（2026-11-27）。Supabase の SQL Editor で全部を実行する。何度実行しても大丈夫。
 -- 戻すときは: update public.app_config set day_coin_cap = 15000 where id = 1;
 alter table public.app_config alter column day_coin_cap set default 0;

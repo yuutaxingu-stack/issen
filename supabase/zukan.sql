@@ -2,7 +2,7 @@
 -- 一閃 図鑑（2026-11-27）
 -- 二つ名・背景の札の一覧を、自分が持っているかどうかと一緒に返す。
 -- 隠し二つ名（天下〇〇・剣聖など）は、一度でも手にした人にだけ名前と条件を見せる。
--- 先に profile.sql を実行しておくこと。何度実行してもよい。
+-- 先に save-data.sql と profile.sql を実行しておくこと。何度実行してもよい。
 -- =====================================================================
 
 -- 一度でも手にした二つ名（隠し二つ名は抜かれると外れるので、ここに覚えておく）
@@ -34,6 +34,28 @@ insert into public.title_seen (id, title)
 select e.id, t from public.profile_ext e, unnest(e.titles) t
 where exists (select 1 from public.title_catalog c where c.id = t)
 on conflict do nothing;
+
+-- 図鑑より前に手にして、もう抜かれた隠し二つ名も覚える（文箱に残る「授けます」「移りました」の手紙から。2026-11-28）
+insert into public.title_seen (id, title, at)
+select m.to_id, t.id, min(m.created_at) from public.mail m join public.title_catalog t on t.hidden
+  and m.subject in ('隠し二つ名「' || t.name || '」', '「' || t.name || '」が移りました')
+group by m.to_id, t.id
+on conflict do nothing;
+
+-- 新・一閃にしかない決着は、これまでの回数を新・一閃の分（saves.rec_new）にも写す（2026-11-28 に旧と新を分けて数え始めた）
+-- 何度実行しても、新・一閃の分が rec より多くなることはない
+do $$
+declare r record;
+begin
+  for r in select s.id, k.key kat, f.key fin, (f.value)::text::bigint n
+           from public.saves s, jsonb_each(s.rec) k, jsonb_each(k.value) f
+           where jsonb_typeof(k.value) = 'object' and jsonb_typeof(f.value) = 'number'
+             and f.key in ('斬り伏せ', '背水', '落花', '刹那', '百花', '散華')
+             and coalesce((s.rec_new -> k.key ->> f.key)::bigint, 0) < (f.value)::text::bigint loop
+    update public.saves x set rec_new = jsonb_set(x.rec_new, array[r.kat], coalesce(x.rec_new -> r.kat, '{}') || jsonb_build_object(r.fin, r.n))
+    where x.id = r.id;
+  end loop;
+end $$;
 
 -- その刀の箱が公開済みか（刀にまつわらない物は常に true）。公開前の箱の二つ名・背景は、神様と持っている人にだけ見せる
 create or replace function public.katana_shown(k text) returns boolean

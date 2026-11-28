@@ -908,18 +908,66 @@ function drawYataFx(){
     }
   }
 }
-function drawCrow(x, y, d, z, fr, al){ // 八咫烏: 三本足の黒い烏。白い縁で光り、背に淡い日を負う
-  const fl = Math.sin(fr * 0.5) * 14;
-  cx.save(); if (al != null) cx.globalAlpha = al; cx.translate(x, y); cx.scale(d * z, z);
-  const g = cx.createRadialGradient(-4, 0, 0, -4, 0, 46); g.addColorStop(0, 'rgba(255,255,255,.28)'); g.addColorStop(1, 'rgba(255,255,255,0)'); cx.fillStyle = g; cx.fillRect(-50, -50, 100, 100);
-  cx.fillStyle = '#0a0a0c'; cx.strokeStyle = 'rgba(255,255,255,.8)'; cx.lineWidth = 1.2;
-  cx.beginPath(); cx.ellipse(0, 0, 22, 9, 0, 0, Math.PI * 2); cx.fill(); cx.stroke();
-  cx.beginPath(); cx.arc(22, -3, 7, 0, Math.PI * 2); cx.fill(); cx.beginPath(); cx.moveTo(28, -5); cx.lineTo(40, -1); cx.lineTo(28, 1.5); cx.fill();
-  for (const sg of [1, -1]) { cx.beginPath(); cx.moveTo(-6, 0); cx.quadraticCurveTo(-2, -20 * sg - fl * sg * 0.3, -28, -26 * sg - fl * sg);
-    cx.lineTo(-24, -18 * sg - fl * sg * 0.7); cx.lineTo(-30, -16 * sg - fl * sg * 0.6); cx.quadraticCurveTo(-14, -8 * sg, 8, 0); cx.closePath(); cx.fill(); cx.stroke(); }
-  cx.beginPath(); cx.moveTo(-20, 0); cx.lineTo(-36, -8); cx.lineTo(-33, 0); cx.lineTo(-36, 8); cx.closePath(); cx.fill(); cx.stroke();
-  cx.strokeStyle = '#0a0a0c'; cx.lineWidth = 1.6; cx.beginPath(); for (const lx of [-4, 1, 6]) { cx.moveTo(lx, 7); cx.lineTo(lx - 5, 17); } cx.stroke(); // 三本の足
-  cx.fillStyle = '#fff'; cx.beginPath(); cx.arc(24, -5, 1.6, 0, Math.PI * 2); cx.fill(); cx.restore();
+/* 八咫烏の絵: 墨の筆で描いた烏。翼を大きく広げ、風切羽が指のように分かれ、太い嘴と爪を出した三本の足。
+   羽ばたきの8コマを一度だけ別の canvas に描いておき、拡大縮小して使う（白い縁で闇からも浮く） */
+const CROWSPR = { f: [], S: 2, w: 300, h: 300, ox: 160, oy: 180 };
+function crowSprite(i){
+  if (CROWSPR.f[i]) return CROWSPR.f[i];
+  const S = CROWSPR.S, c = document.createElement('canvas'); c.width = CROWSPR.w * S; c.height = CROWSPR.h * S;
+  const x = c.getContext('2d'); x.scale(S, S); x.translate(CROWSPR.ox, CROWSPR.oy);
+  let sd = 777 + i * 13; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
+  const ph = 0.55 + 0.95 * Math.cos(Math.PI * 2 * i / 8); // 翼の角度（大きいほど上）
+  const V = a => [-Math.cos(a), -Math.sin(a)];
+  const feather = (bx, by, a, len, w, path) => { // 先の尖った羽一枚（少し反る）
+    const [dx, dy] = V(a), nx = -dy, ny = dx, tx = bx + dx * len, ty = by + dy * len, bend = len * 0.08;
+    path.moveTo(bx + nx * w / 2, by + ny * w / 2);
+    path.quadraticCurveTo(bx + dx * len * 0.55 + nx * (w * 0.55 + bend), by + dy * len * 0.55 + ny * (w * 0.55 + bend), tx, ty);
+    path.quadraticCurveTo(bx + dx * len * 0.5 - nx * (w * 0.4 - bend), by + dy * len * 0.5 - ny * (w * 0.4 - bend), bx - nx * w / 2, by - ny * w / 2); path.closePath(); };
+  const wing = (sx, sy, a, k) => { // a: 腕の向き, k: 大きさ
+    const p = new Path2D(), [dx, dy] = V(a), wx = sx + dx * 52 * k, wy = sy + dy * 52 * k;
+    const sa = a - 1.45, [ex, ey] = V(sa);
+    p.moveTo(sx + 10, sy + 6); p.lineTo(sx + 2, sy - 6); p.quadraticCurveTo(sx + dx * 30 * k + dy * 8, sy + dy * 30 * k - dx * 8, wx, wy); // 前縁はふくらむ
+    p.lineTo(wx + ex * 26 * k, wy + ey * 26 * k); p.lineTo(sx + ex * 30 * k - 6, sy + ey * 30 * k + 6); p.closePath();
+    for (let j = 0; j < 8; j++) { const t = j / 7; feather(sx + (wx - sx) * (0.1 + t * 0.9), sy + (wy - sy) * (0.1 + t * 0.9), sa + (r() - 0.5) * 0.08 + t * 0.18, (34 + 10 * t) * k, 11 * k, p); } // 次列風切
+    for (let j = 0; j < 7; j++) feather(wx - dx * j * 1.5, wy - dy * j * 1.5, a + 0.1 - j * 0.17 + (r() - 0.5) * 0.05, (84 - j * 6 + r() * 6) * k, (10 - j * 0.5) * k, p); // 初列風切（指のように分かれる）
+    return p; };
+  const body = new Path2D(); // 胴・頭・太い嘴
+  body.moveTo(84, -5); body.quadraticCurveTo(70, -20, 58, -24); body.quadraticCurveTo(48, -30, 38, -22); body.quadraticCurveTo(20, -20, 4, -18);
+  body.quadraticCurveTo(-18, -14, -30, -6); body.lineTo(-36, 0); body.quadraticCurveTo(-24, 12, -4, 18); body.quadraticCurveTo(18, 24, 34, 14);
+  body.quadraticCurveTo(44, 6, 54, -2); body.quadraticCurveTo(66, -4, 74, -3); body.quadraticCurveTo(80, -3, 84, -5); body.closePath();
+  const tail = new Path2D(); // 扇に開く尾、先がささくれる
+  for (let j = 0; j < 6; j++) feather(-28, -2 + j, -0.3 + j * 0.11 + (r() - 0.5) * 0.04, 46 + r() * 8 - Math.abs(j - 2.5) * 3, 13, tail);
+  const legs = new Path2D(), claws = new Path2D(); // 三本の足と鉤爪（前へ掴みかかる）
+  for (let j = 0; j < 3; j++) { const bx = 6 + j * 7, by = 16, mx = bx + 4, my = by + 12, kx = bx + 14 + j * 3, ky = by + 22 - j * 2;
+    legs.moveTo(bx, by); legs.quadraticCurveTo(mx - 6, my, kx, ky);
+    for (let t = 0; t < 3; t++) { const a = -0.5 + t * 0.6, L = 8; claws.moveTo(kx, ky); claws.quadraticCurveTo(kx + Math.cos(a) * L, ky + Math.sin(a) * L, kx + Math.cos(a + 1.2) * L * 0.95, ky + Math.sin(a + 1.2) * L * 0.95 + 2); } }
+  const far = wing(24, -20, ph + 0.25, 1.0), near = wing(12, -14, ph, 1.15);
+  // 飛沫と斜めのかすれ（背の後ろ）
+  x.save(); x.strokeStyle = 'rgba(8,8,10,.4)'; x.lineCap = 'round';
+  for (let j = 0; j < 14; j++) { const px = -10 + r() * 70 - 40 * r(), py = -20 + r() * 60, L = 14 + r() * 50; x.lineWidth = 0.4 + r() * 1.2; x.beginPath(); x.moveTo(px, py); x.lineTo(px - L, py + L * 0.42); x.stroke(); }
+  x.fillStyle = 'rgba(8,8,10,.6)'; for (let j = 0; j < 18; j++) { x.beginPath(); x.arc(-100 + r() * 200, -90 + r() * 170, 0.4 + r() * 1.3, 0, 7); x.fill(); }
+  x.restore();
+  // 白い縁（闇から浮かせる）→ 墨
+  x.lineJoin = 'round'; x.lineCap = 'round';
+  x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 3.2; for (const p of [far, tail, near, body]) x.stroke(p); x.lineWidth = 5.5; x.stroke(legs); x.lineWidth = 4.5; x.stroke(claws);
+  x.fillStyle = '#1d1d22'; x.fill(far); x.fillStyle = '#060607'; x.fill(tail); x.fill(body); x.fill(near);
+  x.strokeStyle = '#060607'; x.lineWidth = 3; x.stroke(legs); x.lineWidth = 2; x.stroke(claws);
+  // 筆のかすれ: 羽の向きに細い白い掻き傷
+  x.save(); x.clip(near); x.globalCompositeOperation = 'destination-out'; x.lineCap = 'round';
+  for (let j = 0; j < 18; j++) { const [dx, dy] = V(ph - 0.3 + r() * 0.4), px = 12 + dx * (30 + r() * 60) + (r() - 0.5) * 30, py = -10 + dy * r() * 80 + (r() - 0.5) * 30, L = 6 + r() * 18;
+    x.strokeStyle = `rgba(0,0,0,${0.15 + r() * 0.25})`; x.lineWidth = 0.4 + r() * 0.5; x.beginPath(); x.moveTo(px, py); x.lineTo(px + dx * L, py + dy * L); x.stroke(); }
+  x.restore();
+  x.save(); x.clip(body); x.globalCompositeOperation = 'destination-out'; x.lineCap = 'round';
+  for (let j = 0; j < 8; j++) { const px = -30 + r() * 80, py = -12 + r() * 24, L = 8 + r() * 20; x.strokeStyle = `rgba(0,0,0,${0.2 + r() * 0.3})`; x.lineWidth = 0.4 + r() * 0.7; x.beginPath(); x.moveTo(px, py); x.lineTo(px - L, py + L * 0.2); x.stroke(); }
+  x.restore();
+  // 眼: 白い光
+  x.fillStyle = '#fff'; x.beginPath(); x.arc(52, -18, 1.9, 0, 7); x.fill(); x.strokeStyle = 'rgba(255,255,255,.45)'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(62, -9); x.quadraticCurveTo(72, -6, 83, -5); x.stroke();
+  return (CROWSPR.f[i] = c);
+}
+function drawCrow(x, y, d, z, fr, al){ // 八咫烏（z = 1 で体の長さ ~95px）
+  const i = ((Math.floor(fr * 0.45) % 8) + 8) % 8, s = z * 0.62, c = crowSprite(i);
+  cx.save(); if (al != null) cx.globalAlpha = al; cx.translate(x, y); cx.scale(d * s, s);
+  cx.drawImage(c, -CROWSPR.ox, -CROWSPR.oy, CROWSPR.w, CROWSPR.h); cx.restore();
 }
 function drawCrowLock(){ // 八咫烏: 闇に皆既の日が昇り、大きな烏が翼を広げ、烏の群れが相手を取り巻く
   const L = sim.lock; if (!L) return; const d = sim.p[L.d], t = A.CROW.lock - L.f, u = t / A.CROW.lock, k = Math.min(1, t / 8) * Math.min(1, L.f / 6), z = cam.z;
@@ -927,7 +975,7 @@ function drawCrowLock(){ // 八咫烏: 闇に皆既の日が昇り、大きな�
   const x = wx(d.x / FP), y = wy(d.y / FP + 60);
   drawEclipseAt(x, y - 150 * z, (34 + 16 * Math.min(1, t / 14)) * z, t, k);
   drawCrow(x, y - 150 * z, Math.sin(t * 0.04) > 0 ? 1 : -1, z * 2.4, t * 0.35, k * 0.95);
-  for (let n = 0; n < 7; n++) { const a = n * 0.8976 + t * 0.16, R = (110 - 70 * u) * z; drawCrow(x + Math.cos(a) * R, y + Math.sin(a) * R * 0.55, Math.sin(a) > 0 ? -1 : 1, z * 0.75, t + n * 3, Math.min(1, k * 1.2)); }
+  for (let n = 0; n < 5; n++) { const a = n * 1.2566 + t * 0.14, R = (120 - 70 * u) * z; drawCrow(x + Math.cos(a) * R, y + Math.sin(a) * R * 0.55, Math.sin(a) > 0 ? -1 : 1, z * 0.6, t + n * 5, k * 0.9); }
 }
 function drawTrails(){
   const fr0 = GAME.t || 0;

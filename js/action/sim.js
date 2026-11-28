@@ -732,7 +732,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   a.comboDmg += dmg;
   this.grow(a, m, pj);
   const kbs = 100 + Math.floor((HP_MAX - d.hp) / 200);
-  if (s.dst === 'stun') {
+  if (s.dst === 'stun' && !m.iai) { // 気絶中の普通の斬りは気絶のまま。居合は気絶を断ち切って吹き飛ばす（ガードを一度割るごとに居合は一度）
     d.vx = dir * Math.floor(m.kb[0] * kbs / 200);
     ev.push({ t: 'hit', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, dmg, combo: a.combo, adv: null, stun: true });
   } else {

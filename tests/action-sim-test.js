@@ -22,7 +22,7 @@ function drain(s){ const e = s.ev; s.ev = []; return e; }
 // 4) ガードを削りきると気絶、守が居合になって20ダメージ（2026-11-28）
 { const s = simM(60); s.p[1].gd = 500; run(s, 2, null, () => I({ G: 1 })); run(s, 1, () => I({ A: 1 }), () => I({ G: 1 })); run(s, 30, null, () => I({ G: 1 }));
   ok(s.p[1].st === 'stun', 'ガードが割れて気絶');
-  const hp0 = s.p[1].hp; run(s, 1, () => I({ G: 1 })); run(s, 40); ok(!s.result && hp0 - s.p[1].hp === 2000, '気絶中の居合は20ダメージ（一本ではない） ' + (hp0 - s.p[1].hp));
+  const hp0 = s.p[1].hp; run(s, 1, () => I({ G: 1 })); run(s, 40); ok(!s.result && hp0 - s.p[1].hp === 2000 && s.p[1].st !== 'stun', '気絶中の居合は20ダメージで気絶が解ける（一本ではない） ' + (hp0 - s.p[1].hp) + ' ' + s.p[1].st);
   run(s, 200); ok(s.p[1].gd === A.C.stunRecoverGd, '居合で気絶が解けてもガードは半分から、自然には回復しない ' + s.p[1].gd); }
 // 5) 連撃で体力を削りきる
 { const s = simM(60); s.p[1].hp = 200; let k = 0; run(s, 1, () => I({ A: 1 })); run(s, 30); ok(s.result && s.result.how === 'ko', '体力0で斬り伏せ ' + (s.result && s.result.name)); }

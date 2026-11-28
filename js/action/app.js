@@ -261,10 +261,10 @@ function cpuInput(){
 const GAME = { mode: 'menu', phase: 'intro', t: 0, n: 1, log: [], best: 0 };
 try { GAME.best = (JSON.parse(localStorage.getItem('issen-action-cpu-v1') || '{}').best) | 0; } catch (e) {}
 let sim = new A.Sim({ training: true });
-const FX = { ouka: [], grow: [null, null], pflash: 0, gone: [], parts: [], texts: [], shake: 0, finish: null, trails: [[], []], combo: [null, null], last: null, hist: [], calm: 0, flash: 0, yv: [], ys: [[], []], black: 0, lockPrev: null };
+const FX = { ouka: [], grow: [null, null], pflash: 0, gone: [], parts: [], texts: [], shake: 0, finish: null, trails: [[], []], combo: [null, null], last: null, hist: [], calm: 0, flash: 0, iv: [], yv: [], ys: [[], []], black: 0, lockPrev: null };
 const cam = { x: 800, y: 0, z: 1 };
 
-function clearFx(){ FX.cut = null; WORLD.f = WORLD.m = 0; FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; FX.ys = [[], []]; FX.yv = []; FX.black = 0; FX.lockPrev = null; WORLD.tot = 0; }
+function clearFx(){ FX.cut = null; WORLD.f = WORLD.m = 0; FX.ouka = []; FX.grow = [null, null]; FX.pflash = 0; FX.gone = []; FX.finish = null; FX.trails = [[], []]; FX.combo = [null, null]; FX.texts = []; FX.parts = []; FX.ys = [[], []]; FX.yv = []; FX.iv = []; FX.black = 0; FX.lockPrev = null; WORLD.tot = 0; }
 function resetRound(){ sim.resetRound(); clearFx(); }
 /* 持たせる刀（新・一閃の特殊技）。common＝今の共通の技、ouka＝桜華 */
 /* 持たせる刀: 一閃（index.html）で集めた刀から選ぶ。刀の技は桜華だけ固有、ほかは共通。
@@ -489,7 +489,7 @@ function tickParts(){
   for (let i = 0; i < 2; i++) if (FX.grow[i] != null && FX.grow[i] < 30) FX.grow[i]++;
   if (FX.pflash > 0) FX.pflash--;
   for (const o of FX.ouka) o.t++;
-  tickYata();
+  tickYata(); tickIai();
   // 花嵐の花びらは尾を引く。紅と黒が混じる
   for (const q of sim.pj) if (q.petal) for (let k = 0, n = q.hana ? 1 + Math.round(q.w / q.w0) : 2; k < n; k++) FX.parts.push({ x: q.x / FP + (rnd() - 0.5) * q.w * 0.6, y: q.y / FP + (rnd() - 0.5) * q.h * 0.6, vx: -Math.sign(q.vx) * (1 + rnd() * 2), vy: (rnd() - 0.3) * 1.5, life: 26 + rnd() * 20, t: 0, col: k ? SAKURA[FR % 3] : CRIM[(FR + k) % 3], r: 2.5 + rnd() * 2, petal: true, rot: rnd() * 6 });
   // 天桜: 体のまわりを花びらが渦を巻いて昇る / 降下は花の嵐
@@ -653,7 +653,7 @@ function drawFighter(p, fr){
 function recordTrail(p){
   const tr = FX.trails[p.i];
   const swinging = p.st === 'atk' && !MV[p.mv].noBox && p.mvf >= MV[p.mv].s - 1 && p.mvf < MV[p.mv].s + MV[p.mv].a;
-  if (swinging && p._tip) { const ox = p.x / FP, oy = p.y / FP; tr.push({ t: [p._tip[0] - ox, p._tip[1] - oy], h: [p._hand[0] - ox, p._hand[1] - oy], life: 10, iai: !!MV[p.mv].iai }); }
+  if (swinging && p._tip) { const ox = p.x / FP, oy = p.y / FP; tr.push({ t: [p._tip[0] - ox, p._tip[1] - oy], h: [p._hand[0] - ox, p._hand[1] - oy], life: 10, iai: !!MV[p.mv].iai }); if (MV[p.mv].iai) tr.pop(); } // 居合は横の一閃で見せる
   if (!swinging && p.st !== 'atk') tr.length = 0;
   for (const q of tr) q.life--;
   FX.trails[p.i] = tr.filter(q => q.life > 0).slice(-10);
@@ -856,6 +856,27 @@ function tickYata(){
   FX.lockPrev = L ? { d: L.d } : null;
   if (FX.black > 0) FX.black--; WORLD.tot *= 0.95;
 }
+/* 居合: 旧・一閃と同じ、画面を横に断つ刀の色の一閃（抜いた瞬間に。刀ごとの色・光・太さ・虹・二重） */
+function tickIai(){
+  for (const p of sim.p) { const m = p.st === 'atk' ? MV[p.mv] : null, v = FX.iv[p.i] || (FX.iv[p.i] = {});
+    if (m && m.iai && p.mvf >= m.s && !(v.mv === p.mv && v.f >= m.s)) {
+      FX.ouka.push({ k: 'iaislash', i: p.i, x: p.x / FP, y: p.y / FP + 58, f: p.face, t: 0, life: 64 });
+      const y = p.y / FP + 58; for (let k = 0; k < 8; k++) { const x = p.x / FP + p.face * (k * 60 + 30); if (p.kit === 'ouka') petals(x, y, 3, 3); else if (p.kit === 'yata') feathers(x, y, 2, 3); } }
+    v.mv = m ? p.mv : null; v.f = p.mvf; }
+}
+function slashOld(x0, y0, x1, y1, h1, w, st){ // 旧・一閃の slash() と同じ形: 根元は細く、先へ太り、先端で尖る
+  st = st || {}; w *= st.thick || 1; if (h1 <= 0 || w <= 0.3) return;
+  const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), nx = -dy / L, ny = dx / L, N = 28, top = [], bot = [];
+  for (let i = 0; i <= N; i++) { const u = i / N, s = h1 * u, px = x0 + dx * s, py = y0 + dy * s, ww = w * Math.pow(Math.sin(Math.PI * u), 0.5) * (0.35 + 0.65 * u) * 0.5 + 0.4;
+    top.push([px + nx * ww, py + ny * ww]); bot.push([px - nx * ww, py - ny * ww]); }
+  let fill = st.col || '#ffffff';
+  if (st.rainbow) { const g = cx.createLinearGradient(x0, y0, x1, y1), h0 = performance.now() / 5; for (let i = 0; i <= 6; i++) { const q = hsl(h0 + i * 55, 0.85, 0.82); g.addColorStop(i / 6, `rgb(${q[0] | 0},${q[1] | 0},${q[2] | 0})`); } fill = g; }
+  cx.save(); cx.shadowColor = st.glow || 'rgba(255,255,255,0.95)'; cx.shadowBlur = w * 3; cx.fillStyle = fill;
+  cx.beginPath(); top.forEach((q, i) => i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1])); for (let i = bot.length - 1; i >= 0; i--) cx.lineTo(bot[i][0], bot[i][1]); cx.closePath(); cx.fill();
+  if (st.double) { const off = w * 1.7, hx = x0 + dx * h1, hy = y0 + dy * h1; cx.globalAlpha = 0.55; cx.shadowBlur = w * 1.5; cx.strokeStyle = fill; cx.lineWidth = Math.max(1, w * 0.18);
+    cx.beginPath(); cx.moveTo(x0 + dx * h1 * 0.15 + nx * off, y0 + dy * h1 * 0.15 + ny * off); cx.lineTo(hx + nx * off, hy + ny * off); cx.stroke(); }
+  cx.restore();
+}
 function drawYataFx(){
   // 羽跳・初虧の踏み込み: 黒い帯に白い芯の軌跡
   for (let i = 0; i < 2; i++) { const s = FX.ys[i]; if (!s || s.length < 2) continue;
@@ -886,6 +907,9 @@ function drawYataFx(){
       cx.fillStyle = `rgba(255,255,255,${0.95 * fade})`; cx.beginPath(); cx.arc(0, 0, R, -1.2, 1.2); cx.arc(-R * 0.42, 0, R * 0.88, 1.05, -1.05, true); cx.closePath(); cx.fill();
       cx.shadowBlur = 0; cx.strokeStyle = `rgba(8,8,10,${0.9 * fade})`; cx.lineWidth = 2.5; cx.beginPath(); cx.arc(-R * 0.42, 0, R * 0.88, 1.05, -1.05, true); cx.stroke();
       cx.fillStyle = `rgba(255,255,255,${fade})`; cx.fillRect(-R * 0.6, -1, R * 2.2 * ease, 2); cx.restore();
+    } else if (o.k === 'iaislash') { // 居合の一閃（12Fで走り、16Fから消えていく）
+      const e = o.t, u = Math.min(1, e / 12), ease = u * u * (3 - 2 * u), life = 1 - Math.max(0, Math.min(1, (e - 16) / 48)), y = wy(o.y), d = o.f * MIR;
+      slashOld(d > 0 ? -40 : W + 40, y, d > 0 ? W + 40 : -40, y, ease, Math.max(4, H * 0.02) * life, lookOf((GAME.kats || [])[o.i]).s);
     } else if (o.k === 'ysun') { // 食甚: 斬り抜けた所に皆既の日
       const x = wx(o.x), y = wy(o.y); drawEclipseAt(x, y, (26 + 24 * ease) * cam.z, o.t, fade);
     } else if (o.k === 'yring' || o.k === 'ydia') { // 白い輪 / 復円のダイヤモンドリング

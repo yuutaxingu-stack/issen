@@ -1044,7 +1044,8 @@ function zetsuField(now){
   const on=G.phase!=='title'&&(katOf(0).tier==='絶'||katOf(1).tier==='絶');
   const dt=Math.min(0.1,Math.max(0,(now-ZFS.last)/1000)); ZFS.last=now;
   ZFS.b+=((on?1:0)-ZFS.b)*Math.min(1,dt*3); if(!on&&ZFS.b<0.01) ZFS.b=0;
-  if(on) ZFS.t=zTheme(katOf(0).tier==='絶'?katOf(0):katOf(1));  // 二人とも絶なら朱の刀の戦場
+  // 二人とも絶なら一本ごとに交互（一本目・三本目は朱、二本目は藍の刀の戦場）
+  if(on){ const z0=katOf(0).tier==='絶', z1=katOf(1).tier==='絶'; ZFS.t=zTheme(z0&&z1?katOf((G.round-1)%2):z0?katOf(0):katOf(1)); }
   ZFS.f=on?mutualLevel(now):0; return ZFS;
 }
 function buildSakuraBG(night){

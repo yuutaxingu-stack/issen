@@ -74,6 +74,8 @@ create table if not exists public.notices (
 alter table public.notices add column if not exists art text check (art is null or art ~ '^[a-z0-9_]{1,32}$');
 alter table public.notices drop constraint if exists notices_kind_check;
 alter table public.notices add constraint notices_kind_check check (kind in ('maint', 'important', 'update', 'special'));
+-- 載せた後に直した時（2026-11-28）
+alter table public.notices add column if not exists edited_at timestamptz;
 
 alter table public.title_catalog enable row level security;
 alter table public.plate_catalog enable row level security;
@@ -300,7 +302,7 @@ $$;
 -- ---------- お知らせ（ログインしていなくても読める） ----------
 create or replace function public.list_notices() returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select coalesce(jsonb_agg(jsonb_build_object('id', n.id, 'kind', n.kind, 'title', n.title, 'body', n.body, 'at', n.created_at, 'art', n.art) order by n.id desc), '[]')
+  select coalesce(jsonb_agg(jsonb_build_object('id', n.id, 'kind', n.kind, 'title', n.title, 'body', n.body, 'at', n.created_at, 'art', n.art, 'edited', n.edited_at) order by n.id desc), '[]')
   from (select * from public.notices x where not x.deleted order by x.id desc limit 40) n;
 $$;
 
@@ -402,6 +404,19 @@ begin
   if p_kind = 'special' and p_art is null then raise exception '特別なお知らせには刀を選んでください'; end if;
   insert into public.notices (kind, title, body, art) values (p_kind, btrim(p_title), coalesce(p_body, ''), case when p_kind = 'special' then p_art end) returning id into i;
   return i;
+end;
+$$;
+
+-- 載せたお知らせを直す（種類・題・本文・看板の刀）。並びと載せた日はそのまま。大事なお知らせに直すと、まだ見ていない人にはタイトルで大きく出る
+create or replace function public.god_edit_notice(p_id bigint, p_kind text, p_title text, p_body text, p_art text default null) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if not public.is_god(auth.uid()) then raise exception '神様だけが使えます'; end if;
+  if char_length(btrim(coalesce(p_title, ''))) = 0 then raise exception '題を書いてください'; end if;
+  if p_kind = 'special' and p_art is null then raise exception '特別なお知らせには刀を選んでください'; end if;
+  update public.notices set kind = p_kind, title = btrim(p_title), body = coalesce(p_body, ''), art = case when p_kind = 'special' then p_art end, edited_at = now()
+  where id = p_id and not deleted;
+  if not found then raise exception 'そのお知らせはありません'; end if;
 end;
 $$;
 
@@ -813,7 +828,7 @@ revoke execute on function
   public.get_profile(uuid), public.profile_tags(uuid[]), public.set_profile(text, text, text, text),
   public.my_mail(), public.read_mail(bigint), public.claim_mail(bigint), public.list_notices(),
   public.god_preview(text, text), public.god_send_mail(text, text, text, text, jsonb), public.god_info(),
-  public.god_post_notice(text, text, text, text), public.god_delete_notice(bigint),
+  public.god_post_notice(text, text, text, text), public.god_delete_notice(bigint), public.god_edit_notice(bigint, text, text, text, text),
   public.auto_gift_check(public.saves), public.auto_gift_trigger(),
   public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text),
   public.report_thread(bigint), public.report_reply(bigint, text),
@@ -824,7 +839,7 @@ grant execute on function
   public.get_profile(uuid), public.profile_tags(uuid[]), public.set_profile(text, text, text, text),
   public.my_mail(), public.read_mail(bigint), public.claim_mail(bigint), public.list_notices(),
   public.god_preview(text, text), public.god_send_mail(text, text, text, text, jsonb), public.god_info(),
-  public.god_post_notice(text, text, text, text), public.god_delete_notice(bigint),
+  public.god_post_notice(text, text, text, text), public.god_delete_notice(bigint), public.god_edit_notice(bigint, text, text, text, text),
   public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text),
   public.report_reply(bigint, text)
   to authenticated;

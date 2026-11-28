@@ -156,6 +156,13 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   ok(await g.isVisible('.pfzs canvas') && /近日公開/.test(await g.textContent('.pfzsgo')) && await g.isDisabled('.pfzsgo'), '特別なお知らせ: 八咫の看板が流れ、ガチャは近日公開');
   await g.screenshot({ path: OUT + '/news-special.png' });
   for (const [w, h, n] of [[1180, 820, 'ipad']]) { await g.setViewportSize({ width: w, height: h }); await g.waitForTimeout(400); await g.screenshot({ path: OUT + '/news-special-' + n + '.png' }); await g.setViewportSize({ width: 844, height: 390 }); }
+  // 載せたお知らせを直す（種類も変えられる）
+  await g.click('[data-editnews]');
+  await g.waitForSelector('#nf_title');
+  await g.click('[data-kind="update"]'); await g.fill('#nf_title', '八咫、まもなく');
+  await g.click('[data-act="post"]'); await g.click('[data-act="post"]');
+  await g.waitForFunction(() => /八咫、まもなく/.test((document.querySelector('.pfnews') || {}).textContent || '') && /直し/.test((document.querySelector('.pfnews') || {}).textContent || ''), null, { timeout: 8000 });
+  ok(sql("select kind || ' ' || title || ' ' || (art is null) || ' ' || (edited_at is not null) from public.notices order by id desc limit 1") === 'update 八咫、まもなく true true', '載せたお知らせを直せた（特別→更新、題も）');
   await g.click('#pf_back');
 
   console.log('--- 風見さん: 大事なお知らせ → 文箱で受け取る → 名乗り');

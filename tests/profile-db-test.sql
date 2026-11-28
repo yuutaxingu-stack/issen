@@ -204,3 +204,10 @@ select case when public.my_reports() -> -1 ->> 'status' = 'new'
 select pg_temp.as_('22222222-2222-2222-2222-222222222222');
 select pg_temp.expect_err(format('select public.report_reply(%s, %L)', :rid, 'x'), 'その報告はありません');
 reset role;
+\echo '--- お知らせを直す'
+select pg_temp.as_('11111111-1111-1111-1111-111111111111'); set role authenticated;
+select pg_temp.expect_err($$select public.god_edit_notice(1, 'update', '題', '')$$, '神様だけ');
+select pg_temp.as_('99999999-9999-9999-9999-999999999999');
+select public.god_edit_notice((public.list_notices() -> 0 ->> 'id')::bigint, 'update', '直した題', '直した本文');
+select case when public.list_notices() -> 0 ->> 'title' = '直した題' and public.list_notices() -> 0 ->> 'kind' = 'update' and public.list_notices() -> 0 ->> 'edited' is not null then 'OK 神様はお知らせを直せる' else 'NG' end;
+reset role;

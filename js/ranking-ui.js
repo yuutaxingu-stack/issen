@@ -2,6 +2,7 @@
    一閃 番付（自分とフレンドだけのランキング）
    三つの番付: 戦闘力（オンライン対戦）・勝ち抜き（CPU戦の最高）・刀帳（集めた刀の数）
    一閃と新・一閃は切り替えて見る（戦闘力と勝ち抜きが別々。刀帳は共通）
+   フレンド（自分とフレンド）と全員（global_ranking: 上位100人と自分の位）も切り替える
    値はサーバーの friend_ranking（supabase/ranking.sql）から読む。戦闘力の計算もサーバーが行う。
    ===================================================================== */
 (function(){
@@ -11,9 +12,11 @@
   if (!el) return;
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const kn = n => (I && I.kn) ? I.kn(n) : String(n);
-  let tab = 'power', game = 'issen', data = null, loading = false, err = '';
-  const cache = {};   // 遊び方ごとの読み込んだ番付
-  try { tab = localStorage.getItem('issen-rank-tab') || 'power'; game = localStorage.getItem('issen-rank-game') === 'action' ? 'action' : 'issen'; } catch (e) {}
+  let tab = 'power', game = 'issen', scope = 'friend', data = null, loading = false, err = '';
+  const cache = {};   // 読み込んだ番付（遊び方・フレンド/全員・全員なら番付の種類ごと）
+  try { tab = localStorage.getItem('issen-rank-tab') || 'power'; game = localStorage.getItem('issen-rank-game') === 'action' ? 'action' : 'issen';
+        scope = localStorage.getItem('issen-rank-scope') === 'all' ? 'all' : 'friend'; } catch (e) {}
+  const keyOf = () => scope === 'all' ? game + '|all|' + tab : game + '|friend';
   const GNAME = { issen: '一閃', action: '新・一閃' };
 
   const TABS = {
@@ -48,36 +51,44 @@
   $('r_back').addEventListener('click', close);
   $('r_reload').addEventListener('click', () => load());
   $('r_go').addEventListener('click', () => { close(); $('m_online').click(); });
-  el.querySelectorAll('.rgame button').forEach(b => b.addEventListener('click', () => {
+  el.querySelectorAll('.rgame button[data-game]').forEach(b => b.addEventListener('click', () => {
     if (game === b.dataset.game) return;
     game = b.dataset.game; try { localStorage.setItem('issen-rank-game', game); } catch (e) {}
-    data = cache[game] || null; err = ''; render(); load();
+    data = cache[keyOf()] || null; err = ''; render(); load();
+  }));
+  el.querySelectorAll('.rscope button').forEach(b => b.addEventListener('click', () => {
+    if (scope === b.dataset.scope) return;
+    scope = b.dataset.scope; try { localStorage.setItem('issen-rank-scope', scope); } catch (e) {}
+    data = cache[keyOf()] || null; err = ''; render(); load();
   }));
   el.querySelectorAll('.rtabs button').forEach(b => b.addEventListener('click', () => {
     tab = b.dataset.tab; try { localStorage.setItem('issen-rank-tab', tab); } catch (e) {}
+    if (scope === 'all') { data = cache[keyOf()] || null; err = ''; render(); if (!data) load(); return; }
     render();
   }));
 
   async function load(){
     if (!N || !N.configured() || !N.ready || !N.user || loading) { render(); return; }
     loading = true; err = ''; render();
-    const g = game;
+    const g = game, k = keyOf(), all = scope === 'all';
     try {
-      let { data: d, error } = await N.sb.rpc('friend_ranking', { p_game: g });
+      let { data: d, error } = all ? await N.sb.rpc('global_ranking', { p_game: g, p_tab: tab })
+                                   : await N.sb.rpc('friend_ranking', { p_game: g });
+      if (error && missing(error) && all) throw Object.assign(new Error('全員の番付はまだ準備中です'), { soon: true });
       // サーバーの SQL がまだ古い（一閃と新・一閃を分ける前）なら、一閃は前の形で読む
       if (error && missing(error)) {
         if (g !== 'issen') throw Object.assign(new Error('新・一閃の番付はまだ準備中です'), { soon: true });
         ({ data: d, error } = await N.sb.rpc('friend_ranking'));
       }
       if (error) throw error;
-      cache[g] = d;
-      if (g !== game) return;
+      cache[k] = d;
+      if (k !== keyOf()) return;
       data = d;
       if (window.IssenProfile && d && d.rows) window.IssenProfile.loadTags(d.rows.map(r => r.id));
     } catch (e) {
-      if (g === game) err = e.soon ? e.message : missing(e) ? '番付はまだ準備中です' : N.jp(e);
+      if (k === keyOf()) err = e.soon ? e.message : missing(e) ? '番付はまだ準備中です' : N.jp(e);
     } finally { loading = false; }
-    if (g !== game) { load(); return; }
+    if (k !== keyOf()) { if (!cache[keyOf()]) load(); else { data = cache[keyOf()]; render(); } return; }
     render();
   }
 
@@ -94,7 +105,9 @@
     if (el.hidden) return;
     const T = TABS[tab] || TABS.power;
     el.querySelectorAll('.rtabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
-    el.querySelectorAll('.rgame button').forEach(b => { const on = b.dataset.game === game; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    el.querySelectorAll('.rgame button[data-game]').forEach(b => { const on = b.dataset.game === game; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    el.querySelectorAll('.rscope button').forEach(b => { const on = b.dataset.scope === scope; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); });
+    const all = scope === 'all';
     $('r_lead').textContent = tab === 'book' ? T.lead : GNAME[game] + '　' + T.lead;
     const loggedIn = !!(N && N.user);
     $('r_login').hidden = loggedIn || !(N && N.configured() && N.ready);
@@ -108,7 +121,9 @@
     $('r_msg').textContent = msg;
 
     const rows = loggedIn && data && !err ? data.rows || [] : [];
-    const list = ranked(rows, T.val);
+    // 全員の番付は、サーバーが付けた位（同じ値は同じ位）をそのまま使う
+    const list = all ? rows.map(r => ({ r, no: r.no })) : ranked(rows, T.val);
+    if (all && data && !err && !rows.length && !msg) $('r_msg').textContent = tab === 'power' ? 'まだ誰も対戦していません' : 'まだ誰も載っていません';
     $('r_list').innerHTML = list.map(({ r, no }, i) =>
       '<li data-pid="' + esc(r.id) + '" class="' + (r.me ? 'me ' : '') + (no <= 3 ? 'top' + no : '') + '" style="animation-delay:' + Math.min(i, 12) * 45 + 'ms">' +
         '<span class="rno"><span>' + kn(no) + '</span></span>' +
@@ -116,11 +131,15 @@
         '<span class="rval">' + T.cell(r) + '</span>' +
       '</li>').join('');
 
-    const mine = list.find(x => x.r.me);
+    const mine = all ? (data && !err && data.mine ? { r: data.mine, no: data.mine.no } : null) : list.find(x => x.r.me);
     const me = $('r_me');
-    me.hidden = !mine;
+    me.hidden = !mine && !(all && data && !err);
+    if (!mine && all && data && !err) {
+      me.innerHTML = '<span class="rsub"><span>' + (tab === 'power' ? '一度対戦すると、あなたも全員の番付に載ります' : 'CPU戦で一人抜くと、あなたも全員の番付に載ります') + '</span></span>';
+    }
     if (mine) {
-      const r = mine.r, place = list.length > 1 ? kn(mine.no) + '位　' + list.length + '人中' : 'フレンドを増やすと競えます';
+      const n = all ? data.count : list.length;
+      const r = mine.r, place = n > 1 ? kn(mine.no) + '位　' + n + '人中' : all ? '一位' : 'フレンドを増やすと競えます';
       if (tab === 'power') {
         me.innerHTML = '<span class="rcap">戦闘力</span><span class="rbig">' + r.rating + '</span>' +
           '<span class="rsub"><span>' + esc(place) + '</span><span>最高 <b>' + r.peak + '</b></span>' + (r.best_streak ? '<span>最高 ' + kn(r.best_streak) + '連勝</span>' : '') + '</span>';
@@ -132,14 +151,14 @@
           '<span class="rsub"><span>/ ' + data.total + '振り</span><span>' + esc(place) + '</span></span>';
       }
     }
-    $('r_note').textContent = loggedIn ? T.note + (tab === 'book' ? '' : '　一閃と新・一閃は別々に数えます。') + '　自分とフレンドだけの番付です。' : '';
+    $('r_note').textContent = loggedIn ? T.note + (tab === 'book' ? '' : '　一閃と新・一閃は別々に数えます。') + (all ? '　全員の番付は上位百人まで並べます。' : '　自分とフレンドだけの番付です。') : '';
   }
 
   // 対戦が始まるときは閉じる
   const prev = N && N.onMatchUi;
   if (N) {
     N.onMatchUi = function(s){ if (s !== 'idle') close(); if (prev) prev(s); };
-    N.on(() => { if (!el.hidden) { if (N.user && !data && !loading && !err) load(); else render(); } if (!N.user) { data = null; delete cache.issen; delete cache.action; } });
+    N.on(() => { if (!el.hidden) { if (N.user && !data && !loading && !err) load(); else render(); } if (!N.user) { data = null; Object.keys(cache).forEach(k => delete cache[k]); } });
   }
   const ok = $('o_invok'); if (ok) ok.addEventListener('click', close);
   // 名乗りの二つ名が届いたら描き直す（profile.js は後から読まれる）

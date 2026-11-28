@@ -31,3 +31,21 @@ select r->>'name', r->>'rating', r->>'cpu' from jsonb_array_elements(public.frie
 select r->>'name', r->>'rating', r->>'cpu', r->>'wins', r->>'losses' from jsonb_array_elements(public.friend_ranking('action') -> 'rows') r;
 do $$ begin perform public.friend_ranking('x'); raise exception 'NG'; exception when raise_exception then raise notice 'OK 知らない遊び方は断る: %', sqlerrm; end $$;
 reset role;
+\echo '--- 全員の番付（丁はフレンドでなくても出る。神様は出ない）'
+insert into auth.users values ('55555555-5555-5555-5555-555555555555', '{"login":"eee","name":"神"}') on conflict do nothing;
+insert into public.saves (id, cpu_best) values ('55555555-5555-5555-5555-555555555555', 99) on conflict (id) do update set cpu_best = 99;
+insert into public.god_accounts (id) values ('55555555-5555-5555-5555-555555555555') on conflict do nothing;
+insert into public.saves (id, cpu_best) values ('44444444-4444-4444-4444-444444444444', 30) on conflict (id) do update set cpu_best = 30;
+set role authenticated;
+set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
+select 'global power', r->>'no', r->>'name', r->>'rating', r->>'me' from jsonb_array_elements(public.global_ranking('issen', 'power') -> 'rows') r;
+select 'global cpu', r->>'no', r->>'name', r->>'cpu' from jsonb_array_elements(public.global_ranking('issen', 'cpu') -> 'rows') r;
+select 'global book', r->>'no', r->>'name', r->>'katana' from jsonb_array_elements(public.global_ranking('issen', 'book', 2) -> 'rows') r;
+select 'global action mine', public.global_ranking('action', 'power') -> 'mine', public.global_ranking('action', 'power') -> 'count';
+do $$ declare g jsonb := public.global_ranking('issen', 'book'); begin
+  if exists (select 1 from jsonb_array_elements(g -> 'rows') r where r->>'name' = '神') then raise exception 'NG 神様が出た'; end if;
+  if exists (select 1 from jsonb_array_elements(public.global_ranking('issen', 'cpu') -> 'rows') r where r->>'name' = '神') then raise exception 'NG 神様が出た'; end if;
+  if (g -> 'rows') @? '$[*] ? (@.code != null)' then raise exception 'NG 余計な情報'; end if;
+  raise notice 'OK 神様は全員の番付に出ない';
+end $$;
+reset role;

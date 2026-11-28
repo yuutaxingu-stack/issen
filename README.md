@@ -134,6 +134,7 @@ web/
 - 数値は `rating_config` の表で変えられる（Table Editor で直せばすぐ反映）
 - 試合の結果画面に「戦闘力 1056 → 1074 ＋18」と出る（`match_rating`）
 - 一閃と新・一閃は番付の上の切り替えで別々に見る。戦闘力は `ratings`/`rating_log` の `game`（'issen'/'action'、試合の `matches.game` から）で分け、2026-11-28 より前の分はすべて一閃。勝ち抜きは一閃=`saves.cpu_best`、新・一閃=`saves.action_cpu_best`（端末の記録を `record_action_cpu_best` で送る）。刀帳は共通
+- 「フレンド｜全員」の切り替え。全員は `global_ranking(p_game, p_tab)`：番付ごとに上位100人と自分の位（同じ値は同じ位）。戦闘力は一度でも対戦した人、勝ち抜きは1人以上抜いた人だけ。神様は出さない。返すのは名前と番付の値だけ
 - 神様（`god_accounts` の人）は全員と自動でフレンド（今いる人も、新しく登録する人も。`schema.sql`）。番付には出さず、フレンド100人の上限にも数えない。自分で神様を外した人は `god_friend_optout` に残り、SQLを再実行しても戻らない。本番への差分は `supabase/god-friends.sql`。テスト: `sh tests/god-friends-db-test.sh`
 - リンク禁止: 寄合（皆で・密書・募集）、名前、名乗りの一言、対戦中のひとことにURL・ドメインを書けない（画面とサーバーの両方。対戦中のひとことは受け取り側でも隠す）。神様は書ける。運営への報告は書ける。本番への差分は `supabase/no-links.sql`（今あるリンクの片づけ付き）。テスト: `node tests/no-link-test.js`、`sh tests/no-link-db-test.sh`
 

@@ -232,6 +232,53 @@ begin
 end;
 $$;
 
+-- 全員の番付（2026-11-28）。一つの番付の上位 p_limit 人（最大100）と、自分の位を返す
+-- p_tab: 'power' = 戦闘力（一度でも対戦した人）/ 'cpu' = 勝ち抜き（1人以上抜いた人）/ 'book' = 刀帳（全員）
+-- 同じ値は同じ位。神様は出さない。返すのは名前と番付の値だけ（フレンドでない人の他の情報は出さない）
+create or replace function public.global_ranking(p_game text default 'issen', p_tab text default 'power', p_limit int default 100) returns jsonb
+language plpgsql stable security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  st int; total int; lim int := least(greatest(coalesce(p_limit, 100), 1), 100);
+  rows jsonb; mine jsonb; cnt int;
+begin
+  if me is null then raise exception 'ログインしていません'; end if;
+  if p_game is null or p_game not in ('issen', 'action') then raise exception 'その遊び方はありません'; end if;
+  if p_tab is null or p_tab not in ('power', 'cpu', 'book') then raise exception 'その番付はありません'; end if;
+  select c.start_rating into st from public.rating_config c where c.id = 1;
+  select count(*) into total from public.katana_catalog;
+  with x as (
+    select pr.id, pr.name,
+      case p_tab when 'power' then coalesce(r.rating, st)
+                 when 'cpu' then coalesce(case when p_game = 'action' then s.action_cpu_best else s.cpu_best end, 0)
+                 else k.n end::bigint as val,
+      coalesce(r.rating, st) as rating, coalesce(r.peak, st) as peak, coalesce(r.wins, 0) as wins, coalesce(r.losses, 0) as losses,
+      coalesce(r.streak, 0) as streak, coalesce(r.best_streak, 0) as best_streak,
+      coalesce(case when p_game = 'action' then s.action_cpu_best else s.cpu_best end, 0) as cpu, k.n as katana
+    from public.profiles pr
+    left join public.saves s on s.id = pr.id
+    left join public.ratings r on r.id = pr.id and r.game = p_game
+    cross join lateral (select (1 + coalesce((select count(*) from jsonb_each(s.owned) o
+                                join public.katana_catalog c on c.id = o.key
+                                where o.key <> 'mumei' and jsonb_typeof(o.value) = 'number' and (o.value)::text::numeric > 0), 0))::int as n) k
+    where not exists (select 1 from public.god_accounts g where g.id = pr.id)
+      and case p_tab when 'power' then coalesce(r.wins, 0) + coalesce(r.losses, 0) > 0
+                     when 'cpu' then coalesce(case when p_game = 'action' then s.action_cpu_best else s.cpu_best end, 0) > 0
+                     else true end
+  ), ranked as (
+    select x.*, rank() over (order by x.val desc) as no, row_number() over (order by x.val desc, x.name, x.id) as rn from x
+  )
+  select count(*)::int,
+    coalesce(jsonb_agg(to_jsonb(t) - 'val' - 'rn' || jsonb_build_object('me', t.id = me) order by t.rn) filter (where t.rn <= lim), '[]'),
+    (array_agg(to_jsonb(t) - 'val' - 'rn' || jsonb_build_object('me', true)) filter (where t.id = me))[1]
+  into cnt, rows, mine
+  from ranked t;
+  return jsonb_build_object('total', total, 'game', p_game, 'tab', p_tab, 'count', cnt, 'rows', rows, 'mine', mine);
+end;
+$$;
+
 -- ---------- 関数を呼べる人 ----------
-revoke execute on function public.rating_apply(), public.match_rating(uuid), public.friend_ranking(text), public.record_action_cpu_best(int) from public, anon, authenticated;
-grant execute on function public.match_rating(uuid), public.friend_ranking(text), public.record_action_cpu_best(int) to authenticated;
+revoke execute on function public.rating_apply(), public.match_rating(uuid), public.friend_ranking(text), public.record_action_cpu_best(int),
+  public.global_ranking(text, text, int) from public, anon, authenticated;
+grant execute on function public.match_rating(uuid), public.friend_ranking(text), public.record_action_cpu_best(int),
+  public.global_ranking(text, text, int) to authenticated;

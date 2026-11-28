@@ -16,7 +16,7 @@ const USERS = { aaa: '11111111-1111-1111-1111-111111111111', bbb: '22222222-2222
 let sqlMissing = false, offline = false;
 const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
 const jwt = id => b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ sub: id, role: 'authenticated', exp: Math.floor(Date.now() / 1000) + 3600, aud: 'authenticated' }) + '.sig';
-const TYPES = { p: 'jsonb', p_n: 'int', p_id: 'uuid' };
+const TYPES = { p: 'jsonb', p_n: 'int', p_id: 'uuid', p_limit: 'int' };
 
 async function mk(browser, guest){
   const ctx = await browser.newContext({ viewport: { width: 844, height: 390 } });
@@ -109,7 +109,27 @@ const rows = p => p.$$eval('#r_list li', ls => ls.map(l => l.innerText.replace(/
   r = await rows(p);
   ok(/乙/.test(r[0]) && /12人抜き/.test(r[0]), '一閃に戻すと一閃の勝ち抜き: ' + JSON.stringify(r));
 
-  console.log('--- 縦向きのスマホでも崩れない');
+  console.log('--- 全員の番付（フレンドでない丁も出る。神様は出ない）');
+  await p.click('.rscope button[data-scope="all"]');
+  await p.click('.rtabs button[data-tab="cpu"]');
+  await p.waitForFunction(() => /丁/.test(document.getElementById('r_list').innerText), null, { timeout: 10000 });
+  await p.waitForTimeout(900);
+  r = await rows(p);
+  ok(/丁/.test(r[0]) && /30人抜き/.test(r[0]) && !r.some(x => /神/.test(x)), '全員の勝ち抜き（神様の99人抜きは出ない）: ' + JSON.stringify(r));
+  ok(/三位　3人中/.test(await p.textContent('#r_me')), '自分の位: ' + (await p.textContent('#r_me')).replace(/\s+/g, ' '));
+  await p.screenshot({ path: out + '/rank-all-cpu.png' });
+  await p.click('.rtabs button[data-tab="power"]');
+  await p.waitForFunction(() => /1074/.test(document.getElementById('r_list').innerText), null, { timeout: 10000 });
+  r = await rows(p);
+  ok(r.length === 3 && /甲/.test(r[0]) && /丙/.test(r[1]) && !/丁/.test(r.join()), '全員の戦闘力は対戦した人だけ: ' + JSON.stringify(r));
+  await p.click('.rgame button[data-game="action"]');
+  await p.waitForFunction(() => /1032/.test(document.getElementById('r_list').innerText), null, { timeout: 10000 });
+  ok(true, '全員×新・一閃に切り替わる');
+  await p.click('.rscope button[data-scope="friend"]'); await p.waitForTimeout(600);
+  r = await rows(p);
+  ok(r.length === 3 && /丙/.test(r.join()), 'フレンドに戻すとフレンドの番付: ' + JSON.stringify(r));
+
+
   await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
   if (await p.isVisible('#r_ok')) await p.click('#r_ok');
   await p.click('.rtabs button[data-tab="power"]'); await p.waitForTimeout(900);

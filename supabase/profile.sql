@@ -101,6 +101,28 @@ insert into public.plate_catalog (id, name, note, free, ord, katana) values
 on conflict (id) do update set name = excluded.name, note = excluded.note, free = excluded.free, ord = excluded.ord, katana = excluded.katana;
 
 -- ---------- 中で使う小さな処理 ----------
+-- リンク（URL）の判定（本体は schema.sql。ここでも同じ形で作っておく: 名乗りの一言・名前で使う。2026-11-28）
+create or replace function public.has_link(t text) returns boolean
+language sql immutable set search_path = '' as $$
+  select lower(normalize(coalesce(t, ''), nfkc)) ~
+    '(https?|ftp)\s?:\s?/|:\s?//|www\s?\.|[a-z0-9-]+\s?[.。]\s?(com|net|org|info|biz|jp|co|io|me|gg|tv|ly|to|cc|be|us|uk|ru|cn|kr|tw|hk|de|fr|eu|in|ai|so|gl|app|dev|xyz|link|site|online|top|club|shop|page|fun|live|vip|work|blog|store|tech|asia|mobi|pro|world|today|chat|social|moe|tokyo)(?![a-z0-9])|[a-z0-9-]+\.[a-z]{2,}/';
+$$;
+create or replace function public.link_blocked(u uuid, t text) returns boolean
+language sql stable security definer set search_path = '' as $$
+  select public.has_link(t) and not exists (select 1 from public.god_accounts g where g.id = u);
+$$;
+revoke execute on function public.link_blocked(uuid, text) from public, anon;
+-- 名前を変える（名乗りの書き換えから呼ぶ。本体は schema.sql と同じ）
+create or replace function public.set_name(p_name text) returns void
+language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then raise exception 'ログインしていません'; end if;
+  if char_length(trim(p_name)) not between 1 and 10 then raise exception '名前は1〜10文字にしてください'; end if;
+  if public.link_blocked(auth.uid(), p_name) then raise exception '名前にリンク（URL）は書き込めません'; end if;
+  update public.profiles set name = trim(p_name) where id = auth.uid();
+end;
+$$;
+grant execute on function public.set_name(text) to authenticated;
 create or replace function public.is_god(u uuid) returns boolean
 language sql stable security definer set search_path = '' as $$
   select u is not null and exists (select 1 from public.god_accounts g where g.id = u);

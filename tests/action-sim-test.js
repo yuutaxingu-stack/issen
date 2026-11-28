@@ -335,3 +335,10 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   ok(near.act && near.hit && near.x < 680, '初虧: 踏み込みの途中で相手が入ったら、そこで止まって斬る (' + near.x + 'px)'); }
 
 console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ? 1 : 0);
+
+// 2026-11-28 居合がなくなった後の決着名: 一閃・紙一重・流転・疾風
+{ const fin = (o) => { const s = new A.Sim({ toWin: 2 }); s.p[0].x = 600 * A.FP; s.p[1].x = 700 * A.FP; if (o.last) s.wins = [1, 1];
+    const w = s.p[0], l = s.p[1]; w.touched = !!o.touched; w.hp = o.hp || A.HP_MAX; w.stunCount = o.stun || 0; w.combo = 2; w.comboDmg = 800;
+    s.finish(w, l, 'ko', A.MV.jab1, { dst: o.dst || 'hit', dground: true }); return s.result.name; };
+  const r = [fin({ last: 1 }), fin({ last: 1, touched: 1, hp: 900 }), fin({ last: 1, touched: 1, hp: 5000 }), fin({ touched: 1, stun: 1, hp: 6000 }), fin({ touched: 1, hp: 6000, dst: 'stun' }), fin({ touched: 1, hp: 6000 })];
+  ok(r.join() === '一閃,紙一重,鏡返し,流転,疾風,斬り伏せ', '居合なしの決着名: 後なし無傷=一閃 / 後なし体力一割=紙一重 / 気絶からの逆転=流転 / 気絶した相手を斬る=疾風 (' + r.join() + ')'); }

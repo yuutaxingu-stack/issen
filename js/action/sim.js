@@ -760,21 +760,22 @@ Sim.prototype.finish = function(w, l, how, m, s){
   const bothLast = tw > 1 && this.wins[0] === tw - 1 && this.wins[1] === tw - 1; // 一本勝負では「後なし」はない
   const air = !w.ground || !s.dground;
   const back = l.face * (w.x - l.x) < 0;
-  const iai = how === 'iai';
+  const iai = how === 'iai'; // 居合は今は出ない（名前の判定には使わない）
   let name;
+  // 2026-11-28 居合がなくなったので、疾風・流転・紙一重・一閃は崩し（ガードを割って気絶させる）と後なしを軸にした条件へ
   if (how === 'sd') name = '刹那';
-  else if (iai && bothLast && !w.touched) name = '一閃';
+  else if (bothLast && !w.touched) name = '一閃';                 // 互いに後なしの一本を無傷で
   else if (!w.touched) name = '明鏡止水';
-  else if (bothLast && iai) name = '紙一重';
+  else if (bothLast && w.hp <= HP_MAX / 10) name = '紙一重';     // 互いに後なしの一本を、体力一割を切ってから
   else if (bothLast) name = '鏡返し';
   else if (w.hp <= 2000) name = '死中活';
-  else if (iai && w.gdLow) name = '流転';
-  else if (!iai && w.combo >= 10) name = '百花';
+  else if (w.stunCount >= 1) name = '流転';                       // 自分がガードを割られて気絶した一本をひっくり返す
+  else if (w.combo >= 10) name = '百花';
   else if (back) name = '陽炎';
-  else if (!iai && w.comboDmg >= 5000) name = '止め';
+  else if (w.comboDmg >= 5000) name = '止め';
   else if (air) name = '落花';
   else if (l.wallF > 0) name = '背水';
-  else if (iai) name = '疾風';
+  else if (s.dst === 'stun') name = '疾風';                       // ガードを割って気絶させた相手を斬って決める
   else if (w.comboFirst && w.comboFirst.counter) name = '先の先';
   else if (w.comboFirst && w.comboFirst.punish) name = '隙穿ち';
   else name = '斬り伏せ';

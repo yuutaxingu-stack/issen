@@ -57,3 +57,12 @@ select case when pg_temp.t(public.zukan(), 'issen_yata') ->> 'have' = 'false' an
   then 'OK 箱が出たら皆に見える' else 'NG' end;
 select pg_temp.as_('');
 update public.gacha_boxes set open = false where id = 'b2';
+
+\echo '--- 新・一閃の勝ちは rec_new にも数える（旧はそのまま rec だけ）'
+select pg_temp.as_('22222222-2222-2222-2222-222222222222');
+select public.record_win('明鏡止水', 'mumei', null, 'new') is not null;
+select public.record_win('明鏡止水', 'mumei') is not null;
+select public.record_win('斬り伏せ', 'mumei', 'vs', 'new') is not null;
+select case when (public.get_save() -> 'rec' -> 'mumei' ->> '明鏡止水') = '2' and (public.get_save() -> 'rec_new' -> 'mumei' ->> '明鏡止水') = '1'
+  and (public.get_save() -> 'rec_new' -> 'mumei' ->> '斬り伏せ') = '1' then 'OK 旧と新を分けて数える' else 'NG ' || public.get_save()::text end;
+

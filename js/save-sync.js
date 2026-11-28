@@ -61,6 +61,17 @@
     } finally { flushing = false; }
   }
   setInterval(flush, 20000);
+
+  /* 新・一閃（action.html）の CPU 戦の最高記録を、番付のためにアカウントへ送る（上がったときだけ） */
+  async function syncActionBest(){
+    if (!uid || !loaded) return;
+    const best = (store.get('issen-action-cpu-v1', {}) || {}).best | 0, key = 'issen-action-best-sent:' + uid;
+    if (best <= 0 || best <= (store.get(key, 0) | 0)) return;
+    try { await rpc('record_action_cpu_best', { p_n: best }); store.set(key, best); }
+    catch (e) { if (!isNet(e) && !missing(e)) console.warn('新・一閃の記録を送れませんでした', e); }
+  }
+  setInterval(syncActionBest, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncActionBest(); });
   window.addEventListener('online', () => flush());
 
   /* ---------- ゲームから呼ばれる出入り口 ---------- */
@@ -119,7 +130,7 @@
         }
       }
       if (uid !== u) return;
-      loaded = true; I.useAccount(api); apply(d); flush();
+      loaded = true; I.useAccount(api); apply(d); flush(); syncActionBest();
       N.listeners.forEach(f => { try { f(); } catch (e) {} });   // 画面の表示を更新
     } catch (e) {
       // SQL がまだ実行されていないときや通信できないときは、端末の記録のまま遊べる

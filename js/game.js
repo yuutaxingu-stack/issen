@@ -243,7 +243,7 @@ const KATANA=[
   {id:'yogarasu',box:'b2',mei:'夜鴉',yomi:'よがらす',tier:'極',wrap:[30,20,40],metal:'black',blade:[90,60,140,0.42],lore:'夜に鳴く鴉は凶事の兆し。斬られた者だけがその声を聞く。',slash:{col:'#efe6ff',glow:'rgba(140,90,230,1)',double:true,thick:1.3}},
   {id:'kaiki',box:'b2',mei:'皆既',yomi:'かいき',tier:'幻',wrap:[16,16,20],metal:'silver',blade:'iris',lore:'日が欠けきる一瞬。昼の空に星が出る。',slash:{rainbow:true,glow:'rgba(230,230,255,1)',double:true,thick:1.5}},
   {id:'iwato',box:'b2',mei:'岩戸',yomi:'いわと',tier:'幻',wrap:[150,120,80],metal:'gold',blade:[255,240,200,0.5],lore:'日が隠れた岩の戸。開けば世に光が戻る。',slash:{col:'#fffbe8',glow:'rgba(255,230,150,1)',double:true,thick:1.6}},
-  {id:'yata',box:'b2',mei:'八咫',yomi:'やた',tier:'絶',src:'assets/katana_yata.png',up:true,lore:'日を覆う黒に、三本足の烏が道を示す。抜けば空が欠け、羽が降る。',slash:{col:'#000000',glow:'rgba(255,255,255,1)',double:true,thick:1.7,feathers:true}}
+  {id:'yata',box:'b2',mei:'八咫',yomi:'やた',tier:'絶',src:'assets/katana_yata.png?v=3',up:true,lore:'日を覆う黒に、三本足の烏が道を示す。抜けば空が欠け、羽が降る。',slash:{col:'#000000',glow:'rgba(255,255,255,1)',double:true,thick:1.7,feathers:true}}
 ];
 const KMAP={}; KATANA.forEach(k=>KMAP[k.id]=k);
 // 描いた絵がある刀（src）は、その絵を読み込んでから作り直す
@@ -1620,7 +1620,7 @@ const ZART={
     bg:['#5a0d18','#250609','#070203'],hot:[255,40,70],deep:[200,24,48],pale:[255,220,228],void:[5,1,2],band:'#0a0203',seal:['#a8101f','#f4d6d6'],mark:'#ff5a6a',
     tint:['rgba(40,2,8,.6)','rgba(255,70,95,.45)'],parts:'petal',sun:'moon',
     tag:['#6e0c18','#f2d2d2'],big:[200,24,44],tintc:'#a3182c',cls:'z-ouka'},
-  yata:{mei:'八咫',yomi:'やた',up:true,saya:'assets/katana_yata_saya.png',hd:'assets/katana_yata_hd.png',sayaHd:'assets/katana_yata_saya_hd.png',src:'assets/katana_yata.png',
+  yata:{mei:'八咫',yomi:'やた',up:true,saya:'assets/katana_yata_saya.png?v=3',hd:'assets/katana_yata_hd.png?v=3',sayaHd:'assets/katana_yata_saya_hd.png?v=3',src:'assets/katana_yata.png?v=3',
     bg:['#3a3a40','#121215','#020203'],hot:[255,255,255],deep:[210,210,220],pale:[255,255,255],void:[2,2,3],band:'#060608',seal:['#0a0a0c','#f4f4f6'],mark:'#ffffff',
     tint:['rgba(255,255,255,.18)','rgba(255,255,255,.55)'],parts:'feather',sun:'eclipse',
     tag:['#050506','#f6f6f8','#e8e8ee'],big:[250,250,255],tintc:'#ffffff',cls:'z-yata'}};

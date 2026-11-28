@@ -110,7 +110,7 @@ select case when (public.god_reports() ->> 'new') = '2' and public.god_reports()
 select public.god_report_mark((select min(id) from public.reports), 'done', '直しました。ありがとう');
 select pg_temp.as_('33333333-3333-3333-3333-333333333333');
 select case when public.my_reports() -> 1 ->> 'status' = 'done' and public.my_reports() -> 1 ->> 'reply' = '直しました。ありがとう'
-            and exists (select 1 from public.mail where to_id = auth.uid() and subject = '不具合報告へのお返事' and body like '直しました%画面が止まった') then 'OK 返事が文箱に届く' else 'NG' end;
+            and exists (select 1 from public.mail where to_id = auth.uid() and subject = '不具合報告へのお返事' and body like '直しました%画面が止まった%返事を書けます。') then 'OK 返事が文箱に届く' else 'NG' end;
 do $$ begin for i in 1..8 loop perform public.send_report('request', 'たくさん'); end loop; end $$;
 select pg_temp.expect_err($$select public.send_report('request', 'もう一通')$$, '1日10通');
 reset role;
@@ -194,3 +194,13 @@ select case when exists (select 1 from public.mail where to_id = '33333333-3333-
             and (select holder from public.crowns where title = 'top_issen_yata') = '33333333-3333-3333-3333-333333333333'
             and (select name from public.title_catalog where id = 'top_issen_yata') = '天下　八咫一閃'
   then 'OK 八咫の札・八咫一閃・天下　八咫一閃が丙に' else 'NG' end;
+\echo '--- 運営とのやりとり（返事の返事）'
+reset role; select id as rid, from_id as rfrom from public.reports order by id limit 1 \gset
+set role authenticated;
+select pg_temp.as_(:'rfrom');
+select public.report_reply(:rid, '続きです');
+select case when public.my_reports() -> -1 ->> 'status' = 'new'
+            and jsonb_array_length(public.my_reports() -> -1 -> 'msgs') = 2 then 'OK 送った人が返事を書け、運営の届いたに戻る' else 'NG' end;
+select pg_temp.as_('22222222-2222-2222-2222-222222222222');
+select pg_temp.expect_err(format('select public.report_reply(%s, %L)', :rid, 'x'), 'その報告はありません');
+reset role;

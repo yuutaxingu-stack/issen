@@ -514,6 +514,29 @@ create index if not exists reports_from on public.reports (from_id, id desc);
 alter table public.reports enable row level security;
 revoke all on public.reports from anon, authenticated;
 
+-- やりとり（2026-11-28）: 神様の返事と、それへの返事を何往復でも。最初の文は reports.body
+create table if not exists public.report_msgs (
+  id bigint generated always as identity primary key,
+  report_id bigint not null references public.reports(id) on delete cascade,
+  from_god boolean not null,
+  body text not null check (char_length(body) between 1 and 1000),
+  created_at timestamptz not null default now()
+);
+create index if not exists report_msgs_report on public.report_msgs (report_id, id);
+alter table public.report_msgs enable row level security;
+revoke all on public.report_msgs from anon, authenticated;
+-- 前からある返事（reports.reply）を、やりとりの1通目として移す（一度だけ）
+insert into public.report_msgs (report_id, from_god, body, created_at)
+select r.id, true, left(r.reply, 1000), coalesce(r.replied_at, r.created_at) from public.reports r
+where r.reply is not null and btrim(r.reply) <> '' and not exists (select 1 from public.report_msgs m where m.report_id = r.id);
+
+-- やりとりを古い順に
+create or replace function public.report_thread(p_id bigint) returns jsonb
+language sql stable security definer set search_path = '' as $$
+  select coalesce(jsonb_agg(jsonb_build_object('god', m.from_god, 'body', m.body, 'at', m.created_at) order by m.id), '[]')
+  from public.report_msgs m where m.report_id = p_id;
+$$;
+
 -- 送る（1日10通まで）
 create or replace function public.send_report(p_kind text, p_body text, p_env text default '') returns bigint
 language plpgsql security definer set search_path = '' as $$
@@ -534,8 +557,30 @@ $$;
 -- 自分が送ったもの（新しい順に30）
 create or replace function public.my_reports() returns jsonb
 language sql stable security definer set search_path = '' as $$
-  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'kind', r.kind, 'body', r.body, 'status', r.status, 'reply', r.reply, 'at', r.created_at) order by r.id desc), '[]')
+  select coalesce(jsonb_agg(jsonb_build_object('id', r.id, 'kind', r.kind, 'body', r.body, 'status', r.status, 'reply', r.reply, 'at', r.created_at,
+    'msgs', public.report_thread(r.id)) order by r.id desc), '[]')
   from (select * from public.reports x where x.from_id = auth.uid() order by x.id desc limit 30) r;
+$$;
+
+-- 遊ぶ人: 運営の返事に返事を書く（運営が一度返事をした報告だけ。1日20通まで、1つの報告に50通まで）。運営の「届いた」に戻る
+create or replace function public.report_reply(p_id bigint, p_body text) returns void
+language plpgsql security definer set search_path = '' as $$
+declare me uuid := auth.uid(); r public.reports; b text := btrim(coalesce(p_body, ''));
+begin
+  if me is null then raise exception 'ログインしていません'; end if;
+  select * into r from public.reports x where x.id = p_id and x.from_id = me for update;
+  if r.id is null then raise exception 'その報告はありません'; end if;
+  if char_length(b) = 0 then raise exception '中身を書いてください'; end if;
+  if char_length(b) > 1000 then raise exception '1000文字までです'; end if;
+  if not exists (select 1 from public.report_msgs m where m.report_id = p_id and m.from_god) then raise exception '運営からの返事が届いてから書けます'; end if;
+  if (select count(*) from public.report_msgs m join public.reports x on x.id = m.report_id
+      where x.from_id = me and not m.from_god and m.created_at > now() - interval '1 day') >= 20 then
+    raise exception '返事は1日20通までです。また明日お願いします';
+  end if;
+  if (select count(*) from public.report_msgs m where m.report_id = p_id) >= 50 then raise exception 'このやりとりはいっぱいです。新しく送ってください'; end if;
+  insert into public.report_msgs (report_id, from_god, body) values (p_id, false, b);
+  update public.reports set status = 'new' where id = p_id;
+end;
 $$;
 
 -- 神様: 届いたもの（まだ済んでいないものを先に、新しい順に100）
@@ -546,7 +591,7 @@ begin
   return jsonb_build_object(
     'new', (select count(*) from public.reports r where r.status = 'new'),
     'items', coalesce((select jsonb_agg(jsonb_build_object('id', r.id, 'kind', r.kind, 'body', r.body, 'env', r.env, 'status', r.status,
-        'reply', r.reply, 'at', r.created_at, 'from', r.from_id, 'name', p.name, 'login', p.login) order by (r.status = 'done'), r.id desc)
+        'reply', r.reply, 'at', r.created_at, 'from', r.from_id, 'name', p.name, 'login', p.login, 'msgs', public.report_thread(r.id)) order by (r.status = 'done'), r.id desc)
       from (select * from public.reports x order by (x.status = 'done'), x.id desc limit 100) r join public.profiles p on p.id = r.from_id), '[]'));
 end;
 $$;
@@ -560,11 +605,15 @@ begin
   if p_status not in ('new', 'seen', 'done') then raise exception '状態が正しくありません'; end if;
   select * into r from public.reports x where x.id = p_id for update;
   if r.id is null then raise exception 'その報告はありません'; end if;
+  if char_length(t) > 1000 then raise exception '1000文字までです'; end if;
   update public.reports set status = p_status, reply = coalesce(t, reply), replied_at = case when t is not null then now() else replied_at end where id = p_id;
   if t is not null then
+    insert into public.report_msgs (report_id, from_god, body) values (p_id, true, t);
     insert into public.mail (to_id, batch, subject, body) values (r.from_id, gen_random_uuid(),
       case r.kind when 'bug' then '不具合報告へのお返事' else '改善依頼へのお返事' end,
-      left(t, 600 - least(char_length(r.body), 200) - 12) || E'\n\n――あなたが送った文\n' || left(r.body, 200));
+      left(t, 400) || case when char_length(t) > 400 then '…' else '' end ||
+      E'\n\n――あなたが送った文\n' || left(r.body, 120) || case when char_length(r.body) > 120 then '…' else '' end ||
+      E'\n\n文箱の「運営へ」で、やりとりの続きを読み、返事を書けます。');
   end if;
 end;
 $$;
@@ -767,6 +816,7 @@ revoke execute on function
   public.god_post_notice(text, text, text, text), public.god_delete_notice(bigint),
   public.auto_gift_check(public.saves), public.auto_gift_trigger(),
   public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text),
+  public.report_thread(bigint), public.report_reply(bigint, text),
   public.crown_values(text, text), public.crown_refresh(text), public.crown_refresh_kinds(text[]), public.crown_saves_trigger(), public.crown_rating_trigger(),
   public.god_fill(), public.god_fill_trigger()
   from public, anon, authenticated;
@@ -775,6 +825,7 @@ grant execute on function
   public.my_mail(), public.read_mail(bigint), public.claim_mail(bigint), public.list_notices(),
   public.god_preview(text, text), public.god_send_mail(text, text, text, text, jsonb), public.god_info(),
   public.god_post_notice(text, text, text, text), public.god_delete_notice(bigint),
-  public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text)
+  public.send_report(text, text, text), public.my_reports(), public.god_reports(), public.god_report_mark(bigint, text, text),
+  public.report_reply(bigint, text)
   to authenticated;
 grant execute on function public.list_notices() to anon;

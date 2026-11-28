@@ -406,8 +406,18 @@
       '<h3>送ったもの</h3>' +
       (mine == null ? '<p class="gnote">読み込んでいます…</p>' : !mine.length ? '<p class="gnote">まだありません</p>' :
         '<ul class="pfrep">' + mine.map(r => '<li><div class="pfrh"><span class="pfkind k-' + r.kind + '">' + RK[r.kind] + '</span><span class="pfrs s-' + r.status + '">' + RST[r.status] + '</span><time>' + day(r.at) + '</time></div>' +
-          '<p>' + esc(r.body).replace(/\n/g, '<br>') + '</p>' + (r.reply ? '<p class="pfreply"><b>運営より</b>' + esc(r.reply).replace(/\n/g, '<br>') + '</p>' : '') + '</li>').join('') + '</ul>') +
+          '<p>' + esc(r.body).replace(/\n/g, '<br>') + '</p>' + thread(r, 'あなた', '運営より') +
+          (msgsOf(r).some(m => m.god) ? '<div class="pfract">' + (S.replying === r.id ?
+            '<textarea id="rp_body" maxlength="1000" rows="3" placeholder="運営への返事"></textarea><button type="button" class="obtn pri" data-myreply="' + r.id + '"' + (S.busy ? ' disabled' : '') + '>返事を送る</button><button type="button" class="obtn" data-replyoff="1">やめる</button>' :
+            '<button type="button" class="obtn" data-replyto="' + r.id + '">返事を書く</button>') + '</div>' : '') +
+          '</li>').join('') + '</ul>') +
     '</div>';
+  }
+  // やりとり（運営の返事と、それへの返事）。古い返事だけのもの（msgs が無い版のサーバー）は reply を1通目として出す
+  const msgsOf = r => Array.isArray(r.msgs) ? r.msgs : (r.reply ? [{ god: true, body: r.reply, at: null }] : []);
+  function thread(r, me, god){
+    return msgsOf(r).map(m => '<div class="pfreply' + (m.god ? '' : ' me') + '"><b>' + esc(m.god ? god : me) + (m.at ? '<time>' + day(m.at) + '</time>' : '') + '</b>' +
+      esc(m.body).replace(/\n/g, '<br>') + '</div>').join('');
   }
   function renderInbox(){
     const R = S.reports;
@@ -417,9 +427,9 @@
       '<div class="pfrh"><span class="pfkind k-' + r.kind + '">' + RK[r.kind] + '</span><b data-pid="' + esc(r.from) + '">' + esc(r.name) + '</b><small>' + esc(r.login) + '</small><span class="pfrs s-' + r.status + '">' + RST[r.status] + '</span><time>' + day(r.at) + '</time></div>' +
       '<p>' + esc(r.body).replace(/\n/g, '<br>') + '</p>' +
       (r.env ? '<p class="pfenv">' + esc(r.env) + '</p>' : '') +
-      (r.reply ? '<p class="pfreply"><b>返事</b>' + esc(r.reply).replace(/\n/g, '<br>') + '</p>' : '') +
+      thread(r, r.name || '送った人', '返事') +
       '<div class="pfract">' +
-        (S.replying === r.id ? '<textarea id="rp_body" maxlength="380" rows="3" placeholder="返事（送った人の文箱に届きます）"></textarea><button type="button" class="obtn pri" data-reply="' + r.id + '">返事を送って済みにする</button><button type="button" class="obtn" data-replyoff="1">やめる</button>' :
+        (S.replying === r.id ? '<textarea id="rp_body" maxlength="1000" rows="3" placeholder="返事（送った人の文箱に届き、送った人も返事を書けます）"></textarea><button type="button" class="obtn pri" data-reply="' + r.id + '">返事を送って済みにする</button><button type="button" class="obtn" data-replyoff="1">やめる</button>' :
           '<button type="button" class="obtn" data-replyto="' + r.id + '">返事を書く</button>' +
           (r.status !== 'done' ? '<button type="button" class="obtn" data-rmark="done" data-rid="' + r.id + '">済みにする</button>' : '<button type="button" class="obtn" data-rmark="seen" data-rid="' + r.id + '">未済に戻す</button>')) +
       '</div></li>').join('') + '</ul>';
@@ -593,6 +603,13 @@
     }
     if (d.replyto) { S.replying = Number(d.replyto); render(); const t = $('rp_body'); if (t) t.focus(); return; }
     if (d.replyoff) { S.replying = 0; render(); return; }
+    if (d.myreply) {
+      const text = (($('rp_body') || {}).value || '').trim(); if (!text) return;
+      S.busy = true; render();
+      try { await rpc('report_reply', { p_id: Number(d.myreply), p_body: text }); S.replying = 0; if (N.toast) N.toast('運営へ返事を送りました', 2500); }
+      catch (x) { if (N.toast) N.toast(errText(x), 5000); }
+      S.busy = false; await loadReports(); render(); return;
+    }
     if (d.reply || d.rmark) {
       const id = Number(d.reply || d.rid), text = d.reply ? (($('rp_body') || {}).value || '').trim() : null;
       if (d.reply && !text) return;

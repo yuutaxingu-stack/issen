@@ -257,6 +257,23 @@ const notice = (kind, title, bodyText) => sql("insert into public.notices (kind,
   await g.waitForFunction(() => /済んだ/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
   ok(sql("select count(*) from public.mail where to_id = :'b' and subject = '不具合報告へのお返事'", { b: USERS[B] }) === '1', '返事が乙の文箱に届いた');
 
+  console.log('--- 乙が運営の返事に返事 → 神様がまた返事（返事の返事）');
+  await b.click('#pf_tabs [data-tab="box"]'); await b.click('#pf_tabs [data-tab="report"]');
+  await b.waitForFunction(() => /直しました/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
+  await b.click('[data-replyto]'); await b.fill('#rp_body', 'まだ止まります。三人目で');
+  await b.click('[data-myreply]');
+  await b.waitForFunction(() => /まだ止まります/.test(document.getElementById('pf_body').textContent) && /届いた/.test(document.querySelector('.pfrep .pfrs').textContent), null, { timeout: 8000 });
+  ok(true, '乙が返事を書けた（報告は「届いた」に戻る）');
+  await g.click('#pf_tabs [data-tab="box"]'); await g.click('#pf_tabs [data-tab="inbox"]');
+  await g.waitForFunction(() => /まだ止まります/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
+  await g.click('[data-replyto]'); await g.fill('#rp_body', 'もう一度直しました');
+  await g.click('[data-reply]');
+  await g.waitForFunction(() => /もう一度直しました/.test(document.getElementById('pf_body').textContent), null, { timeout: 8000 });
+  await b.click('#pf_tabs [data-tab="box"]'); await b.click('#pf_tabs [data-tab="report"]');
+  await b.waitForFunction(() => document.querySelectorAll('.pfrep .pfreply').length === 3, null, { timeout: 8000 });
+  ok(sql("select count(*) from public.mail where to_id = :'b' and subject = '不具合報告へのお返事'", { b: USERS[B] }) === '2', '返事の返事まで続き、乙の文箱にも2通');
+  await b.evaluate(() => document.querySelector('.pfrep').scrollIntoView()); await b.waitForTimeout(300); await b.screenshot({ path: OUT + '/report-thread.png' });
+
   await browser.close();
   console.log(fails ? 'NG ' + fails + '件' : 'すべてOK');
   process.exit(fails ? 1 : 0);

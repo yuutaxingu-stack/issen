@@ -223,6 +223,9 @@
 .pfenv{font-size:11px !important;opacity:.4;font-family:ui-monospace,Menlo,monospace;}
 .pfreply{padding:6px 10px;border-left:2px solid #a8322a;background:rgba(168,50,42,.1);}
 .pfreply b{display:block;font-family:var(--display);font-weight:400;font-size:13px;letter-spacing:.14em;opacity:.8;}
+.pfreply{font-size:14px;line-height:1.7;word-break:break-word;}
+.pfreply b time{margin-left:10px;font-family:inherit;font-size:11px;letter-spacing:0;opacity:.6;}
+.pfreply.me{margin-left:14px;border-left-color:rgba(233,226,207,.45);background:rgba(233,226,207,.05);}
 .pfract{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start;}
 .pfract textarea{flex:1 1 100%;}
 

@@ -130,6 +130,7 @@ const FIN = {
   '散華':{tier:'絶'}, '先の先':{tier:'並'}, '隙穿ち':{tier:'並'}, '疾風':{tier:'並'}, '斬り伏せ':{tier:'並'}, '睨み合い':{tier:'分'}
 };
 
+const WALLKEEP = { hit: 1, tumble: 1, land: 1, down: 1, getup: 1, tech: 1, stun: 1 };
 const sgn = v => v > 0 ? 1 : v < 0 ? -1 : 0;
 const toward = (v, t, d) => v < t ? Math.min(t, v + d) : Math.max(t, v - d);
 const NOIN = { L:0, R:0, U:0, D:0, A:0, J:0, G:0 };
@@ -369,7 +370,7 @@ Sim.prototype.think = function(p, o){
 /* 状態ごとの時間の進み・移動 */
 Sim.prototype.update = function(p, o){
   const h = horiz(p);
-  if (p.wallF > 0) p.wallF--;
+  if (p.wallF > 0 && !WALLKEEP[p.st]) p.wallF--; // 背水: 壁に叩きつけられた後、吹っ飛び・ダウン・起き上がりの間は減らさず、動けるようになってから1秒
   if (p.ground && p.haneUsed && p.mv !== 'hane') p.haneUsed = false; // 地面にいれば羽跳はまた使える（地上で横へ跳んだときも）
   if (p.dropF > 0) p.dropF--;
   switch (p.st) {

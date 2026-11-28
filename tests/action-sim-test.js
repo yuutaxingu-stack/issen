@@ -342,3 +342,8 @@ console.log(fail ? fail + ' 件失敗' : 'すべて成功'); process.exit(fail ?
     s.finish(w, l, 'ko', A.MV.jab1, { dst: o.dst || 'hit', dground: true }); return s.result.name; };
   const r = [fin({ last: 1 }), fin({ last: 1, touched: 1, hp: 900 }), fin({ last: 1, touched: 1, hp: 5000 }), fin({ touched: 1, stun: 1, hp: 6000 }), fin({ touched: 1, hp: 6000, dst: 'stun' }), fin({ touched: 1, hp: 6000 })];
   ok(r.join() === '一閃,紙一重,鏡返し,流転,疾風,斬り伏せ', '居合なしの決着名: 後なし無傷=一閃 / 後なし体力一割=紙一重 / 気絶からの逆転=流転 / 気絶した相手を斬る=疾風 (' + r.join() + ')'); }
+
+// 背水: 壁に叩きつけられた後のダウン・起き上がりの間は猶予が減らない（動けるようになってから1秒）
+{ const s = new A.Sim({ training: true }); const p = s.p[1]; p.wallF = 60; p.st = 'down'; p.f = 0; let minDown = 60;
+  for (let k = 0; k < 200 && p.st !== 'idle'; k++) { s.step([I(), I()]); if (p.st !== 'idle') minDown = Math.min(minDown, p.wallF); }
+  const after = p.wallF; ok(minDown === 60 && p.st === 'idle' && after >= 58, '背水の猶予はダウン・起き上がりの間は減らない (' + minDown + ' → 起きて ' + after + ')'); }

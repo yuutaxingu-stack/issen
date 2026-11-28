@@ -919,7 +919,8 @@ function crowSprite(i){
   const S = CROWSPR.S, c = document.createElement('canvas'); c.width = CROWSPR.w * S; c.height = CROWSPR.h * S;
   const x = c.getContext('2d'); x.scale(S, S); x.translate(CROWSPR.ox, CROWSPR.oy);
   let sd = 777 + i * 13; const r = () => (sd = (sd * 16807) % 2147483647) / 2147483647;
-  const ph = 0.55 + 0.95 * Math.cos(Math.PI * 2 * i / 8); // 翼の角度（大きいほど上）
+  const TUCK = i === 8, FLARE = i === 9; // 8 = 翼をたたんで突っ込む、9 = 翼を広げ爪を出して襲いかかる
+  const ph = TUCK ? 0.16 : FLARE ? 1.95 : 0.55 + 0.95 * Math.cos(Math.PI * 2 * i / 8); // 翼の角度（大きいほど上）
   const V = a => [-Math.cos(a), -Math.sin(a)];
   const feather = (bx, by, a, len, w, path) => { // 先の尖った羽一枚（少し反る）
     const [dx, dy] = V(a), nx = -dy, ny = dx, tx = bx + dx * len, ty = by + dy * len, bend = len * 0.08;
@@ -928,10 +929,10 @@ function crowSprite(i){
     path.quadraticCurveTo(bx + dx * len * 0.5 - nx * (w * 0.4 - bend), by + dy * len * 0.5 - ny * (w * 0.4 - bend), bx - nx * w / 2, by - ny * w / 2); path.closePath(); };
   const wing = (sx, sy, a, k) => { // a: 腕の向き, k: 大きさ
     const p = new Path2D(), [dx, dy] = V(a), wx = sx + dx * 52 * k, wy = sy + dy * 52 * k;
-    const sa = a - 1.45, [ex, ey] = V(sa);
+    const sa = a - (TUCK ? 0.32 : 1.45), [ex, ey] = V(sa); // たたむときは次列風切も後ろへ流す
     p.moveTo(sx + 10, sy + 6); p.lineTo(sx + 2, sy - 6); p.quadraticCurveTo(sx + dx * 30 * k + dy * 8, sy + dy * 30 * k - dx * 8, wx, wy); // 前縁はふくらむ
     p.lineTo(wx + ex * 26 * k, wy + ey * 26 * k); p.lineTo(sx + ex * 30 * k - 6, sy + ey * 30 * k + 6); p.closePath();
-    for (let j = 0; j < 14; j++) { const t = j / 13; feather(sx + (wx - sx) * (0.08 + t * 0.92), sy + (wy - sy) * (0.08 + t * 0.92), sa + (r() - 0.5) * 0.06 + t * 0.2, (32 + 12 * t + r() * 3) * k, 6.5 * k, p); } // 次列風切
+    for (let j = 0; j < 14; j++) { const t = j / 13; feather(sx + (wx - sx) * (0.08 + t * 0.92), sy + (wy - sy) * (0.08 + t * 0.92), sa + (r() - 0.5) * 0.06 + t * 0.2, (32 + 12 * t + r() * 3) * k * (TUCK ? 0.85 : 1), 6.5 * k, p); } // 次列風切
     for (let j = 0; j < 11; j++) feather(wx - dx * j * 1.1, wy - dy * j * 1.1, a + 0.1 - j * 0.11 + (r() - 0.5) * 0.03, (88 - j * 4 + r() * 5) * k, (6.5 - j * 0.2) * k, p); // 初列風切（指のように分かれる）
     return p; };
   const body = new Path2D(); // 胴・頭・太い嘴
@@ -941,10 +942,10 @@ function crowSprite(i){
   const tail = new Path2D(); // 扇に開く尾、先がささくれる
   for (let j = 0; j < 10; j++) feather(-28, -2 + j * 0.4, -0.22 + j * 0.05 + (r() - 0.5) * 0.03, 50 + r() * 6 - Math.abs(j - 4.5) * 2, 6, tail);
   const legs = new Path2D(), claws = new Path2D(); // 三本の足と鉤爪（前へ掴みかかる）
-  for (let j = 0; j < 3; j++) { const bx = 6 + j * 7, by = 8, mx = bx + 4, my = by + 12, kx = bx + 14 + j * 3, ky = by + 22 - j * 2;
+  for (let j = 0; j < 3; j++) { const bx = 6 + j * 7, by = 8, mx = bx + 4, my = by + 12, kx = TUCK ? bx - 14 - j * 2 : FLARE ? bx + 30 + j * 4 : bx + 14 + j * 3, ky = TUCK ? by + 8 : FLARE ? by + 18 - j * 3 : by + 22 - j * 2;
     legs.moveTo(bx, by); legs.quadraticCurveTo(mx - 6, my, kx, ky);
     for (let t = 0; t < 3; t++) { const a = -0.5 + t * 0.6, L = 8; claws.moveTo(kx, ky); claws.quadraticCurveTo(kx + Math.cos(a) * L, ky + Math.sin(a) * L, kx + Math.cos(a + 1.2) * L * 0.95, ky + Math.sin(a + 1.2) * L * 0.95 + 2); } }
-  const far = wing(24, -16, ph + 0.25, 1.0), near = wing(12, -11, ph, 1.15);
+  const far = wing(24, -16, ph + (TUCK ? 0.12 : 0.25), TUCK ? 0.85 : 1.0), near = wing(12, -11, ph, TUCK ? 1.0 : 1.15);
   // 飛沫と斜めのかすれ（背の後ろ）
   x.save(); x.strokeStyle = 'rgba(8,8,10,.4)'; x.lineCap = 'round';
   for (let j = 0; j < 14; j++) { const px = -10 + r() * 70 - 40 * r(), py = -20 + r() * 60, L = 14 + r() * 50; x.lineWidth = 0.4 + r() * 1.2; x.beginPath(); x.moveTo(px, py); x.lineTo(px - L, py + L * 0.42); x.stroke(); }
@@ -967,10 +968,29 @@ function crowSprite(i){
   x.fillStyle = '#fff'; x.beginPath(); x.arc(56, -15, 1.7, 0, 7); x.fill(); x.strokeStyle = 'rgba(255,255,255,.45)'; x.lineWidth = 0.8; x.beginPath(); x.moveTo(64, -10); x.quadraticCurveTo(76, -8, 87, -8); x.stroke();
   return (CROWSPR.f[i] = c);
 }
-function drawCrow(x, y, d, z, fr, al){ // 八咫烏（z = 1 で体の長さ ~95px）
-  const i = ((Math.floor(fr * 0.45) % 8) + 8) % 8, s = z * 0.62, c = crowSprite(i);
-  cx.save(); if (al != null) cx.globalAlpha = al; cx.translate(x, y); cx.scale(d * s, s);
+function drawCrow(x, y, d, z, fr, al, pose, tilt){ // 八咫烏（z = 1 で体の長さ ~95px）。pose: 8 たたむ / 9 襲う、なければ羽ばたき
+  const i = pose != null ? pose : ((Math.floor(fr * 0.45) % 8) + 8) % 8, s = z * 0.62, c = crowSprite(i);
+  cx.save(); if (al != null) cx.globalAlpha = al; cx.translate(x, y); cx.scale(d * s, s); if (tilt) cx.rotate(tilt);
   cx.drawImage(c, -CROWSPR.ox, -CROWSPR.oy, CROWSPR.w, CROWSPR.h); cx.restore();
+}
+/* 飛ぶ八咫烏: 羽ばたきで飛び出し → 翼をたたんで急降下しながら突っ込む（残像と風の筋） → 相手の手前で翼を広げ爪を出して襲いかかる
+   見た目だけ。位置と判定は sim のまま（出だしは少し上から降りてくるように見せる） */
+function drawCrowPj(q){
+  const age = A.CROW.life - q.life, d = Math.sign(q.vx) * MIR, z = cam.z * 1.15, o = sim.p[1 - q.o];
+  const near = Math.abs(o.x - q.x) / FP < 150 && Math.sign(o.x - q.x) === Math.sign(q.vx);
+  const lift = Math.max(0, 1 - age / 16), up = 46 * lift * lift; // 上から降りてくる
+  const x = wx(q.x / FP), y = wy(q.y / FP + up);
+  let pose, tilt = 0;
+  if (age < 7) pose = [0, 1, 2, 3, 4, 5, 6][age]; // 力強く一度羽ばたいて飛び出す
+  else if (near) { pose = 9; tilt = -0.18; }
+  else { pose = 8; tilt = 0.12 * lift + 0.05 * Math.sin(age * 0.6); }
+  if (pose === 8) { // 残像と風の筋
+    cx.save(); cx.strokeStyle = 'rgba(255,255,255,.55)'; cx.lineCap = 'round';
+    for (let k = 0; k < 5; k++) { const yy = y + (k - 2) * 9 * z + Math.sin(age + k) * 2, L = (60 + k * 17 % 40) * z; cx.lineWidth = 1 + (k % 2); cx.beginPath(); cx.moveTo(x - d * 30 * z, yy); cx.lineTo(x - d * (30 * z + L), yy - up * 0.2); cx.stroke(); }
+    cx.restore();
+    for (let k = 3; k >= 1; k--) drawCrow(x - d * k * 22 * z, y - k * 4 * lift * z, d, z, 0, 0.16 * (4 - k) / 3, 8, tilt);
+  }
+  drawCrow(x, y, d, z, age, 1, pose, tilt);
 }
 function drawCrowLock(){ // 八咫烏: 捕まえると闇に沈み、烏の羽が散る中に皆既の日が昇る（烏の姿は見せない。2026-11-28 ユーザー指定）
   const L = sim.lock; if (!L) return; const d = sim.p[L.d], t = A.CROW.lock - L.f, k = Math.min(1, t / 8) * Math.min(1, L.f / 6), z = cam.z;
@@ -1439,7 +1459,7 @@ function drawView(v){
       for (let k = 0; k < 5; k++) { const a = FR * 0.25 + k * 1.2566, rr = r * (0.35 + 0.45 * ((k * 37) % 10) / 10);
         cx.save(); cx.translate(Math.cos(a) * rr, Math.sin(a) * rr); cx.rotate(a + FR * 0.1); cx.fillStyle = SAKURA[k % 3]; cx.beginPath(); cx.ellipse(0, 0, 7 * cam.z, 4 * cam.z, 0, 0, Math.PI * 2); cx.fill(); cx.restore(); }
       cx.restore(); continue; }
-    if (q.crow) { drawCrow(wx(q.x / FP), wy(q.y / FP), Math.sign(q.vx) * MIR, cam.z * 1.15, FR); continue; } // 八咫烏
+    if (q.crow) { drawCrowPj(q); continue; } // 八咫烏
     const x = wx(q.x / FP), y = wy(q.y / FP), d = Math.sign(q.vx) * MIR, r = 30 * cam.z;
     cx.save(); cx.globalCompositeOperation = 'lighter'; cx.translate(x, y); cx.scale(d, 1);
     for (let k = 0; k < 3; k++) { cx.fillStyle = `rgba(245,240,228,${0.6 - k * 0.18})`; cx.beginPath();

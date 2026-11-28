@@ -102,9 +102,9 @@ set role authenticated;
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 do $$ declare r jsonb; begin
   r := public.zetsu_owners();
-  if r <> '[]'::jsonb then raise exception 'NG フレンドでない人が出た: %', r; end if;
+  if r <> '{}'::jsonb then raise exception 'NG フレンドでない人が出た: %', r; end if;
   r := public.zetsu_owners(array['22222222-2222-2222-2222-222222222222'::uuid]);
-  if r <> '["22222222-2222-2222-2222-222222222222"]'::jsonb then raise exception 'NG 渡した人: %', r; end if;
+  if r <> '{"22222222-2222-2222-2222-222222222222":"ouka"}'::jsonb then raise exception 'NG 渡した人: %', r; end if;
   raise notice 'OK 絶の印: 渡した人だけ %', r;
 end $$;
 reset role;
@@ -113,10 +113,23 @@ set role authenticated;
 set request.jwt.claim.sub = '11111111-1111-1111-1111-111111111111';
 do $$ declare r jsonb; begin
   r := public.zetsu_owners();
-  if r <> '["33333333-3333-3333-3333-333333333333"]'::jsonb then raise exception 'NG フレンド: %', r; end if;
+  if r <> '{"33333333-3333-3333-3333-333333333333":"ouka"}'::jsonb then raise exception 'NG フレンド: %', r; end if;
   raise notice 'OK 絶の印: フレンドの持ち主 %', r;
 end $$;
 reset role;
+-- 絶を2本持つと: 朱に持たせている絶の刀、持たせていなければ新しい箱の絶（八咫）
+update public.saves set owned = owned || '{"yata":1}', equip = '["ouka","mumei"]' where id = '33333333-3333-3333-3333-333333333333';
+set role authenticated;
+do $$ declare r jsonb; begin
+  r := public.zetsu_owners();
+  if r ->> '33333333-3333-3333-3333-333333333333' <> 'ouka' then raise exception 'NG 持たせている絶: %', r; end if;
+  reset role; update public.saves set equip = '["mumei","ouka"]' where id = '33333333-3333-3333-3333-333333333333'; set role authenticated;
+  r := public.zetsu_owners();
+  if r ->> '33333333-3333-3333-3333-333333333333' <> 'yata' then raise exception 'NG 新しい箱の絶: %', r; end if;
+  raise notice 'OK 絶を2本: 持たせている絶→桜華、持たせていなければ新しい箱の八咫';
+end $$;
+reset role;
+update public.saves set owned = owned - 'yata', equip = '["mumei","mumei"]' where id = '33333333-3333-3333-3333-333333333333';
 do $$ begin
   set local role anon;
   perform public.zetsu_owners(); raise exception 'NG';

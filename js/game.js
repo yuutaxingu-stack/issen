@@ -835,7 +835,8 @@ function drawHUD(c,now,vw){
     c.beginPath(); c.roundRect(L?x0-6:x0-bw2+6,y-sz*0.68,bw2,sz*1.36+sz*0.55,8); c.fill(); c.restore();
     if(G.mode==='online'&&zetsuOf(i)){ // 絶の刀の持ち主の印
       const zs=sz*0.95, zx=L?x0-6+bw2+6:x0+6-bw2-6-zs, zy=y-zs*0.5; c.save();
-      const ZW=katOf(i).tier==='絶'&&zt(katOf(i)).parts==='feather'; // 持っている絶の色（八咫は黒地に白）
+      const ZZ=window.IssenZetsu, zk=katOf(i).tier==='絶'?katOf(i):KMAP[ZZ&&NET.ids?ZZ.kat(NET.ids[i]):'ouka']; // 持たせている絶、なければ印の刀の色
+      const ZW=!!zk&&zt(zk).parts==='feather'; // 八咫は黒地に白
       const zg=c.createLinearGradient(zx,zy,zx+zs,zy+zs); zg.addColorStop(0,ZW?'#2a2a30':'#c4142e'); zg.addColorStop(1,ZW?'#020203':'#4a0710');
       c.shadowColor=ZW?'rgba(255,255,255,0.8)':'rgba(220,20,50,0.8)'; c.shadowBlur=10+Math.sin(performance.now()/300)*4; c.fillStyle=zg; c.fillRect(zx,zy,zs,zs);
       if(ZW){ c.shadowBlur=0; c.strokeStyle='#f2f2f6'; c.lineWidth=1; c.strokeRect(zx+0.5,zy+0.5,zs-1,zs-1); } c.restore();
@@ -1868,7 +1869,8 @@ function openDetail(k){
   document.getElementById('gd_rec').innerHTML=names.length?names.map(n=>'<li><span class="rt" style="color:'+TIER[FIN[n].tier]+'">'+FIN[n].tier+'</span>'+n+'<b>'+rec[n]+'</b></li>').join(''):'<li class="none">まだこの刀で勝っていません</li>';
   [0,1].forEach(i=>{ const btn=document.getElementById('gd_e'+i); const on=ARM.equip[i]===k.id; btn.textContent=on?COL[i].name+'が持っています':COL[i].name+'に持たせる'; btn.disabled=on; });
 }
-document.getElementById('gd_e0').addEventListener('click',()=>{ ARM.equip[0]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
+document.getElementById('gd_e0').addEventListener('click',()=>{ ARM.equip[0]=DETAIL.id; saveArm(); if(ACCT){ ACCT.equip(ARM.equip); if(window.IssenZetsu) setTimeout(()=>IssenZetsu.refresh(),2500); }  // 朱の刀で絶の印の色が変わる
+  openDetail(DETAIL); renderBook(); });
 document.getElementById('gd_e1').addEventListener('click',()=>{ ARM.equip[1]=DETAIL.id; saveArm(); if(ACCT) ACCT.equip(ARM.equip); openDetail(DETAIL); renderBook(); });
 document.getElementById('gd_close').addEventListener('click',()=>{ document.getElementById('g_detail').hidden=true; zetsuStage(null); });
 /* 玉鋼で鍛える（まだ持っていない刀だけ）。間違えて押さないよう、二度触れて鍛える */

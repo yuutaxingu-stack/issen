@@ -449,7 +449,9 @@ end;
 $$;
 
 -- 絶の刀の持ち主（名前に「絶」の印を出すため）。自分とフレンド、それに p_ids で渡した人（対戦相手など、最大64人）のうち、
--- 絶の刀を1本でも持つ人の id を返す。返すのは「持っているか」だけで、銭や刀の中身は返さない
+-- 絶の刀を1本でも持つ人について { 人のid: 印に使う絶の刀id } を返す（2026-11-28 から。前は id の配列）
+-- 印の刀 = 朱に持たせている刀が絶ならその刀、でなければ持っている絶のうち いちばん新しい箱の刀
+-- 返すのは印の刀だけで、銭や刀の中身は返さない
 create or replace function public.zetsu_owners(p_ids uuid[] default null) returns jsonb
 language sql stable security definer set search_path = '' as $$
   with me as (select auth.uid() as id),
@@ -460,10 +462,19 @@ language sql stable security definer set search_path = '' as $$
       where m.id is not null and (f.a = m.id or f.b = m.id) and f.status = 'accepted'
     union
     select x from me m, unnest(coalesce(p_ids[1:64], '{}'::uuid[])) x where m.id is not null
+  ),
+  owned as (
+    select s.id, c.id as kat, (c.id = s.equip ->> 0) as eq, b.ord
+    from public.saves s join people p on p.id = s.id
+    cross join lateral jsonb_each(s.owned) o
+    join public.katana_catalog c on c.id = o.key and c.tier = '絶'
+    join public.gacha_boxes b on b.id = c.box
+    where jsonb_typeof(o.value) = 'number' and (o.value)::text::numeric > 0
+  ),
+  pick as (
+    select distinct on (o.id) o.id, o.kat from owned o order by o.id, o.eq desc, o.ord desc, o.kat
   )
-  select coalesce(jsonb_agg(s.id), '[]'::jsonb) from public.saves s join people p on p.id = s.id
-  where exists (select 1 from jsonb_each(s.owned) o join public.katana_catalog c on c.id = o.key
-                where c.tier = '絶' and jsonb_typeof(o.value) = 'number' and (o.value)::text::numeric > 0);
+  select coalesce(jsonb_object_agg(k.id, k.kat), '{}'::jsonb) from pick k;
 $$;
 revoke execute on function public.zetsu_owners(uuid[]) from public, anon, authenticated;
 grant execute on function public.zetsu_owners(uuid[]) to authenticated;

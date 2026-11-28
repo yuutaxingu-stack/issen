@@ -72,6 +72,7 @@ const MV = {
   shoki: { n:'初虧', k:'g', s:13, a:4, r:20, land:16, dmg:[600, 1000], gd:[1200, 1800], hs:26, blk:-6, kb:[700,450], box:[0,30,110,70], arc:[150,-30], shoki:1, hover:1, lunge:[2,11,0], noLate:1, pose:'side' },
   shokujin:{ n:'食甚', k:'g', s:16, a:1, r:24, land:16, dmg:900, gd:2000, hs:30, blk:-14, kb:[800,700], noBox:1, sj:1, after:'air', noLate:1, arc:[150,-30], pose:'side' },
   fukuen:{ n:'復円', k:'g', s:4, a:1, r:12, land:12, noBox:1, fuku:1, arc:[100,100] },
+  sjchg: { n:'食甚の溜め', k:'g', s:4, a:1, r:12, land:12, noBox:1, fuku:1, sjc:1, arc:[100,100] }, // 食甚は出す前に復円と同じゲージを溜める
   yatagarasu:{ n:'八咫烏', k:'g', s:25, a:1, r:26, land:14, noBox:1, shot:'crow', arc:[120,-10] },
   crowG: { n:'八咫烏（つかみ）', k:'p', s:1, a:1, r:0, dmg:600, gd:0, hs:34, kb:[-420,900], unblock:1 }, // ガードしていても捕まえる。手前へ引き寄せて浮かせる
   tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
@@ -108,7 +109,7 @@ const HANE = { sp: 3400, d1: 9, gap: 5, d2: 9, win: 9 }; // 羽跳: 速さ（1F�
 /* 八咫の横＋技は使うたびに 初虧 → 食甚 → 復円 と変わる。復円を溜めきると初虧に戻る */
 const ECL = ['shoki', 'shokujin', 'fukuen'], ECLN = ['初虧', '食甚', '復円'];
 const SHOKI = { max: 56, d0: 90, dPer: 7, dw: 90, dh: 100 }; // dw・dh = 前の索敵の幅・高さ（相手が入ったら斬る）   // 初虧: 溜めは最大56F、踏み込みは 90px + 溜め1Fごとに7px（2026-11-28 ユーザーの調整）
-const FUKU = { max: 90 };                    // 復円: 合わせて90F溜めると初虧に戻る（途中で離しても溜めは残る）
+const FUKU = { max: 90, dur: 900, spd: 12, atk: 12 }; // dur = 復円の後の強化F（15秒）、spd/atk = 移動速度・攻撃力（10で1倍）                    // 復円: 合わせて90F溜めると初虧に戻る（途中で離しても溜めは残る）
 const CROW = { speed: 700, life: 70, w: 64, h: 54, oy: 70, lock: 60 }; // lock = 当たってからの演出のF（二人とも動けず、終わると同時に動ける。食らった側はダウン） // 八咫烏: つかむ烏の速さ・飛ぶF・大きさ・高さ
 const SJ = { tight: 0, K: 1 };                     // 食甚: 羽跳の二度当ての後、最速で出せばちょうど当たる（tight = 余裕のF）
 const PETAL = { slow: 0.4, w: 76, h: 76, life: 900, grow: 500, maxW: 4, dmgPer: 800, maxDm: 250 };
@@ -137,7 +138,7 @@ function newPlayer(i){
   return { i, x: (i ? 1000 : 600) * FP, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, ground: true, plat: -1,
     st: 'idle', f: 0, mv: null, mvf: 0, hitDone: false, chainReq: false, chargeF: 0, power: 0,
     jumps: 1, adUsed: false, ff: false, dropF: 0,
-    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0, hq: null, ecl: 0, fuku: 0, chg: 0, sjOK: false, sjHit: false, hold: 0, keep: false,
+    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0, hq: null, ecl: 0, fuku: 0, ebuf: 0, chg: 0, sjOK: false, sjHit: false, hold: 0, keep: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
     stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
@@ -186,7 +187,7 @@ function takeC(p, inp){
   if (inp.K) { p.buf.A = C.buf; p.wk = { d: inp.K, n: C.buf }; p.cb = null; } // 技スティック
 }
 /* 落花の間は速く動ける（1.5倍） */
-const spd = (p, v) => p.tree && p.tree.stage >= 2 ? Math.trunc(v * 13 / 10) : v; // 満開・落花は動きが1.3倍
+const spd = (p, v) => p.tree && p.tree.stage >= 2 ? Math.trunc(v * 13 / 10) : p.ebuf > 0 ? Math.trunc(v * FUKU.spd / 10) : v; // 満開・落花は動きが1.3倍、復円の後は1.2倍
 const horiz = p => (p.inp.R ? 1 : 0) - (p.inp.L ? 1 : 0);
 /* 技の向き。スティックは強く倒した方（V）、キーボードなどは斜めなら横を優先（急降下しながらでも空前・空後が出る） */
 function hsign(p){ return p.cb ? (p.cb.d === 'r' ? 1 : p.cb.d === 'l' ? -1 : 0) : horiz(p); }
@@ -228,8 +229,9 @@ Sim.prototype.startMove = function(p, id){
   }
   if (id === 'yatagarasu' && this.pj.some(q => q.crow && q.o === p.i)) { p.buf.A = 0; p.wk = null; p.spB = 0; return; } // 自分の烏が飛んでいる間は次の八咫烏を出せない
   if (id === 'ecl') id = ECL[p.ecl] || 'shoki';
+  if (id === 'shokujin' && p.fuku < FUKU.max) id = 'sjchg'; // ゲージが溜まるまでは食甚の溜め
   p.sjOK = false;
-  if (id === 'shoki') { p.ecl = 1; p.chg = 0; } else if (id === 'shokujin') { p.ecl = 2; } else if (id === 'fukuen') p.chg = 0;
+  if (id === 'shoki') { p.ecl = 1; p.chg = 0; } else if (id === 'shokujin') { p.ecl = 2; p.fuku = 0; } else if (id === 'fukuen') p.chg = 0;
   p.treeHit = false;
   if (id === 'hane') { p.haneUsed = true; p.haneN = 0; p.hane2 = false; p.hdx = 0; p.hdy = 1000; }
   p.st = 'atk'; p.mv = id; p.mvf = 0; p.hitDone = false; p.chainReq = false; p.buf.A = 0; p.cb = null; p.wk = null; p.spB = 0;
@@ -288,7 +290,7 @@ Sim.prototype.think = function(p, o){
   const oppStun = o.st === 'stun';
   const canIai = oppStun && p.buf.G > 0;
   // 八咫: 羽跳を二度当てた後は、跳び終わった後の硬直・無防備落下・着地の硬直を食甚で打ち消せる（最速で出せばちょうど確定）
-  if (p.sjOK && p.ecl === 1 && (p.st === 'fall' || p.st === 'land' || (p.st === 'atk' && p.mv === 'hane' && p.mvf >= MV.hane.s + MV.hane.a)) && (o.st === 'hit' || o.st === 'tumble')) {
+  if (p.sjOK && p.ecl === 1 && p.fuku >= FUKU.max && (p.st === 'fall' || p.st === 'land' || (p.st === 'atk' && p.mv === 'hane' && p.mvf >= MV.hane.s + MV.hane.a)) && (o.st === 'hit' || o.st === 'tumble')) {
     const side = (p.wk && p.wk.d !== 'u' && p.wk.d !== 'd') || (p.spB && !i.U && !i.D && !p.wk);
     if (side) return this.startMove(p, 'shokujin'); }
   switch (p.st) {
@@ -417,7 +419,9 @@ Sim.prototype.update = function(p, o){
     if (m.fuku && p.mvf === 2 && p.inp.H) {                                    // 復円: 押し続けると溜まる（離しても溜めは残る）
       if (p.inp.G && !p.pi.G) { p.mv = null; p.st = p.ground ? 'guard' : 'air'; p.f = 0; p.slideF = C.slideF; return; }
       p.fuku++; p.mvf = 1;
-      if (p.fuku >= FUKU.max) { p.fuku = 0; p.ecl = 0; p.mvf = 2; this.ev.push({ t: 'fukuen', p: p.i, x: p.x, y: p.y }); } }
+      if (p.fuku >= FUKU.max) { p.mvf = 2;
+        if (m.sjc) { p.fuku = FUKU.max; this.ev.push({ t: 'sjReady', p: p.i, x: p.x, y: p.y }); } // 食甚の溜めが満ちた: 次の横＋技で食甚
+        else { p.fuku = 0; p.ecl = 0; p.ebuf = FUKU.dur; this.ev.push({ t: 'fukuen', p: p.i, x: p.x, y: p.y }); } } } // 復円: 初虧に戻り、15秒強くなる
     if (m.fuku && p.mvf <= 2 && !p.ground) p.vy = Math.max(p.vy, -300);       // 溜めている間はゆっくり落ちる
     if (m.sj && p.mvf === m.s) this.shokujin(p, o);
     if (m.hover && p.mvf <= m.lunge[1]) p.vy = 0;
@@ -678,6 +682,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   let dmgBase = Array.isArray(m.dmg) ? m.dmg[0] + Math.floor((m.dmg[1] - m.dmg[0]) * pw / 100) : m.dmg;
   if (pj && pj.dm) dmgBase = Math.floor(dmgBase * pj.dm / 100); // 花嵐: 遠くまで飛ぶほど重い
   if (a.tree && a.tree.stage === 3) dmgBase = Math.floor(dmgBase * 14 / 10); // 落花: 与えるダメージ1.4倍
+  if (a.ebuf > 0) dmgBase = Math.floor(dmgBase * FUKU.atk / 10); // 復円の後: 攻撃力1.2倍
   const gdBase = Array.isArray(m.gd) ? m.gd[0] + Math.floor((m.gd[1] - m.gd[0]) * pw / 100) : m.gd;
   const guarding = (s.dst === 'guard' || s.dst === 'bstun' || s.dst === 'unguard') && s.dground;
   const hx = pj ? pj.x : Math.trunc((a.x + d.x) / 2), hy = d.y + 60 * FP;
@@ -809,6 +814,7 @@ Sim.prototype.step = function(inputs){
     return;
   }
   this.frame++;
+  for (const p of P) if (p.ebuf > 0) p.ebuf--; // 復円の強化の残り
   for (const p of P) readInput(p, inputs[p.i] || NOIN);
   this.think(P[0], P[1]); this.think(P[1], P[0]);
   for (const p of P) this.update(p, P[1 - p.i]);
@@ -847,7 +853,7 @@ Sim.prototype.hash = function(){
   let h = 2166136261 >>> 0;
   const mix = v => { h ^= (v | 0); h = Math.imul(h, 16777619) >>> 0; };
   mix(this.frame); mix(this.hitstop); mix(this.lock ? this.lock.f : 0); for (const q of this.pj) { mix(q.x); mix(q.y); mix(q.life); }
-  for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); mix(p.tree.n); mix(p.tree.big); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
+  for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); mix(p.tree.n); mix(p.tree.big); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.fuku); mix(p.ebuf); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
   return h;
 };
 

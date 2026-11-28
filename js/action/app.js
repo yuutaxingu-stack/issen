@@ -8,7 +8,7 @@ const A = window.IssenAction, FP = A.FP, MV = A.MV;
 const cv = document.getElementById('cv'), cx = cv.getContext('2d');
 const DISPLAY = "'Yuji Syuku','Hiragino Mincho ProN','Yu Mincho',serif";
 const UIF = "'Zen Kaku Gothic New','Hiragino Sans',sans-serif";
-const INK = '#141512', PALE = '#efe8d6';
+const INK = '#141512', PALE = '#efe8d6', INK0 = INK;
 const COL = [{ main: '#c8372d', light: '#f3a294', name: '朱' }, { main: '#2c4f96', light: '#a9c1f0', name: '藍' }];
 const TIERC = { '並': '#d9d3c4', '上': '#9cc4ea', '極': '#e8c35a', '幻': '#e9b8ff', '絶': '#ffffff', '分': '#bdb6a6' };
 const KN = ['〇','一','二','三','四','五','六','七','八','九','十'];
@@ -407,6 +407,7 @@ function onEvent(e){
     feathers(e.x1 / FP, e.y1 / FP + 60, 18, 6); SND.play('ySj'); }
   else if (e.t === 'fukuen') { const x = e.x / FP, y = e.y / FP + 66; FX.ouka.push({ k: 'ydia', x, y, t: 0, life: 44, r: 70 }); FX.ouka.push({ k: 'yring', x, y, t: 0, life: 30, r: 240 }); FX.ouka.push({ k: 'yband', s: '復円', x, y: y + 110, t: 0, life: 56 }); feathers(x, y, 24, 5, 0.7); FX.flash = 5; SND.play('yFuku'); }
   else if (e.t === 'charged') { const p = sim.p[e.p]; FX.ouka.push({ k: 'yring', x: p.x / FP + p.face * 26, y: p.y / FP + 66, t: 0, life: 16, r: 46 }); }
+  else if (e.t === 'sjReady') { const x = e.x / FP, y = e.y / FP + 66; FX.ouka.push({ k: 'ydia', x, y, t: 0, life: 30, r: 52 }); feathers(x, y, 10, 3, 0.7); SND.play('yHane'); }
   else if (e.t === 'crowLock') { FX.ouka.push({ k: 'yband', s: '八咫烏', x: e.x / FP, y: e.y / FP + 200, t: 0, life: A.CROW.lock }); SND.play('yCrow'); }
   else if (e.t === 'hane') { const p = sim.p[e.p], x = p.x / FP, y = p.y / FP + 60; feathers(x, y, 14, 3); FX.ouka.push({ k: 'yring', x, y, t: 0, life: 14, r: 70 }); SND.play('yHane'); } // 羽跳: 羽ばたいて羽が散る
   else if (e.t === 'fallBurst') { const x = e.x / FP, y = e.y / FP; for (const d of [1, -1]) for (let k = 0; k < 40; k++) FX.parts.push({ x, y: y + 10 + rnd() * 40, vx: d * (2 + rnd() * 9), vy: 1 + rnd() * 4, life: 50 + rnd() * 30, t: 0, col: k % 3 ? SAKURA[k % 3] : CRIM[k % 3], r: 3 + rnd() * 3, petal: true, rot: rnd() * 6 });
@@ -586,12 +587,12 @@ function slashLook(id){
   return (s._c = { c, dark, glow: s.glow || null, rainbow: !!s.rainbow, double: !!s.double, feathers: !!s.feathers });
 }
 function drawFighter(p, fr){
-  const P = pose(p, fr), col = COL[p.i];
+  const P = pose(p, fr), col = COL[p.i], INK = WORLD.y * Math.max(WORLD.e, WORLD.tot) > 0.5 ? '#e6e6ec' : INK0; // 皆既の闇では白い墨で描いて見やすく
   const sx = wx(p.x / FP), sy = wy(p.y / FP), z = cam.z;
   const c = cx;
   c.save(); c.translate(sx, sy); c.scale(z * p.face * MIR, -z);
   c.globalAlpha = P.alpha;
-  if (WORLD.f > 0.3) { c.shadowColor = `rgba(255,214,224,${0.8 * WORLD.f})`; c.shadowBlur = 8; } else if (WORLD.y * Math.max(WORLD.e, WORLD.tot) > 0.3) { c.shadowColor = 'rgba(255,255,255,.85)'; c.shadowBlur = 7; } // 皆既の闇でも姿が見えるように // 落花の夜でも姿が見えるように縁を光らせる
+  if (WORLD.f > 0.3) { c.shadowColor = `rgba(255,214,224,${0.8 * WORLD.f})`; c.shadowBlur = 8; } else if (WORLD.y * Math.max(WORLD.e, WORLD.tot) > 0.3) { c.shadowColor = 'rgba(255,255,255,.9)'; c.shadowBlur = 10; } // 皆既の闇でも姿が見えるように // 落花の夜でも姿が見えるように縁を光らせる
   if (P.rot) { c.translate(0, P.hip); c.rotate(rad(P.rot)); c.translate(0, -P.hip); }
   const hx = 0, hy = P.hip;
   const shx = hx + Math.sin(rad(P.lean)) * 44, shy = hy + Math.cos(rad(P.lean)) * 44;
@@ -1071,8 +1072,8 @@ function updateWorld(){
   let st = 0; for (const p of sim.p) if (p.tree && p.tree.stage > st) st = p.tree.stage;
   const yata = sim.p.some(p => p.kit === 'yata'); // 八咫を持つ者がいる戦場は枯れ木の野（桜華の満開・落花が来れば桜に塗り替わる）
   const zetsu = !yata && sim.p.some(p => p.kit === 'ouka'); // 絶の刀を持つ者がいる戦場は、最初から桜の森
-  WORLD.y += ((yata && st < 2 ? 1 : 0) - WORLD.y) * 0.05; const sjWait = sim.p.some(p => p.kit === 'yata' && p.ecl === 1); // 横の技が食甚の番の間も皆既の闇（2026-11-28 ユーザー指定）
-  WORLD.e += ((sim.sd || lastBout() || sjWait ? 1 : 0) - WORLD.e) * 0.04;
+  WORLD.y += ((yata && st < 2 ? 1 : 0) - WORLD.y) * 0.05; const eBuf = sim.p.some(p => p.kit === 'yata' && p.ebuf > 0); // 復円の後の強化の間も皆既の闇（2026-11-28 ユーザー指定）
+  WORLD.e += ((sim.sd || lastBout() || eBuf ? 1 : 0) - WORLD.e) * 0.04;
   WORLD.b += ((zetsu || st >= 2 ? 1 : 0) - WORLD.b) * 0.06; WORLD.f += ((st >= 3 ? 1 : 0) - WORLD.f) * 0.05;
   WORLD.k += ((zetsu ? 1 : 0) - WORLD.k) * 0.05; WORLD.m += ((st >= 2 ? 1 : 0) - WORLD.m) * 0.05;
   if (FX.finish && FX.finish.zetsu) { WORLD.k = 1; WORLD.m = Math.min(1, WORLD.m + 0.05); }
@@ -1221,7 +1222,7 @@ function drawHud(){
     bar(x, top + 20, bw, 12, p.hp / A.HP_MAX, red ? '#f2e6d8' : INK, right);
     bar(x, top + 36, bw * 0.8 + 0, 5, p.gd / A.GD_MAX, p.gd <= 2000 ? COL[0].main : '#3d5a6c', right);
     cx.font = `500 11px ${UIF}`; cx.fillStyle = red ? '#f2e6d8' : '#3b3d33';
-    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : p.kit === 'yata' ? '　八咫　横 ' + A.ECLN[p.ecl] + (p.ecl === 2 ? ' ' + '●'.repeat(Math.floor(p.fuku * 5 / A.FUKU.max)) + '○'.repeat(5 - Math.floor(p.fuku * 5 / A.FUKU.max)) : '') + (p.haneUsed && !p.ground ? '' : '　羽跳◆') : ''), right ? W - m : m, top + 56);
+    cx.fillText(`体力 ${Math.ceil(p.hp / 100)}　ガード ${Math.ceil(p.gd / 100)}` + (p.kit === 'ouka' ? `　桜華${p.tree ? '・' + A.TREE.name[p.tree.stage] + (p.tree.stage < 3 ? '　' + '●'.repeat(p.tree.n || 0) + '○'.repeat(Math.max(0, A.GROW.per - (p.tree.n || 0))) + (p.tree.stage === 2 ? '　強' + '◆'.repeat(p.tree.big || 0) + '◇'.repeat(Math.max(0, A.GROW.big - (p.tree.big || 0))) : '') : '') + (p.tree.u1 ? '' : '　花嵐◆') + (p.tree.u2 ? '' : '　天桜◆') : ''}` : p.kit === 'yata' ? '　八咫　横 ' + A.ECLN[p.ecl] + (p.ecl >= 1 ? ' ' + (p.ecl === 1 && p.fuku >= A.FUKU.max ? '満' : '●'.repeat(Math.floor(p.fuku * 5 / A.FUKU.max)) + '○'.repeat(5 - Math.floor(p.fuku * 5 / A.FUKU.max))) : '') + (p.ebuf > 0 ? '　強 ' + Math.ceil(p.ebuf / 60) + '秒' : '') + (p.haneUsed && !p.ground ? '' : '　羽跳◆') : ''), right ? W - m : m, top + 56);
   }
   const left = sim.sd ? Math.max(0, Math.ceil((A.C.sdF - (sim.frame - sim.sdStart)) / 60)) : Math.max(0, Math.ceil((A.C.roundF - sim.frame) / 60));
   cx.textAlign = 'center'; cx.font = `30px ${DISPLAY}`; cx.fillStyle = red ? '#ffe2d4' : INK;
@@ -1672,7 +1673,7 @@ const TF0 = [ // [鍵, 名前, 単位の説明, 刻み]
 // 技ごとの特別な数（八咫）。[鍵, 名前, 単位, 刻み, 入れ物, 中の名前]
 const TX = { hane: [['hsp', '跳ぶ速さ（1Fに進む距離）', 'px', 2, A.HANE, 'sp', 100], ['hd1', '一度目に跳ぶ長さ', 'F', 1, A.HANE, 'd1'], ['hgap', '二度目までの間', 'F', 1, A.HANE, 'gap'], ['hd2', '二度目に跳ぶ長さ', 'F', 1, A.HANE, 'd2'], ['hwin', '二度目の向きの受付', 'F', 1, A.HANE, 'win']],
   shoki: [['smax', '溜めの最大', 'F', 1, A.SHOKI, 'max'], ['sd0', '踏み込み（溜めなし）', 'px', 5, A.SHOKI, 'd0'], ['sdp', '溜め1Fで伸びる', 'px', 1, A.SHOKI, 'dPer'], ['sdw', '前の索敵の幅', 'px', 5, A.SHOKI, 'dw'], ['sdh', '前の索敵の高さ', 'px', 5, A.SHOKI, 'dh']],
-  fukuen: [['fmax', '溜めきるまで', 'F', 5, A.FUKU, 'max']],
+  fukuen: [['fmax', '溜めきるまで（食甚の溜めも同じ）', 'F', 5, A.FUKU, 'max'], ['fdur', '強化の長さ', 'F', 30, A.FUKU, 'dur'], ['fspd', '強化の移動速度（10で1倍）', '', 1, A.FUKU, 'spd'], ['fatk', '強化の攻撃力（10で1倍）', '', 1, A.FUKU, 'atk']],
   yatagarasu: [['csp', '烏の速さ（1Fに進む距離）', 'px', 1, A.CROW, 'speed', 100], ['clife', '烏が飛ぶ長さ', 'F', 5, A.CROW, 'life']],
   shokujin: [['sjt', '羽跳の二度当ての後の余裕', 'F', 1, A.SJ, 'tight']] };
 const TXO = new Map(); for (const id in TX) for (const f of TX[id]) if (!TXO.has(f[4])) TXO.set(f[4], Object.assign({}, f[4]));

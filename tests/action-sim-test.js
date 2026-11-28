@@ -255,7 +255,7 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   const d0 = dist(0), d1 = dist(40); ok(d1.d > d0.d + 150 && d0.e === 1, '初虧: 溜めると踏み込みが伸びる (' + d0.d + 'px → ' + d1.d + 'px)、使うと次は食甚');
   const j = mk(55), ev = []; j.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 8; k++) { j.step([I(), I()]); ev.push(...drain(j)); } j.step([I({ K: 'r' }), I()]); for (let k = 0; k < 30; k++) { j.step([I(), I()]); ev.push(...drain(j)); }
   ok(ev.filter(e => e.t === 'hit').map(e => e.mv + e.combo).join() === 'jab11,shoki2', '弱斬り→初虧がつながる');
-  const sj = late => { const c = mk(55); c.p[0].ecl = 1; const go = (inp, n) => { c.step([I(inp), I()]); for (let k = 0; k < n; k++) c.step([I(), I()]); };
+  const sj = late => { const c = mk(55); c.p[0].ecl = 1; c.p[0].fuku = A.FUKU.max; const go = (inp, n) => { c.step([I(inp), I()]); for (let k = 0; k < n; k++) c.step([I(), I()]); };
     go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'n' }, 9); go({ A: 1, C: 'u' }, 11); c.step([I({ K: 'u' }), I()]); const ev = []; let at = -1;
     const aim = () => { const dx = c.p[1].x - c.p[0].x, dy = c.p[1].y - c.p[0].y, q = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)); const D = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]][(q + 8) % 8]; return { R: D[0] > 0 ? 1 : 0, L: D[0] < 0 ? 1 : 0, U: D[1] > 0 ? 1 : 0, D: D[1] < 0 ? 1 : 0 }; };
     for (let k = 0; k < 120; k++) { let inp = c.p[0].st === 'atk' && c.p[0].mv === 'hane' && c.p[0].mvf < A.MV.hane.s + A.MV.hane.a ? aim() : {};
@@ -266,7 +266,24 @@ for (const [kit, mv] of [['ouka', 'hana'], ['common', 'shot']]) { const run1 = g
   ok(a.join(' ').includes('haneX#5 shokujin#6') && !b.join(' ').includes('shokujin#6'), '食甚: 羽跳の二度当てから最速ならつながり、1F遅れるとつながらない (' + a.slice(-2).join(' ') + ' / ' + b.slice(-1) + ')');
   const f = mk(1200); f.p[0].ecl = 2; f.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < 50; k++) f.step([I({ H: 1 }), I()]); for (let k = 0; k < 20; k++) f.step([I(), I()]);
   const half = f.p[0].ecl; f.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < 60; k++) f.step([I({ H: 1 }), I()]);
-  ok(half === 2 && f.p[0].ecl === 0, '復円: 途中で離しても溜めは残り、溜めきると初虧に戻る'); }
+  ok(half === 2 && f.p[0].ecl === 0, '復円: 途中で離しても溜めは残り、溜めきると初虧に戻る');
+  // 食甚はゲージ（復円と同じ）を溜めてから。溜めきるまでは食甚の溜めになり、満ちたら次で食甚
+  const g = mk(1200); g.p[0].ecl = 1; const gev = []; g.step([I({ K: 'r', H: 1 }), I()]); const first = g.p[0].mv;
+  for (let k = 0; k < A.FUKU.max + 4; k++) { g.step([I({ H: 1 }), I()]); gev.push(...drain(g)); } for (let k = 0; k < 30; k++) g.step([I(), I()]);
+  const ready = g.p[0].fuku === A.FUKU.max && g.p[0].ecl === 1 && gev.some(e => e.t === 'sjReady'); g.step([I({ K: 'r' }), I()]);
+  ok(first === 'sjchg' && ready && g.p[0].mv === 'shokujin' && g.p[0].fuku === 0 && g.p[0].ecl === 2, '食甚: ゲージが満ちるまでは溜め、満ちたら食甚（ゲージは空に）');
+  const n = mk(55); n.p[0].ecl = 1; const nev = []; const go2 = (inp, k2) => { n.step([I(inp), I()]); nev.push(...drain(n)); for (let k = 0; k < k2; k++) { n.step([I(), I()]); nev.push(...drain(n)); } };
+  go2({ A: 1, C: 'n' }, 9); go2({ A: 1, C: 'n' }, 9); go2({ A: 1, C: 'u' }, 11); n.step([I({ K: 'u' }), I()]);
+  for (let k = 0; k < 80; k++) { n.step([I(k > 30 && k < 40 ? { K: 'r' } : {}), I()]); nev.push(...drain(n)); }
+  ok(!nev.some(e => e.t === 'hit' && e.mv === 'shokujin'), 'ゲージが空なら羽跳の二度当ての後も食甚は出ない');
+  // 復円の後は15秒、移動速度1.2倍・攻撃力1.2倍
+  const w = (buf) => { const q = mk(1200); q.p[0].ebuf = buf ? A.FUKU.dur : 0; for (let k = 0; k < 20; k++) q.step([I({ R: 1 }), I()]); return q.p[0].vx; };
+  ok(w(1) === Math.trunc(w(0) * A.FUKU.spd / 10), '復円の後は歩きが1.2倍 (' + w(0) + ' → ' + w(1) + ')');
+  const dm = (buf) => { const q = mk(55); q.p[0].ebuf = buf ? A.FUKU.dur : 0; const e = []; q.step([I({ A: 1, C: 'n' }), I()]); for (let k = 0; k < 10; k++) { q.step([I(), I()]); e.push(...drain(q)); } const h = e.find(x => x.t === 'hit'); return h && h.dmg; };
+  ok(dm(1) === Math.floor(dm(0) * A.FUKU.atk / 10), '復円の後は攻撃力1.2倍 (' + dm(0) + ' → ' + dm(1) + ')');
+  const f2 = mk(1200); f2.p[0].ecl = 2; f2.step([I({ K: 'r', H: 1 }), I()]); for (let k = 0; k < A.FUKU.max + 2; k++) f2.step([I({ H: 1 }), I()]);
+  const b0 = f2.p[0].ebuf; for (let k = 0; k < A.FUKU.dur + 5; k++) f2.step([I(), I()]);
+  ok(b0 > A.FUKU.dur - 10 && f2.p[0].ebuf === 0, '復円を溜めきると15秒の強化が付き、時間で切れる (' + b0 + ')'); }
 
 // 八咫烏（下＋技）: 烏が捕まえたら演出で二人とも止まり、終わると同時に動ける。捕まった側は必ずダウン（ガード中でも捕まえる）
 { const mk = d => { const s = new A.Sim({ training: true, kits: ['yata', 'common'] }); s.p[0].x = 600 * A.FP; s.p[1].x = (600 + d) * A.FP; return s; };

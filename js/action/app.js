@@ -1071,7 +1071,8 @@ function updateWorld(){
   let st = 0; for (const p of sim.p) if (p.tree && p.tree.stage > st) st = p.tree.stage;
   const yata = sim.p.some(p => p.kit === 'yata'); // 八咫を持つ者がいる戦場は枯れ木の野（桜華の満開・落花が来れば桜に塗り替わる）
   const zetsu = !yata && sim.p.some(p => p.kit === 'ouka'); // 絶の刀を持つ者がいる戦場は、最初から桜の森
-  WORLD.y += ((yata && st < 2 ? 1 : 0) - WORLD.y) * 0.05; WORLD.e += ((sim.sd || lastBout() ? 1 : 0) - WORLD.e) * 0.04;
+  WORLD.y += ((yata && st < 2 ? 1 : 0) - WORLD.y) * 0.05; const sjWait = sim.p.some(p => p.kit === 'yata' && p.ecl === 1); // 横の技が食甚の番の間も皆既の闇（2026-11-28 ユーザー指定）
+  WORLD.e += ((sim.sd || lastBout() || sjWait ? 1 : 0) - WORLD.e) * 0.04;
   WORLD.b += ((zetsu || st >= 2 ? 1 : 0) - WORLD.b) * 0.06; WORLD.f += ((st >= 3 ? 1 : 0) - WORLD.f) * 0.05;
   WORLD.k += ((zetsu ? 1 : 0) - WORLD.k) * 0.05; WORLD.m += ((st >= 2 ? 1 : 0) - WORLD.m) * 0.05;
   if (FX.finish && FX.finish.zetsu) { WORLD.k = 1; WORLD.m = Math.min(1, WORLD.m + 0.05); }

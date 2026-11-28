@@ -15,9 +15,9 @@ const PH = { walk: 340, dash: 800, airMax: 520, airAcc: 70, grav: 62, fallMax: 1
 const HP_MAX = 10000, GD_MAX = 10000;
 const C = {
   gdRegenDelay: 60,   // 守を離してから回復が始まるまで
-  gdRegen: 33,        // 1Fの回復量（約 毎秒20）
+  gdRegen: 0,         // 1Fの回復量。ガードは自然には回復しない（2026-11-28 ユーザー指定。前は33＝約 毎秒20）
   stunF: 90,          // 気絶
-  stunRecoverGd: 5000,// 気絶明けのガード
+  stunRecoverGd: 5000,// 気絶が終わった後のガード（耐久の半分から。居合で気絶が解けても同じ）
   slideF: 30,         // ダッシュ中の守で滑る長さ（0.5秒）
   roundF: 7200,       // 120秒
   sdF: 3600,          // サドンデスの長さ
@@ -50,7 +50,7 @@ const MV = {
   utilt: { n:'上斬り', k:'g', s:7, a:5, r:16, dmg:500, gd:800, hs:34, blk:-6, kb:[90,1500], box:[-14,72,84,92], arc:[-40,125] },
   dtilt: { n:'下斬り', k:'g', s:6, a:3, r:14, dmg:400, gd:700, hit:3, blk:-4, kb:[260,0], box:[6,0,92,34], arc:[-25,-5], crouch:1 },
   grab:  { n:'組み打ち', k:'g', s:7, a:2, r:30, dmg:400, gd:3500, hs:30, kb:[750,760], kd:1, box:[8,20,58,92], grab:1, arc:[-10,-10] },
-  iai:   { n:'居合', k:'g', s:10, a:4, r:40, dmg:1000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,30,132,82], iai:1, arc:[-45,15], lunge:[2,10,3400], ext:30 },
+  iai:   { n:'居合', k:'g', s:10, a:4, r:40, dmg:2000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,30,132,82], iai:1, arc:[-45,15], lunge:[2,10,3400], ext:30 },
   gatk:  { n:'起き上がり斬り', k:'g', s:18, a:4, r:8, dmg:500, gd:800, hs:24, blk:-4, kb:[650,300], box:[-72,0,144,60], arc:[-170,170], inv:[1,12] },
   nair:  { n:'空中斬', k:'a', s:5, a:6, r:14, land:8, dmg:400, gd:600, hs:18, kb:[320,320], box:[-44,26,104,84], arc:[-150,150] },
   fair:  { n:'前空斬', k:'a', s:8, a:4, r:18, land:12, dmg:600, gd:900, hs:22, kb:[720,360], box:[8,28,98,72], arc:[120,-60] },
@@ -78,7 +78,7 @@ const MV = {
   tenFall:{ n:'天桜（落花・降下）', k:'a', s:6, a:90, r:1, land:22, dmg:700, gd:1200, hs:28, kb:[300,700], kd:1, plunge:1, arc:[-90,-90], ext:20, pad:14, pose:'plunge', aura:[-60,-10,120,100], landBurst:1 },
   petalG:{ n:'天桜（落花・着地の花）', k:'p', s:1, a:1, r:0, dmg:250, gd:500, hs:12, blk:-2, kb:[160,0], flinch:1 },
   plant: { n:'植樹', k:'g', s:14, a:1, r:16, noBox:1, plant:1, arc:[-70,-85] },
-  airiai:{ n:'空中居合', k:'a', s:10, a:4, r:30, land:20, dmg:1000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,10,132,100], iai:1, arc:[-45,15], lunge:[2,10,3000], ext:30 },
+  airiai:{ n:'空中居合', k:'a', s:10, a:4, r:30, land:20, dmg:2000, gd:2000, hs:30, blk:-30, kb:[900,600], box:[0,10,132,100], iai:1, arc:[-45,15], lunge:[2,10,3000], ext:30 },
 };
 for (const id in MV) {
   const m = MV[id]; m.id = id;
@@ -139,7 +139,7 @@ function newPlayer(i){
   return { i, x: (i ? 1000 : 600) * FP, y: 0, vx: 0, vy: 0, face: i ? -1 : 1, ground: true, plat: -1,
     st: 'idle', f: 0, mv: null, mvf: 0, hitDone: false, chainReq: false, chargeF: 0, power: 0,
     jumps: 1, adUsed: false, ff: false, dropF: 0,
-    hp: HP_MAX, gd: GD_MAX, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0, hq: null, ecl: 0, fuku: 0, ebuf: 0, chg: 0, sjOK: false, sjHit: false, hold: 0, keep: false,
+    hp: HP_MAX, gd: GD_MAX, gdRe: false, gdDelay: 0, stun: 0, hs: 0, kd: false, nokd: false, dfall: false, pjCut: false, haneUsed: false, haneN: 0, hane2: false, hdx: 0, hdy: 0, hq: null, ecl: 0, fuku: 0, ebuf: 0, chg: 0, sjOK: false, sjHit: false, hold: 0, keep: false,
     pi: NOIN, inp: NOIN, buf: { A: 0, J: 0, G: 0 }, hEdge: 0, holdA: 0, lastG: 99, downT: 0,
     combo: 0, comboDmg: 0, comboFirst: null, lastMv: null, sameCnt: 0,
     stunCount: 0, gdLow: false, touched: false, wallF: 0, kit: 'common', dashRoll: false, slideV: 0, slideF: 30, s1Used: false, rk: 'fwd', ak: 'airN', adx: 0, ady: 0 };
@@ -289,7 +289,7 @@ Sim.prototype.dodge = function(p, k, dir){
 Sim.prototype.think = function(p, o){
   const h = horiz(p), i = p.inp;
   const oppStun = o.st === 'stun';
-  const canIai = false; // ガードを壊しても居合はない（2026-11-28 ユーザー指定）。気絶した相手には連撃で
+  const canIai = oppStun && p.buf.G > 0; // ガードを壊した相手には守が居合になる（当たれば20ダメージ）
   // 八咫: 羽跳を二度当てた後は、跳び終わった後の硬直・無防備落下・着地の硬直を食甚で打ち消せる（最速で出せばちょうど確定）
   if (p.sjOK && p.ecl === 1 && p.fuku >= FUKU.max && (p.st === 'fall' || p.st === 'land' || (p.st === 'atk' && p.mv === 'hane' && p.mvf >= MV.hane.s + MV.hane.a)) && (o.st === 'hit' || o.st === 'tumble')) {
     const side = (p.wk && p.wk.d !== 'u' && p.wk.d !== 'd') || (p.spB && !i.U && !i.D && !p.wk);
@@ -447,8 +447,9 @@ Sim.prototype.update = function(p, o){
   }
   if (p.st === 'stun') {
     p.stun--;
-    if (p.stun <= 0) { p.st = 'idle'; p.gd = C.stunRecoverGd; this.ev.push({ t: 'stunEnd', p: p.i }); }
+    if (p.stun <= 0) { p.st = 'idle'; p.gd = C.stunRecoverGd; p.gdRe = false; this.ev.push({ t: 'stunEnd', p: p.i }); }
   }
+  if (p.gdRe && p.st !== 'stun') { p.gd = C.stunRecoverGd; p.gdRe = false; } // 居合などで気絶が解けても、ガードは半分から
   // ガードの回復
   if (p.st === 'guard' || p.st === 'bstun' || p.st === 'stun') p.gdDelay = 0;
   else { p.gdDelay++; if (p.gdDelay > C.gdRegenDelay && p.gd < GD_MAX) p.gd = Math.min(GD_MAX, p.gd + C.gdRegen); }
@@ -693,7 +694,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
     d.gd -= gdBase; d.touched = true; d.gdDelay = 0;
     if (d.gd <= 2000) d.gdLow = true;
     if (d.gd <= 0) {
-      d.gd = 0; d.st = 'stun'; d.stun = C.stunF; d.stunCount++; d.vx = dir * 500;
+      d.gd = 0; d.gdRe = true; d.st = 'stun'; d.stun = C.stunF; d.stunCount++; d.vx = dir * 500;
       this.hitstop = 14;
       ev.push({ t: 'break', p: d.i, by: a.i, x: hx, y: hy, mv: m.id });
       a.combo = 0;
@@ -711,7 +712,6 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   if (this.sd) { d.hp = Math.max(0, d.hp - dmgBase); this.finish(a, d, 'sd', m, s); return; }
   const inStun = s.dst === 'hit' || s.dst === 'tumble' || s.dst === 'stun' || s.dst === 'down';
   const inf = this.opts.training && d.i === 1; // 稽古の相手は体力無限（倒れない）
-  if (s.dst === 'stun' && m.iai && !inf) { this.finish(a, d, 'iai', m, s); return; }
   if (inStun && a.combo > 0) { a.combo++; }
   else {
     a.combo = 1; a.comboDmg = 0; a.sameCnt = 0; a.lastMv = null;
@@ -726,7 +726,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
   let scale = a.combo >= 4 ? Math.max(40, 100 - 10 * (a.combo - 3)) : 100;
   for (let k = 0; k < a.sameCnt; k++) scale = Math.floor(scale * 8 / 10);
   if (a.combo === 1 && a.comboFirst.counter) scale = Math.floor(scale * 13 / 10);
-  const dmg = Math.floor(dmgBase * scale / 100) + (m.grab ? 0 : 0);
+  const dmg = m.iai ? dmgBase : Math.floor(dmgBase * scale / 100); // 居合は連撃の補正なしで決まった量（20）
   d.hp = Math.max(0, d.hp - dmg); d.touched = true;
   if (m.grab) { d.gd = Math.max(1, d.gd - gdBase); }
   a.comboDmg += dmg;
@@ -752,7 +752,7 @@ Sim.prototype.applyHit = function(a, d, m, s, pj){
     ev.push({ t: 'hit', p: d.i, by: a.i, x: hx, y: hy, mv: m.id, dmg, combo: a.combo, adv, counter: a.combo === 1 && a.comboFirst.counter });
   }
   this.hitstop = dmg >= 700 ? 8 : 4;
-  if (d.hp <= 0) { if (inf) d.hp = HP_MAX; else this.finish(a, d, 'ko', m, s); }
+  if (d.hp <= 0) { if (inf) d.hp = HP_MAX; else this.finish(a, d, m.iai ? 'iai' : 'ko', m, s); } // 居合で削りきれば「居合で一本」の演出
 };
 
 /* 一本。決着名を決める */
@@ -854,7 +854,7 @@ Sim.prototype.hash = function(){
   let h = 2166136261 >>> 0;
   const mix = v => { h ^= (v | 0); h = Math.imul(h, 16777619) >>> 0; };
   mix(this.frame); mix(this.hitstop); mix(this.lock ? this.lock.f : 0); for (const q of this.pj) { mix(q.x); mix(q.y); mix(q.life); }
-  for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); mix(p.tree.n); mix(p.tree.big); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.fuku); mix(p.ebuf); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
+  for (const p of this.p) { if (p.tree) { mix(p.tree.x); mix(p.tree.hp); mix(p.tree.stage); mix(p.tree.n); mix(p.tree.big); } mix(p.x); mix(p.y); mix(p.vx); mix(p.vy); mix(p.hp); mix(p.gd); mix(p.stun); mix(p.mvf); mix(p.f); mix(p.hs); mix(p.fuku); mix(p.ebuf); mix(p.gdRe ? 1 : 0); mix(p.st.length * 31 + p.st.charCodeAt(0)); }
   return h;
 };
 

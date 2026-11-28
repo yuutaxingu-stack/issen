@@ -201,8 +201,8 @@ function cpuInput(){
   const back = q => { if (dir > 0) q.L = true; else q.R = true; };
   const cf = dir > 0 ? 'r' : 'l';
   const set = (n, f) => { CPU.plan = f; CPU.n = n; CPU.k = 0; };
-  // 気絶した相手には寄って斬る（居合はない）
-  if (o.st === 'stun') { if (dist > 70) fwd(i); else if (sim.frame % 7 === 0) i.A = true; return i; }
+  // 気絶した相手には寄って居合
+  if (o.st === 'stun') { if (dist > 120) fwd(i); else if (sim.frame % 2) i.G = true; return i; }
   if (p.st === 'down') { if (p.f <= 0 && crnd() < 0.08) { const r = crnd(); if (r < 0.4) i.J = true; else if (r < 0.75) fwd(i); else i.A = true; } return i; }
   if (p.st === 'tumble') { if (p.y < 60 * FP && p.vy < 0 && crnd() < lerp(0.02, 0.25, x)) i.G = true; return i; }
   if (p.st === 'hit' || p.st === 'bstun' || p.st === 'stun') { CPU.plan = null; if (p.st === 'bstun') i.G = true; return i; }
@@ -1356,7 +1356,7 @@ function drawPad(v){
     cx.fillStyle = 'rgba(20,21,18,.4)'; cx.font = `500 11px ${UIF}`; cx.textAlign = 'center'; cx.fillText('左半分を押して動かす', W * 0.22, H - 22);
   }
   for (const b of pd.BTN) {
-    const iai = false; // ガードを壊しても居合はない
+    const iai = b.id === 'G' && stunO;
     const on = !!pd.btn[b.id] || readKeyFor(me, b.id);
     cx.globalAlpha = on ? 0.95 : 0.7;
     const pulse = iai ? 1 + Math.sin(performance.now() / 90) * 0.06 : 1;

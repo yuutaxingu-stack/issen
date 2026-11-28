@@ -118,7 +118,7 @@ language plpgsql security definer set search_path = '' as $$
 begin
   if auth.uid() is null then raise exception 'ログインしていません'; end if;
   if char_length(trim(p_name)) not between 1 and 10 then raise exception '名前は1〜10文字にしてください'; end if;
-  if public.link_blocked(auth.uid(), p_name) then raise exception '名前にリンク（URL）は書き込めません'; end if;
+  if public.has_link(p_name) and not public.is_god(auth.uid()) then raise exception '名前にリンク（URL）は書き込めません'; end if;
   update public.profiles set name = trim(p_name) where id = auth.uid();
 end;
 $$;
@@ -210,7 +210,7 @@ begin
   select * into x from public.profile_ext e where e.id = me for update;
   w := btrim(regexp_replace(coalesce(p_word, ''), '\s+', ' ', 'g'));
   if char_length(w) > 30 then raise exception '一言は30文字までです'; end if;
-  if public.link_blocked(me, w) then raise exception '一言にリンク（URL）は書き込めません'; end if;
+  if public.has_link(w) and not g then raise exception '一言にリンク（URL）は書き込めません'; end if;
   if p_fav is not null and p_fav <> 'mumei' and not g and not exists (
       select 1 from public.saves s where s.id = me and coalesce((s.owned ->> p_fav)::numeric, 0) > 0) then
     raise exception 'その刀を持っていません';

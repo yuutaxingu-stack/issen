@@ -22,7 +22,7 @@
     if (error) throw error;
     return data;
   }
-  const errText = e => missing(e) ? 'サーバーの準備がまだです（SQLの実行待ち）' : (N && N.jp ? N.jp(e) : String(e && e.message || e));
+  const errText = e => missing(e) ? 'サーバーの準備がまだです（SQLの実行待ち）' + (e.message ? '：' + e.message : '') : (N && N.jp ? N.jp(e) : String(e && e.message || e));   // 何が足りないかも出す
 
   // 背景の札。絵は css/profile.css の .pl-<id>
   const PLATE_NAME = { sumi: '墨', take: '竹林', tsuki: '月夜', ouka: '桜華', yata: '八咫' };

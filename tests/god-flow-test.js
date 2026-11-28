@@ -125,6 +125,10 @@ const st = p => p.evaluate(() => ({ coins: __issen.WALLET.coins, best: __issen.W
   await p.click('#g_bo');
   await p.waitForFunction(() => !document.getElementById('g_bo'), null, { timeout: 10000 });
   ok(sql("select open from public.gacha_boxes where id = 'b2'") === 't', '二度目で公開された');
+  await p.waitForSelector('#nf_title', { timeout: 5000 }).catch(() => {});
+  const nf = await p.evaluate(() => ({ t: (document.getElementById('nf_title') || {}).value, b: (document.getElementById('nf_body') || {}).value || '', art: (document.getElementById('nf_art') || {}).value, gh: document.getElementById('gacha').hidden }));
+  ok(nf.t === '第二弾 八咫 解禁' && /0\.3%/.test(nf.b) && nf.art === 'yata' && nf.gh, '公開の後、下書き入りの特別なお知らせの書く画面が開く ' + JSON.stringify({ t: nf.t, art: nf.art, gh: nf.gh }));
+  await p.evaluate(() => IssenProfile.close()); await p.evaluate(() => openGacha('pull')); await p.waitForTimeout(300);
   const pb = await p.evaluate(() => [...document.querySelectorAll('#g_box .gbx')].map(b => b.textContent));
   ok(/新/.test(pb[0]) && /0\.1%/.test(pb[1]), '公開後: 第二弾に「新」、第一弾は絶0.1% ' + JSON.stringify(pb));
   await q.evaluate(() => IssenNet.signIn(IssenNet.user.login || '', 'x').catch(() => {})).catch(() => {});

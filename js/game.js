@@ -255,7 +255,9 @@ const METAL={gold:null,silver:[198,204,214],copper:[206,122,82],black:[44,40,38]
    箱を足すとき: ここに1行、刀に box:'b2' を付け、node tools/katana-sql.js → save-data.sql を SQL Editor で実行
    pre:true の箱は最初は神様だけに見える（サーバーの gacha_boxes.open が false）。公開するとみんなに見え、最新の箱になる */
 const BOXES=[{id:'b1',mei:'第一弾',pick:'ouka',zNew:0.5,note:'リリース記念'},
-  {id:'b2',mei:'第二弾',pick:'yata',zNew:0.3,pre:true}];
+  {id:'b2',mei:'第二弾',pick:'yata',zNew:0.3,pre:true,
+   // 全員に公開した直後に開くお知らせの下書き（神様が直してから載せる）
+   news:{title:'第二弾 八咫 解禁',body:'日が欠ける。\n黒い羽が一枚、竹の葉に落ちる。\n\n第二弾の箱が開きました。目玉は絶「八咫」。八咫烏を宿す一振りで、日食の黒と輝く白をまといます。\n\n八咫は第二弾の箱からだけ出ます。出る確率は0.3%です。第一弾の桜華は、これより0.1%になります。\n\n八咫を持つ者の戦場は、枯れ木の野と欠けていく日に変わります。互いに後がなくなれば、日は皆既に沈みます。\n\n新・一閃では、八咫だけの業が使えます。羽で宙を跳ぶ「羽跳」、日の欠け満ちを刃に移す「初虧・食甚・復円」。まだ明かせぬ業も、闇の向こうに。\n\nガチャから、日を喰らう一振りを。'}}];
 let OPENB=null; // サーバーが教える、公開済みの箱 id（まだ知らなければ pre でない箱が公開済み）
 const ZNEW=0.3, ZOLD=0.1;
 const TIERRATE=[['上',28],['極',10],['幻',2]];
@@ -1372,7 +1374,9 @@ function banSync(){
 function openBoxForAll(b,btn){
   if(!btn.dataset.ask){ btn.dataset.ask='1'; btn.classList.add('ask'); btn.textContent='本当に公開する？（もう一度押す・取り消せません）'; setTimeout(()=>{ if(btn.isConnected&&btn.dataset.ask){ delete btn.dataset.ask; btn.classList.remove('ask'); btn.textContent=b.mei+'を全員に公開'; } },5000); return; }
   btn.disabled=true; btn.textContent='公開しています…';
-  ACCT.openBox(b.id).then(()=>{ const el=document.getElementById('g_box'); if(el) el.dataset.k=''; refreshCoins(); if(window.IssenNet&&IssenNet.toast) IssenNet.toast(b.mei+'を全員に公開しました。この箱が最新になり、前の箱の絶は '+pct(ZOLD)+' になります',6000); },
+  ACCT.openBox(b.id).then(()=>{ const el=document.getElementById('g_box'); if(el) el.dataset.k=''; refreshCoins(); if(window.IssenNet&&IssenNet.toast) IssenNet.toast(b.mei+'を全員に公開しました。この箱が最新になり、前の箱の絶は '+pct(ZOLD)+' になります',6000);
+    // 続けてお知らせの書く画面を開く（特別・目玉の刀・下書き入り）
+    if(window.IssenProfile&&IssenProfile.compose){ closeGacha(); const n=b.news||{title:b.mei+' 解禁',body:''}; IssenProfile.compose({kind:'special',art:b.pick,title:n.title,body:n.body}); } },
     e=>{ btn.disabled=false; delete btn.dataset.ask; btn.classList.remove('ask'); btn.textContent=b.mei+'を全員に公開'; if(window.IssenNet&&IssenNet.toast) IssenNet.toast(e.message,5000); });
 }
 function gachaFor(id){ const b=liveBoxes().find(x=>x.pick===id); if(!b) return false; openGacha('pull'); GA.box=b; refreshCoins(); return true; }

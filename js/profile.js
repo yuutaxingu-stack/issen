@@ -86,6 +86,7 @@
     loadProfile();
   }
   function openMail(){ show('mail', 'box'); loadMail(); }
+  function compose(o){ Object.assign(NF, o || {}); show('news', 'write'); loadNews(); } // 神様: 下書き入りで書く画面を開く（箱の公開の後など）
   function openNews(){ show('news', 'list'); loadNews().then(() => { markSeen(); render(); }); }
 
   corner.addEventListener('click', e => {
@@ -658,5 +659,5 @@
   if (window.IssenZetsu) window.IssenZetsu.on(() => render());
 
   syncCorner();
-  window.IssenProfile = { open: openProfile, openMail, openNews, close, loadTags, tag, onTags: f => tagFns.add(f), plateName: id => PLATE_NAME[id] || id };
+  window.IssenProfile = { open: openProfile, openMail, openNews, compose, close, loadTags, tag, onTags: f => tagFns.add(f), plateName: id => PLATE_NAME[id] || id };
 })();

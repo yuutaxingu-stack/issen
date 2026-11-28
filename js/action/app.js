@@ -149,7 +149,7 @@ function readHuman(pi){
   else if (pd.wz && !pd.wz.fired) {
     const q = pd.BTN.find(z => z.id === 'A'), R = q ? q.r * 0.5 : 24;
     let wx = pd.wz.x - pd.wz.ox; const wy = pd.wz.y - pd.wz.oy; if (flip) wx = -wx;
-    if (wx * wx + wy * wy > R * R) { pd.wz.fired = true; i.K = Math.abs(wx) >= Math.abs(wy) ? (wx > 0 ? 'r' : 'l') : wy < 0 ? 'u' : 'd'; }
+    if (wx * wx + wy * wy > R * R) { pd.wz.fired = true; i.K = Math.abs(wy) >= Math.abs(wx) * 0.58 ? (wy < 0 ? 'u' : 'd') : wx > 0 ? 'r' : 'l'; } // 上下を甘く: 真上・真下から60度まで（横は真横から30度まで）。2026-11-28 ユーザー指定
   }
   return i;
 }

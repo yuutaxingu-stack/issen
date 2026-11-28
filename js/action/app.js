@@ -887,7 +887,7 @@ function drawYataFx(){
     } else if (o.k === 'yring' || o.k === 'ydia') { // 白い輪 / 復円のダイヤモンドリング
       const x = wx(o.x), y = wy(o.y), R = o.r * ease * cam.z;
       cx.save(); cx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`; cx.lineWidth = (o.k === 'ydia' ? 5 : 3) * fade * cam.z + 1; cx.shadowColor = '#fff'; cx.shadowBlur = 12; cx.beginPath(); cx.arc(x, y, R, 0, 7); cx.stroke();
-      if (o.k === 'ydia') { const px = x + Math.cos(-0.8) * R, py = y + Math.sin(-0.8) * R, L = (40 + 120 * (1 - Math.abs(u * 2 - 0.6))) * cam.z;
+      if (o.k === 'ydia') { const px = x + Math.cos(-0.8) * R, py = y + Math.sin(-0.8) * R, L = Math.max(4, 40 + 120 * (1 - Math.abs(u * 2 - 0.6))) * cam.z; // 負の半径は例外になり、その後の描画（操作ボタンなど）が止まる
         cx.fillStyle = `rgba(8,8,10,${0.55 * fade})`; cx.beginPath(); cx.arc(x, y, R * 0.94, 0, 7); cx.fill();
         const g = cx.createRadialGradient(px, py, 0, px, py, L * 0.5); g.addColorStop(0, `rgba(255,255,255,${fade})`); g.addColorStop(1, 'rgba(255,255,255,0)'); cx.fillStyle = g; cx.fillRect(px - L, py - L, L * 2, L * 2);
         cx.strokeStyle = `rgba(255,255,255,${0.9 * fade})`; cx.lineWidth = 1.5; cx.beginPath(); for (let k = 0; k < 4; k++) { const a = k * Math.PI / 4, l = k % 2 ? L * 0.45 : L; cx.moveTo(px - Math.cos(a) * l, py - Math.sin(a) * l); cx.lineTo(px + Math.cos(a) * l, py + Math.sin(a) * l); } cx.stroke(); }
@@ -1396,8 +1396,7 @@ function drawView(v){
       cx.arc(-k * 14 * cam.z, 0, r, -1.2, 1.2); cx.arc(-k * 14 * cam.z - r * 0.45, 0, r * 0.82, 1.1, -1.1, true); cx.closePath(); cx.fill(); }
     cx.restore();
   }
-  drawYataFx();
-  drawCrowLock();
+  cx.save(); try { drawYataFx(); drawCrowLock(); } catch (e) { console.error(e); } cx.restore(); // 演出の不具合で操作ボタンまで消えないように
   // カウンターの構え（受付中は刃が光る）
   for (const p of sim.p) if (p.st === 'atk' && p.mv === 'counter') { const m = MV.counter; if (p.mvf >= m.s && p.mvf < m.s + m.a) {
     cx.strokeStyle = `rgba(255,246,220,${0.5 + Math.sin(FR * 0.6) * 0.3})`; cx.lineWidth = 3; cx.beginPath(); cx.arc(wx(p.x / FP), wy(p.y / FP + 70), 44 * cam.z, 0, Math.PI * 2); cx.stroke(); } }
